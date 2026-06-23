@@ -10,13 +10,13 @@ success — and so **illegal states are unrepresentable** rather than merely dis
 
 ## Contracts: types in, types out, errors in between
 
-The contract is the *whole* signature: the accepted input types, the returned type, **and the errors
+The contract is the _whole_ signature: the accepted input types, the returned type, **and the errors
 the caller must handle.** Errors are part of the contract, not an afterthought — enumerate them.
 
 - **Types carry intent.** `Money(currency, minor_units)` beats a bare `float`; `UserId` beats a
   `str`. The type system rejects whole classes of misuse for free.
 - **Make illegal states unrepresentable.** Prefer a closed set (`enum`/union) over a free string;
-  prefer a type that *can't* hold a bad combination over runtime validation of one that can.
+  prefer a type that _can't_ hold a bad combination over runtime validation of one that can.
 - **Minimize surface area.** Every public symbol is a forever-promise. Expose the smallest set that
   serves the use case; keep the rest internal. You can add later; you can't quietly remove.
 
@@ -36,8 +36,8 @@ def create_order(raw):
 
 ## Errors: typed, meaningful, never swallowed
 
-Return errors that tell the caller **what to do**: distinguish *invalid input* (caller's fault, don't
-retry) from *transient failure* (retry with backoff) from *conflict* (re-read and reconcile). Use
+Return errors that tell the caller **what to do**: distinguish _invalid input_ (caller's fault, don't
+retry) from _transient failure_ (retry with backoff) from _conflict_ (re-read and reconcile). Use
 typed errors or a result type — never a bare boolean or a `null` that erases the reason. **Never
 swallow an error** to keep a signature clean; an unhandled failure that vanishes is the worst outcome.
 
@@ -48,28 +48,24 @@ Networks retry. A mutation that runs twice must not act twice.
 - **Stable idempotency keys.** The caller supplies a key; the server records it and returns the
   original result on replay. Same key + same request → one effect. (`.claude/rules/safety.md`)
 - **Reads are safe; writes are guarded.** Design `GET`-shaped operations to be side-effect-free so
-  retries are free. For writes, define what a duplicate means *before* shipping.
+  retries are free. For writes, define what a duplicate means _before_ shipping.
 
-## Consistency and least surprise
+## Consistency, least surprise, and bounded collections
 
 Like things look alike: consistent naming, argument order, pagination shape, and error format across
-the whole surface. A caller who learns one endpoint should be able to guess the next. **Name for
-intent** — `cancel_order`, not `set_status`; `expires_at`, not `flag`.
+the whole surface. **Name for intent** — `cancel_order`, not `set_status`; `expires_at`, not `flag`.
+Any endpoint returning a list **must** bound its output — there is no "return all." Page with a stable
+cursor (not a fragile offset), cap page size with a server-side maximum, and document the default.
 
-## Collections: pagination and limits
+## Versioning — additive is safe, breaking needs a version
 
-Any endpoint returning a list **must** bound its output — there is no such thing as "return all."
-Page with a stable cursor (not a fragile offset that skips/repeats on concurrent writes), cap page
-size with a server-side maximum, and document the default.
+**Additive changes are safe** (new optional field, new endpoint); **breaking changes need a new
+version** (removing/renaming a field, tightening a type, changing semantics). Default new fields so old
+clients keep working; deprecate with a window and a migration path — never yank. Full policy — version
+schemes, the deprecation sequence, sunset headers, and compatibility gates — in
+[`references/versioning-and-deprecation.md`](references/versioning-and-deprecation.md).
 
-## Backward compatibility and versioning
-
-A published contract is owed stability. **Additive changes are safe** (new optional field, new
-endpoint); **breaking changes need a new version** (removing/renaming a field, tightening a type,
-changing semantics). Default new fields so old clients keep working. Deprecate with a window and a
-migration path — never yank.
-
-## Good vs bad — same operation
+## Design the contract first, then test it, then implement
 
 ```text
 # bad: ambiguous in, lossy out, unbounded, untyped error
@@ -81,5 +77,9 @@ def transfer(
 ) -> Result[Receipt, TransferError]     # InsufficientFunds | AccountFrozen | Duplicate
 ```
 
-Design the boundary first, write the contract test against it, then implement behind it — the
-implementation is replaceable; the contract is not.
+Write the **contract test against the boundary**, then implement behind it — the implementation is
+replaceable; the contract is not. Copy-ready starting points in [`templates/`](templates):
+[`contract.test.ts`](templates/contract.test.ts) (a request/response contract test asserting
+validate-at-edge, typed errors, and idempotent retry) and
+[`openapi-contract.stub.yaml`](templates/openapi-contract.stub.yaml) (an endpoint schema with typed
+money, enumerated errors, a required idempotency key, and capped pagination).

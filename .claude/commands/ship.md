@@ -1,7 +1,13 @@
 ---
 description: Run the full local gate, then commit on a feature branch, push, and open a PR to develop linked to its tracked issue — and update STATUS. The disciplined path to merge.
 argument-hint: "[optional: PR title / summary]"
+model: sonnet
+allowed-tools: Bash(git diff:*), Bash(git branch:*), Bash(git status:*), Bash(git push:*), Bash(git commit:*), Bash(git log:*), Read, Grep, Glob
 ---
+
+!git branch --show-current
+!git status --short
+!git diff develop...HEAD --stat
 
 Ship: **$ARGUMENTS**
 

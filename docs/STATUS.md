@@ -5,32 +5,50 @@ pre-push hook (`require-status-sync.sh`) blocks code pushes that leave it stale.
 
 ## Current state
 
-**v0.1.0** — initial public release of the harness. Portable `.claude/` operating system for
-disciplined, test-driven, review-gated AI-assisted development. Language- and domain-agnostic.
+**v0.2.0 "Gates as Code"** — Keel's discipline is now **enforced**, not just described. The hooks
+block (rather than warn), the harness tests its own gates, review produces a machine-checkable verdict,
+and Keel ships as an installable plugin with language stack packs. Language- and domain-agnostic.
 
 ## What exists
 
 - **Rules ×8** — `dev-process`, `testing`, `engineering`, `git-workflow`, `sync`, `boundaries`,
   `safety`, `token-economy`. The dense, always-on policy surface.
-- **Agents ×7** — `orchestrator`, `implementer`, `test-engineer`, `code-reviewer`,
-  `security-reviewer`, `explorer`, `debugger`.
-- **Skills ×5** — `tdd-workflow`, `code-review`, `debugging`, `refactoring`, `api-design`.
-- **Commands ×10** — `/plan`, `/tdd`, `/implement`, `/review`, `/test`, `/debug`, `/ship`, `/sync`,
-  `/adr`, `/intake`.
-- **Hooks ×3** — `guard-branch.sh` (PreToolUse), `format.sh` (PostToolUse),
-  `require-status-sync.sh` (pre-push git hook).
-- **Settings** — `.claude/settings.json` wiring the hooks and the read-deny posture for `.env` and
-  `secrets/**`.
-- **Docs** — this `STATUS.md`, the `docs/adr/` index, and ADRs 0001–0003.
-- **CI** — `.github/workflows/ci.yml`: `shellcheck` on hooks + `harness-lint` on agent/command
-  frontmatter.
+- **Agents ×8** — `orchestrator`, `planner`, `implementer`, `test-engineer`, `code-reviewer`,
+  `security-reviewer`, `explorer`, `debugger`. Reviewers emit a structured JSON verdict.
+- **Skills ×10** — `tdd-workflow`, `code-review`, `debugging`, `refactoring`, `api-design`,
+  `security-review`, `migration-safety`, `observability`, `concurrency-performance`, `supply-chain` —
+  each bundling runnable scripts/templates/references.
+- **Commands ×13** — `/plan`, `/tdd`, `/implement`, `/review`, `/test`, `/coverage`, `/debug`, `/ship`,
+  `/release`, `/rollback`, `/sync`, `/adr`, `/intake`. Model-tiered; several use `!`/`@` injection.
+- **Hooks** — `guard-branch` (blocks protected-branch commits/pushes), `secret-scan` (blocks secret
+  writes), `format`, `require-status-sync` (pre-push DoD + secret scan, auto-installed at SessionStart),
+  `session-start`; shared `lib/` + plugin `hooks.json`.
+- **Settings** — denies reading secrets and force-push; wires all hooks.
+- **Tests** — `tests/run.sh` (39 gate golden tests) + `tests/harness_lint.py` (self-validation).
+- **Stacks** — `stacks/{python,typescript,go,rust}` wiring the test gate.
+- **Plugin** — `.claude/.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json`.
+- **Docs** — this `STATUS.md`, `ROADMAP.md`, the `docs/adr/` index, and ADRs 0001–0006.
+- **CI** — `.github/workflows/ci.yml`: shellcheck (all scripts) + harness-lint + gate self-tests.
 
 ## Recently changed
 
-- **2026-06-22** — Initial harness extracted and generalized; published to `kapadias/keel`.
+- **2026-06-23** — Shipped **v0.2.0 "Gates as Code"** across seven workstreams:
+  - **WS1 gates as code** — guard-branch/secret-scan block; DoD pre-push auto-installs; structured
+    review verdict + `check-review.sh`.
+  - **WS2 self-tests** — gate golden tests + harness-lint, run in CI.
+  - **WS3 modernize** — command model/allowed-tools + `!`/`@` injection, skill bundling, SessionStart,
+    expanded settings.
+  - **WS4 complete the loop** — `planner` agent; `/release`, `/rollback`, `/coverage`; 5 new skills.
+  - **WS5 stack packs** — python/typescript/go/rust.
+  - **WS6 plugin distribution** — zero-duplication plugin reusing `.claude/`.
+  - **WS7 evals** — the gate scenarios in `tests/run.sh`.
+  - Hardened all gates against fail-open/bypass findings from an internal code + security review (each
+    fix carries a regression test), and fixed the pre-push hook's symlink path resolution so its
+    secret-scan loads when installed as a git hook. `tests/run.sh` is now 41 gate tests.
+- **2026-06-22** — v0.1.0: initial harness extracted and generalized; published to `kapadias/keel`.
 
 ## Next / open
 
-- Add language-specific quickstart recipes (Python, TypeScript, Go) wiring `/test` to a real gate.
 - Optional MCP server examples for the explorer and reviewer agents.
+- A statusline showing branch + gate state (WS3 nice-to-have, deferred).
 - Expand the ADR set as load-bearing decisions accrue (via `/adr`).

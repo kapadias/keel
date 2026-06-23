@@ -1,0 +1,14 @@
+{
+  "name": "keel",
+  "owner": {
+    "name": "Shashank Kapadia"
+  },
+  "plugins": [
+    {
+      "name": "keel",
+      "source": "./.claude",
+      "description": "The Keel harness: rules, agents, skills, commands, and enforcing hooks for disciplined, gate-driven AI-assisted development. Install once; the same loop applies in any repository.",
+      "version": "0.2.0"
+    }
+  ]
+}

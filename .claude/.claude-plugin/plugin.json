@@ -1,0 +1,10 @@
+{
+  "name": "keel",
+  "description": "Production-grade, token-efficient Claude Code harness — disciplined, test-driven, review-gated, and safe by construction. Ships the rules, specialist agents, on-demand skills, dev-loop commands, and enforcing hooks as one installable unit.",
+  "version": "0.2.0",
+  "author": {
+    "name": "Shashank Kapadia"
+  },
+  "homepage": "https://github.com/kapadias/keel",
+  "repository": "https://github.com/kapadias/keel"
+}

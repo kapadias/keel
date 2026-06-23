@@ -10,11 +10,11 @@ proves the code does what it does — not what it should. **The LLM proposes; th
 
 ## The Cycle: RED → GREEN → REFACTOR
 
-| Phase | Goal | Rule |
-|---|---|---|
-| **RED** | Write one failing test that pins the next increment of behavior | Run it. Watch it fail. Confirm it fails *for the stated reason*, not a typo or import error. |
-| **GREEN** | Write the minimum code to pass | No extra abstraction, no speculative cases. Fastest honest path to green. |
-| **REFACTOR** | Improve structure with tests green | Behavior unchanged; tests unchanged. See `refactoring`. |
+| Phase        | Goal                                                            | Rule                                                                                         |
+| ------------ | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| **RED**      | Write one failing test that pins the next increment of behavior | Run it. Watch it fail. Confirm it fails _for the stated reason_, not a typo or import error. |
+| **GREEN**    | Write the minimum code to pass                                  | No extra abstraction, no speculative cases. Fastest honest path to green.                    |
+| **REFACTOR** | Improve structure with tests green                              | Behavior unchanged; tests unchanged. See `refactoring`.                                      |
 
 One behavior per cycle. If a test needs three new code paths to pass, it is too big — split it.
 Never write production logic that no failing test demanded.
@@ -29,39 +29,29 @@ Never write production logic that no failing test demanded.
   `rejects_withdrawal_exceeding_balance`, not `test_withdraw_2`.
 - **Deterministic.** Same inputs, same result, every run. Seed RNG, inject the clock, no network.
 
-## Golden tests — exact oracle values
+## Golden vs property — use both on the critical surface
 
-Assert against a **hand-verifiable known answer**, cross-checked against a trusted library where one
-exists. Use for math, encoders, money, and any pure transform with a knowable correct output.
+**Golden tests** assert against a **hand-verifiable known answer**, cross-checked against a trusted
+library where one exists. They catch _wrong_. Use for math, encoders, money, any pure transform with a
+knowable output. Pin the exact value (with a float tolerance) and state _where the oracle came from_ —
+a golden test against a guessed oracle is worthless.
 
-```python
-# golden: value computed independently and pinned with explicit tolerance
-def test_compound_interest_golden():
-    assert compound(principal=1000, rate=0.05, years=3) == approx(1157.625, abs=1e-3)
-```
-
-Pin the exact number. State *where it came from* (a reference impl, a textbook, a spreadsheet). A
-golden test with an oracle the author guessed is worthless.
-
-## Property tests — invariants over generated inputs
-
-Assert a rule that must hold for *all* valid inputs; let the framework hunt counterexamples.
-The high-value invariant families:
+**Property tests** assert a rule that holds for _all_ valid inputs and let the framework hunt
+counterexamples. They catch _the case you didn't think of_. The high-value invariant families:
 
 - **Round-trip:** `decode(encode(x)) == x`
 - **Idempotence:** `f(f(x)) == f(x)` (normalizers, retries, upserts)
-- **Bounds:** output stays within declared limits for any input (sizing never exceeds the cap)
+- **Bounds / conservation:** output stays within declared limits; nothing is lost or duplicated
 - **Order-independence:** result invariant to input ordering (sums, set operations)
 
-```python
-# property: parsing then serializing is identity for any valid record
-@given(records())
-def test_serialize_roundtrip(rec):
-    assert parse(serialize(rec)) == rec
-```
+Survival-critical code (money, auth, data integrity, persistence, anything irreversible) demands
+**both**, before merge.
 
-Golden tests catch *wrong*; property tests catch *the case you didn't think of*. Survival-critical
-code wants both.
+**Copy-ready skeletons** — golden + property tests for three stacks live in
+[`templates/`](templates): [`python_pytest_hypothesis.py`](templates/python_pytest_hypothesis.py),
+[`typescript_vitest_fastcheck.test.ts`](templates/typescript_vitest_fastcheck.test.ts),
+[`go_testing_quick_test.go`](templates/go_testing_quick_test.go). Longer worked examples with oracle
+provenance: [`references/worked-examples.md`](references/worked-examples.md).
 
 ## Make the untestable testable
 

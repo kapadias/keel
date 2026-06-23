@@ -1,0 +1,168 @@
+# OpenAPI contract stub — a minimal, opinionated endpoint contract.
+#
+# Copy and adapt. It encodes the api-design rules as a concrete schema:
+#   • types carry intent (Money as {currency, minor_units}, typed ids) — not bare numbers/strings
+#   • errors are ENUMERATED and part of the contract (a typed Error with a closed `code` set)
+#   • mutations take an Idempotency-Key header so a retry never double-applies
+#   • collections are BOUNDED — cursor pagination with a server-capped page size
+#   • untrusted input is constrained at the edge (min/max, enum, required) — reject, don't clamp
+#
+# Validate this file:  npx @redocly/cli lint openapi-contract.stub.yaml   (or any OpenAPI 3.1 linter)
+openapi: 3.1.0
+info:
+  title: Orders API
+  version: "1.0.0"
+  description: Reference contract stub. Replace with your real surface; keep the discipline.
+servers:
+  - url: https://api.example.com/v1
+
+paths:
+  /orders:
+    post:
+      operationId: createOrder
+      summary: Create an order (idempotent).
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderRequest"
+      responses:
+        "201":
+          description: Order created (or the original result, on an idempotent replay).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+    get:
+      operationId: listOrders
+      summary: List orders (bounded, cursor-paginated).
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string }
+          description: Opaque, stable cursor from a previous page. Omit for the first page.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100 # server-side cap — there is no "return all"
+            default: 20
+      responses:
+        "200":
+          description: A bounded page of orders plus the next cursor.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 200
+      description: >
+        Caller-supplied stable key. Same key + same body → exactly one effect; the server
+        returns the original result on replay. (.claude/rules/safety.md)
+
+  schemas:
+    Money:
+      type: object
+      additionalProperties: false
+      required: [currency, minor_units]
+      properties:
+        currency:
+          type: string
+          pattern: "^[A-Z]{3}$" # ISO 4217
+        minor_units:
+          type: integer
+          description: Smallest currency unit (e.g. cents). Integer — never a float for money.
+          minimum: 0
+    CreateOrderRequest:
+      type: object
+      additionalProperties: false # reject unknown fields at the edge
+      required: [sku, quantity]
+      properties:
+        sku:
+          type: string
+          minLength: 1
+          maxLength: 64
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 10000 # bound the input — reject out of range, do not clamp
+    Order:
+      type: object
+      additionalProperties: false
+      required: [id, sku, quantity, amount, status]
+      properties:
+        id: { type: string }
+        sku: { type: string }
+        quantity: { type: integer, minimum: 1 }
+        amount: { $ref: "#/components/schemas/Money" }
+        status:
+          type: string
+          enum: [pending, confirmed, cancelled] # closed set, not a free string
+    OrderPage:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Order" }
+        next_cursor:
+          type: [string, "null"]
+          description: Cursor for the next page, or null when there are no more.
+    Error:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          # Enumerated, stable codes — the caller switches on these, not on the message string.
+          enum:
+            - invalid_input # caller's fault; do not retry
+            - unknown_sku
+            - duplicate # idempotency conflict; re-read the original
+            - rate_limited # transient; retry with backoff
+            - internal
+        message:
+          type: string
+          description: Human-readable detail. Never include secrets or PII.
+
+  responses:
+    BadRequest:
+      description: Malformed or out-of-range input — rejected at the edge.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: Idempotency or state conflict — re-read and reconcile.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    UnprocessableEntity:
+      description: Well-formed but semantically invalid (e.g. unknown SKU).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }

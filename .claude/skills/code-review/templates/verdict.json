@@ -1,0 +1,14 @@
+{
+  "verdict": "approve | request_changes",
+  "summary": "one-sentence overall assessment",
+  "findings": [
+    {
+      "severity": "CRITICAL | HIGH | MEDIUM | LOW",
+      "path": "relative/path/to/file",
+      "line": 0,
+      "category": "correctness | security | tests | safety | performance | style",
+      "issue": "what is wrong and why it matters",
+      "fix": "concrete recommended change"
+    }
+  ]
+}
