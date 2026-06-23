@@ -47,25 +47,38 @@ Do not skip stages. The full definition lives in
 ```
 .claude/
   rules/     always-on operating discipline (dense, short — paid every turn)
-  agents/    specialists: orchestrator · implementer · test-engineer · code-reviewer ·
-             security-reviewer · explorer · debugger
-  skills/    on-demand knowledge: tdd-workflow · code-review · debugging · refactoring · api-design
-  commands/  the pipeline: /plan /tdd /implement /review /test /debug /ship /sync /adr /intake
-  hooks/     guard-branch (pre-edit) · format (post-edit) · require-status-sync (pre-push)
-  settings.json   denies reading secrets; wires the hooks
+  agents/    specialists (8): orchestrator · planner · implementer · test-engineer ·
+             code-reviewer · security-reviewer · explorer · debugger
+  skills/    on-demand knowledge (10): tdd-workflow · code-review · debugging · refactoring ·
+             api-design · security-review · migration-safety · observability ·
+             concurrency-performance · supply-chain  (each bundles scripts/templates/references)
+  commands/  the pipeline (13): /plan /tdd /implement /review /test /debug /ship /sync /adr
+             /intake /release /rollback /coverage
+  hooks/     guard-branch (BLOCKS commits/pushes to main/master/develop) · secret-scan (BLOCKS
+             writes with secrets) · format (post-edit) · require-status-sync (pre-push,
+             auto-installed at SessionStart) · session-start · lib/json.sh · lib/secret-patterns.sh
+  hooks.json   plugin hook wiring
+  settings.json   denies reading secrets (.env/*.pem/*.key/.ssh/.aws/…) and force-push; wires hooks
+tests/       28-gate golden tests (tests/run.sh) + harness self-validation (tests/harness_lint.py)
+stacks/      language pack wiring the test gate: python · typescript · go · rust
 ```
 
-| Work | Command / Agent |
-|---|---|
-| Anything (router) | `orchestrator` |
-| Plan a change | `/plan` |
-| Build it test-first | `/tdd` → `test-engineer` + `implementer` |
-| Find code / answer "where is…" | `explorer` (read-only fan-out) |
-| Diagnose a failure | `/debug` → `debugger` |
-| Review before merge | `/review` → `code-reviewer` + `security-reviewer` |
-| Run the test gate | `/test` |
-| Ship (gate → commit → PR) | `/ship` |
-| Record a decision / file a task / reconcile | `/adr` · `/intake` · `/sync` |
+Keel is also installable as a Claude Code plugin: `/plugin marketplace add kapadias/keel`.
+
+| Work                                        | Command / Agent                                                  |
+| ------------------------------------------- | ---------------------------------------------------------------- |
+| Anything (router)                           | `orchestrator`                                                   |
+| Plan a change                               | `/plan` → `planner`                                              |
+| Build it test-first                         | `/tdd` → `test-engineer` + `implementer`                         |
+| Find code / answer "where is…"              | `explorer` (read-only fan-out)                                   |
+| Diagnose a failure                          | `/debug` → `debugger`                                            |
+| Review before merge                         | `/review` → `code-reviewer` + `security-reviewer` (JSON verdict) |
+| Run the test gate                           | `/test`                                                          |
+| Coverage — survival-critical surface        | `/coverage`                                                      |
+| Ship (gate → commit → PR to develop)        | `/ship`                                                          |
+| Release (human-gated develop → main)        | `/release`                                                       |
+| Revert a bad change                         | `/rollback`                                                      |
+| Record a decision / file a task / reconcile | `/adr` · `/intake` · `/sync`                                     |
 
 ## Model-tier policy
 
@@ -78,7 +91,7 @@ Match model to task depth — never burn a deep-reasoning model on mechanical wo
 ## Git & tracking
 
 Branch `feature|fix|chore|refactor/<id>-<slug>` → PR to `develop` → PR to `main`. **Never commit to
-`main`/`develop`** (a hook warns). Conventional commits, one logical change per commit. Your issue
+`main`/`develop`** (`guard-branch.sh` blocks it). Conventional commits, one logical change per commit. Your issue
 tracker is the system of record. **Definition of Done:** code + tests + review + `docs/STATUS.md` +
 tracker move together. See [.claude/rules/sync.md](.claude/rules/sync.md) and
 [.claude/rules/git-workflow.md](.claude/rules/git-workflow.md).
@@ -87,7 +100,7 @@ tracker move together. See [.claude/rules/sync.md](.claude/rules/sync.md) and
 
 No secrets in code, logs, traces, or prompts (`settings.json` denies reading `.env` / `secrets/**`).
 The source of truth for any external system is that system, not local state — reconcile, don't assume.
-Humans approve every risk-*increasing* action. See [.claude/rules/safety.md](.claude/rules/safety.md).
+Humans approve every risk-_increasing_ action. See [.claude/rules/safety.md](.claude/rules/safety.md).
 
 ## Rules precedence
 

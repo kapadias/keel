@@ -7,7 +7,7 @@
 [![Built for Claude Code](https://img.shields.io/badge/Built%20for-Claude%20Code-D97757?style=for-the-badge)](https://claude.com/claude-code)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2b6cb0?style=for-the-badge)](LICENSE)
 [![Language agnostic](https://img.shields.io/badge/Language-agnostic-2f855a?style=for-the-badge)](#make-it-yours)
-[![Release](https://img.shields.io/badge/release-v0.1.0-1a3a52?style=for-the-badge)](docs/STATUS.md)
+[![Release](https://img.shields.io/badge/release-v0.2.0-1a3a52?style=for-the-badge)](docs/STATUS.md)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-d97757?style=for-the-badge)](CONTRIBUTING.md)
 
 **The backbone that keeps an AI coding agent upright.**
@@ -31,13 +31,18 @@ certain.
 resists capsizing under load; this harness is the part of your workflow that resists shipping
 untested, unreviewed, or irreversible change under the pressure to move fast. It is a small, opinionated
 set of **rules, agents, skills, commands, and hooks** that drop into any repository's `.claude/`
-directory and encode *how the work gets done*.
+directory and encode _how the work gets done_.
 
 It is distilled from a harness built for a real-capital systematic-trading operation — where a wrong
 number moves money — and generalized for **any software project, in any language**.
 
 > Keel is not a framework you import. It is a set of operating instructions for Claude Code: copy it in,
 > adapt three things, and the agent starts working like a disciplined senior engineer.
+
+**What makes v0.2 different: the gates are _code_, not prose.** Keel doesn't just tell the agent to
+behave — it _enforces_ it. Commits to a protected branch are blocked, secrets are blocked before they
+hit disk, and a push that skips the Definition of Done is refused. And the harness **tests its own
+gates** (`bash tests/run.sh`) so the enforcement can't silently rot.
 
 ---
 
@@ -46,19 +51,22 @@ number moves money — and generalized for **any software project, in any langua
 Everything in Keel descends from three lines.
 
 ### 1. The LLM proposes; deterministic gates decide
+
 An LLM may read code, draft changes, generate hypotheses, and explain. **Tests, types, linters, and
 human review decide** whether any of it merges or acts. No unvalidated model output crosses a boundary
 that touches production, money, or user data. The sharp test for any design:
 
-> *"If this output is silently wrong, can it cause harm before a deterministic check catches it?"*
+> _"If this output is silently wrong, can it cause harm before a deterministic check catches it?"_
 > If yes — put a gate between the LLM and the consequence.
 
 ### 2. Safety is lexicographically prior to speed
+
 Irreversible and outward-facing actions — deploy, delete, force-push, publish, migrate — are gated
-behind tests, review, and (when they widen blast radius) a human. Risk-*reducing* actions may be
-automatic; risk-*increasing* actions are gated. When "safe" and "fast" disagree, **safe wins, always.**
+behind tests, review, and (when they widen blast radius) a human. Risk-_reducing_ actions may be
+automatic; risk-_increasing_ actions are gated. When "safe" and "fast" disagree, **safe wins, always.**
 
 ### 3. Context is a budget — spend it deliberately
+
 The always-on surface stays tiny; depth loads on demand. Token thrift is a first-class design goal —
 and it is **never** paid for in quality. (See [The token economy](#the-token-economy).)
 
@@ -80,22 +88,24 @@ Research & Reuse → Plan → TDD (RED → GREEN → REFACTOR) → Implement →
 ```
 .claude/
 ├── rules/        always-on operating discipline — dense, short, paid every turn
-├── agents/       specialists you delegate to (orchestrator, reviewers, explorer, …)
-├── skills/       deep playbooks that load only when their trigger matches
-├── commands/     the pipeline: /plan /tdd /review /ship /sync …
-├── hooks/        deterministic guards around edits and pushes
-└── settings.json denies reading secrets; wires the hooks
+├── agents/       specialists you delegate to (orchestrator, planner, reviewers, explorer, …)
+├── skills/       deep playbooks that load only when their trigger matches (+ bundled scripts)
+├── commands/     the pipeline: /plan /tdd /review /ship /release /rollback …
+├── hooks/        deterministic guards that BLOCK protected-branch commits, secrets, and unsynced pushes
+└── settings.json denies reading secrets and force-push; wires the hooks
 CLAUDE.md         the always-on root — the agent reads this first
-docs/             STATUS.md (the live mirror) + Architecture Decision Records
+tests/            the harness's own gate tests + self-validation (bash tests/run.sh)
+stacks/           ready-made test-gate packs: python · typescript · go · rust
+docs/             STATUS.md (the live mirror) + ROADMAP + Architecture Decision Records
 ```
 
-| Layer | Loaded | Purpose |
-|---|---|---|
-| `CLAUDE.md` + `rules/` | **Always** | The dense, short policy the agent obeys every turn. |
-| `skills/` | **On demand** | Long playbooks that cost nothing until their trigger matches. |
-| `commands/` | **On invoke** | Repeatable workflows encoded once, so you never re-explain them. |
-| `agents/` | **On delegate** | Specialists that spend *their own* context and return conclusions. |
-| `hooks/` | **On event** | Deterministic enforcement on edit and on push. |
+| Layer                  | Loaded          | Purpose                                                                               |
+| ---------------------- | --------------- | ------------------------------------------------------------------------------------- |
+| `CLAUDE.md` + `rules/` | **Always**      | The dense, short policy the agent obeys every turn.                                   |
+| `skills/`              | **On demand**   | Long playbooks (with runnable scripts) that cost nothing until their trigger matches. |
+| `commands/`            | **On invoke**   | Repeatable workflows encoded once, so you never re-explain them.                      |
+| `agents/`              | **On delegate** | Specialists that spend _their own_ context and return conclusions.                    |
+| `hooks/`               | **On event**    | Deterministic enforcement on edit and on push.                                        |
 
 ---
 
@@ -105,35 +115,38 @@ Most "AI dev setups" fail the same way: they stuff every instruction into one al
 token in that file is re-read on **every** turn, the window fills, and the agent gets duller as the
 task gets longer. Keel is built the other way — **progressive disclosure**:
 
-| | Always-on (paid every turn) | On-demand (paid only when needed) |
-|---|---|---|
-| **What** | `CLAUDE.md` + 8 rules | 5 skills + 10 commands + 7 agents |
-| **Footprint** | ~510 lines · **≈5k tokens** | ~930 lines · **≈10k tokens** |
-| **When loaded** | Every request | Only when a trigger matches, a command runs, or a subagent is dispatched |
+|                 | Always-on (paid every turn) | On-demand (paid only when needed)                                        |
+| --------------- | --------------------------- | ------------------------------------------------------------------------ |
+| **What**        | `CLAUDE.md` + 8 rules       | 10 skills + 13 commands + 8 agents                                       |
+| **Footprint**   | ~510 lines · **≈5k tokens** | the bulk of Keel — loaded only when relevant                             |
+| **When loaded** | Every request               | Only when a trigger matches, a command runs, or a subagent is dispatched |
 
-So **two-thirds of Keel's guidance never touches your main context** until the moment it is relevant.
-The mechanisms:
+So **most of Keel's guidance never touches your main context** until the moment it is relevant. The
+mechanisms:
 
-- **Tiny always-on core.** Rules state a principle in a sentence and *link* to the detail — they never
+- **Tiny always-on core.** Rules state a principle in a sentence and _link_ to the detail — they never
   inline it. The whole standing policy is ~5k tokens, not 50k.
-- **Skills load on a trigger.** A 2,000-token debugging playbook costs zero until you are debugging.
+- **Skills load on a trigger.** A 2,000-token debugging playbook costs zero until you are debugging —
+  and bundles its scripts/templates so depth loads only when opened.
 - **Commands encode workflows once.** `/ship` runs the whole gate-commit-PR-sync sequence; you don't
   re-describe it each time.
 - **Subagents do the fan-out.** Need to search 40 files? The `explorer` agent (on a cheap model) burns
-  *its* context and hands back three `path:line` references and an answer — not the file dumps. Your
+  _its_ context and hands back three `path:line` references and an answer — not the file dumps. Your
   main thread keeps the conclusion.
 - **Model-tier routing.** Haiku for mechanical fan-out, Sonnet for the build, Opus for review and hard
   reasoning. Cost matched to depth.
 
 > **The one hard line:** token thrift never justifies skipping a test, a review, a validation step, or
-> a safety gate. Save tokens on *how you find and present information* — never on the correctness and
+> a safety gate. Save tokens on _how you find and present information_ — never on the correctness and
 > safety of the work. See [`.claude/rules/token-economy.md`](.claude/rules/token-economy.md).
 
 ---
 
 ## Quickstart
 
-Keel is files, not a dependency. Adopt it in under a minute.
+Keel is files, not a dependency. Adopt it in under a minute — as a copy-in, or as a plugin.
+
+### Option A — copy it in (standalone)
 
 ```bash
 # From the root of your repository:
@@ -144,10 +157,20 @@ cp -r /tmp/keel/.claude .claude
 cp /tmp/keel/CLAUDE.md CLAUDE.md
 mkdir -p docs && cp /tmp/keel/docs/STATUS.md docs/STATUS.md
 
-# Make the hooks executable, and install the Definition-of-Done pre-push gate:
+# Make the hooks executable (the pre-push DoD gate self-installs at SessionStart):
 chmod +x .claude/hooks/*.sh
-ln -sf ../../.claude/hooks/require-status-sync.sh .git/hooks/pre-push
 ```
+
+### Option B — install as a plugin (versioned, shareable)
+
+```
+/plugin marketplace add kapadias/keel
+/plugin install keel@keel
+```
+
+A plugin install brings the agents, skills, commands, and hooks. Plugins don't apply a `settings.json`
+permission posture, so copy Keel's secret read-deny list into your own settings — see
+[`.claude/settings.json`](.claude/settings.json).
 
 Then open the repo in **[Claude Code](https://claude.com/claude-code)** and try:
 
@@ -165,62 +188,72 @@ and refuses to mark work done while a mirror is out of sync. Next, [make it your
 
 ## The pipeline
 
-Ten commands cover the development loop. Invoke them with `/<name>` in Claude Code.
+Thirteen commands cover the development loop. Invoke them with `/<name>` in Claude Code.
 
-| Command | Does |
-|---|---|
-| `/plan` | Restate the requirement, research reuse, surface risks, decompose into reviewable steps. |
-| `/tdd` | Run RED → GREEN → REFACTOR for a unit of behavior. The default way to build. |
-| `/implement` | Write minimal, typed, reviewable code against an existing failing test. |
-| `/review` | Path-aware parallel review — correctness always, security when the change warrants it. |
-| `/test` | Run the project's lint + type-check + test + coverage gate and summarize. |
-| `/debug` | Reproduce → isolate → root-cause → fix the cause → leave a regression test. |
-| `/ship` | Full gate → conventional commit → push → PR to `develop`, linked to the issue. |
-| `/sync` | Reconcile the five mirrors so every record of the system agrees. |
-| `/adr` | Write a numbered Architecture Decision Record with real alternatives. |
-| `/intake` | Turn a raw idea or bug into a well-formed, de-duplicated tracked issue. |
+| Command      | Does                                                                                     |
+| ------------ | ---------------------------------------------------------------------------------------- |
+| `/plan`      | Restate the requirement, research reuse, surface risks, decompose into reviewable steps. |
+| `/tdd`       | Run RED → GREEN → REFACTOR for a unit of behavior. The default way to build.             |
+| `/implement` | Write minimal, typed, reviewable code against an existing failing test.                  |
+| `/review`    | Path-aware parallel review — correctness always, security when the change warrants it.   |
+| `/test`      | Run the project's lint + type-check + test + coverage gate and summarize.                |
+| `/coverage`  | Report line + branch coverage; spotlight the survival-critical surface and its gaps.     |
+| `/debug`     | Reproduce → isolate → root-cause → fix the cause → leave a regression test.              |
+| `/ship`      | Full gate → conventional commit → push → PR to `develop`, linked to the issue.           |
+| `/release`   | Promote `develop → main` — human-gated production release with tag + notes.              |
+| `/rollback`  | Revert a bad change or roll back a deploy — the risk-reducing counterpart to `/ship`.    |
+| `/sync`      | Reconcile the five mirrors so every record of the system agrees.                         |
+| `/adr`       | Write a numbered Architecture Decision Record with real alternatives.                    |
+| `/intake`    | Turn a raw idea or bug into a well-formed, de-duplicated tracked issue.                  |
 
 ---
 
 ## The crew
 
-Seven specialist agents, each model-tiered so you never burn a frontier model on mechanical work.
+Eight specialist agents, each model-tiered so you never burn a frontier model on mechanical work.
 
-| Agent | Model | Role |
-|---|---|---|
-| `orchestrator` | Opus | Router. Decomposes a request and sequences the loop. Read-only; it plans and delegates. |
-| `implementer` | Sonnet | Builds features to make failing tests pass. The bulk of engineering. |
-| `test-engineer` | Sonnet | Writes the failing tests that pin behavior, plus golden and property tests. |
-| `code-reviewer` | Opus | Independent, read-only, adversarial correctness review before merge. |
-| `security-reviewer` | Opus | Read-only security review — injection, secrets, authz, supply chain. |
-| `explorer` | Haiku | Read-only fan-out search. Returns conclusions, not file dumps. The token-saver. |
-| `debugger` | Sonnet | Reproduce, isolate, root-cause, and fix — the cause, not the symptom. |
+| Agent               | Model  | Role                                                                                    |
+| ------------------- | ------ | --------------------------------------------------------------------------------------- |
+| `orchestrator`      | Opus   | Router. Decomposes a request and sequences the loop. Read-only; it plans and delegates. |
+| `planner`           | Opus   | Read-only. Turns a request into a written plan — risks, decomposition, a gate per step. |
+| `implementer`       | Sonnet | Builds features to make failing tests pass. The bulk of engineering.                    |
+| `test-engineer`     | Sonnet | Writes the failing tests that pin behavior, plus golden and property tests.             |
+| `code-reviewer`     | Opus   | Independent, read-only correctness review; emits a machine-checkable JSON verdict.      |
+| `security-reviewer` | Opus   | Read-only security review — injection, secrets, authz, supply chain.                    |
+| `explorer`          | Haiku  | Read-only fan-out search. Returns conclusions, not file dumps. The token-saver.         |
+| `debugger`          | Sonnet | Reproduce, isolate, root-cause, and fix — the cause, not the symptom.                   |
 
-**On-demand skills** deepen the agents when triggered: `tdd-workflow`, `code-review`, `debugging`,
-`refactoring`, `api-design`.
+**On-demand skills** deepen the agents when triggered — each bundling runnable scripts/templates/
+references: `tdd-workflow`, `code-review`, `debugging`, `refactoring`, `api-design`, `security-review`,
+`migration-safety`, `observability`, `concurrency-performance`, `supply-chain`.
 
 ---
 
 ## Safety & enforcement
 
-Three hooks turn the rules into deterministic guards — not suggestions:
+Hooks turn the rules into deterministic guards — gates, not suggestions:
 
-- **`guard-branch.sh`** (pre-edit) — warns when you start editing on `main` / `master` / `develop`.
-- **`format.sh`** (post-edit) — auto-formats the file you just touched, using whatever formatter your
-  project provides (ruff, prettier, gofmt, rustfmt — best-effort, never blocking).
-- **`require-status-sync.sh`** (pre-push) — blocks a code push that forgot to update `docs/STATUS.md`,
-  enforcing the Definition of Done.
+- **`guard-branch.sh`** — **blocks** `git commit` / `git push` to `main` / `master` / `develop` (warns
+  on edits there). The "never commit to a protected branch" rule, actually enforced.
+- **`secret-scan.sh`** — **blocks** any edit/write that introduces a high-confidence secret (AWS /
+  GitHub / Slack / Google keys, private-key blocks, hardcoded credentials).
+- **`format.sh`** — auto-formats the file you just touched (ruff / prettier / gofmt / rustfmt —
+  best-effort, never blocking).
+- **`require-status-sync.sh`** (pre-push, **auto-installed at `SessionStart`**) — blocks a code push
+  that skips `docs/STATUS.md` or that introduces a secret. The Definition of Done, enforced.
 
-`settings.json` also denies the agent from reading `.env`, `secrets/**`, `*.pem`, and private keys —
-secrets never enter the context window in the first place.
+`settings.json` denies reading `.env`, `secrets/**`, `*.pem`, `*.key`, `~/.ssh`, `~/.aws`, and more —
+and denies `git push --force`. The harness even **tests its own gates**: `bash tests/run.sh` runs
+golden tests proving each one blocks vs. allows, and CI fails if any gate regresses.
 
 ---
 
 ## Make it yours
 
-Keel is language-agnostic. Three edits adapt it to any stack:
+Keel is language-agnostic. A few edits adapt it to any stack:
 
-1. **Your test gate** → edit [`.claude/commands/test.md`](.claude/commands/test.md) and
+1. **Your test gate** → copy a ready-made pack from [`stacks/`](stacks/) (python · typescript · go ·
+   rust), or edit [`.claude/commands/test.md`](.claude/commands/test.md) and
    [`/ship`](.claude/commands/ship.md) with your real lint/type/test commands.
 2. **Your tracker** → set your issue-id prefix and branch convention in
    [`.claude/rules/git-workflow.md`](.claude/rules/git-workflow.md).
@@ -243,14 +276,19 @@ keel/
 ├── .claude/
 │   ├── README.md              # harness index
 │   ├── settings.json          # secret-deny + hook wiring
+│   ├── .claude-plugin/        # plugin manifest (plugin.json)
 │   ├── rules/                 # 8 always-on rules
-│   ├── agents/                # 7 specialists
-│   ├── skills/                # 5 on-demand playbooks
-│   ├── commands/              # 10 pipeline commands
-│   └── hooks/                 # 3 enforcement scripts
+│   ├── agents/                # 8 specialists
+│   ├── skills/                # 10 on-demand playbooks (with bundled scripts/templates)
+│   ├── commands/              # 13 pipeline commands
+│   └── hooks/                 # enforcing hooks + lib/ + hooks.json
+├── tests/                     # gate golden tests + harness self-validation
+├── stacks/                    # python · typescript · go · rust gate packs
 ├── docs/
 │   ├── STATUS.md              # the living state mirror
+│   ├── ROADMAP.md             # the v0.2 plan
 │   └── adr/                   # Architecture Decision Records
+├── .claude-plugin/            # marketplace.json (plugin distribution)
 ├── assets/                    # banner
 └── .github/                   # CI + PR template
 ```
