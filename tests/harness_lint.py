@@ -141,6 +141,7 @@ for patt in (
     ".claude/**/*.md",
     "docs/**/*.md",
     "stacks/**/*.md",
+    "tests/**/*.md",
 ):
     md_files += glob.glob(f"{ROOT}/{patt}", recursive=True)
 for md in sorted(set(md_files)):
