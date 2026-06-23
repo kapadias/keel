@@ -1,6 +1,7 @@
 ---
 description: Run the test-driven cycle — RED (failing test) → GREEN (minimal code) → REFACTOR — for a unit of behavior. The default way to build anything in Keel.
 argument-hint: "[the behavior to build, test-first]"
+model: sonnet
 ---
 
 Build, test-first: **$ARGUMENTS**

@@ -1,6 +1,7 @@
 ---
 description: Root-cause a failure — reproduce deterministically, isolate by bisection, fix the cause (not the symptom), and leave a regression test behind.
 argument-hint: "[the failure: a test name, error message, or wrong behavior]"
+model: opus
 ---
 
 Debug: **$ARGUMENTS**
@@ -12,7 +13,7 @@ Debug: **$ARGUMENTS**
 2. **Isolate.** Form a hypothesis and bisect — recent diffs, inputs, the code path, git history. Read
    the stack trace and the actual values; trust evidence over intuition. Use `explorer` to locate
    suspects without bloating this thread.
-3. **Diagnose.** State the root cause in one sentence: *the bug is X, which causes Y under condition Z.*
+3. **Diagnose.** State the root cause in one sentence: _the bug is X, which causes Y under condition Z._
 4. **Fix minimally.** Change the cause, not the symptom. Keep the diff small. Do **not** broaden a
    `catch`, loosen a check, or weaken a test to make red go away — that hides the bug (see
    [`.claude/rules/safety.md`](../rules/safety.md)).

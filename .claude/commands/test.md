@@ -1,7 +1,11 @@
 ---
 description: Run the project's test gate — lint, type-check, tests, and coverage — then summarize failures and coverage gaps. Adapt the commands to your stack.
 argument-hint: "[optional: a subset/path to test; defaults to the whole suite]"
+model: sonnet
+allowed-tools: Bash, Read, Grep, Glob
 ---
+
+!ls package.json pyproject.toml go.mod Cargo.toml Makefile 2>/dev/null
 
 Run the gate for: **$ARGUMENTS** (if empty, the whole suite).
 

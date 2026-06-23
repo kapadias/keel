@@ -1,6 +1,7 @@
 ---
 description: Implement code against an existing failing test or a clear spec — minimal, typed, reviewable, matching the surrounding style. Use when the test/spec already exists.
 argument-hint: "[what to implement; assumes a failing test or clear spec exists]"
+model: sonnet
 ---
 
 Implement: **$ARGUMENTS**
@@ -20,9 +21,7 @@ Implement: **$ARGUMENTS**
 
 ## Guardrails
 
-- Do not run irreversible or outward-facing commands (deploy, force-push, delete, migrate) without
-  explicit authorization — see [`.claude/rules/safety.md`](../rules/safety.md).
-- Do not silently swallow errors in code that touches money, data, or state.
+See [`.claude/rules/safety.md`](../rules/safety.md) — irreversible/outward-facing actions require explicit authorization; fail loud on the critical path, never swallow errors silently.
 
 ## Output
 

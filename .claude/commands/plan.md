@@ -1,6 +1,7 @@
 ---
 description: Turn a request into a written plan — restate requirements, surface risks, decompose into reviewable steps, and identify the gates each step must pass.
 argument-hint: "[what you want to build or change]"
+model: opus
 ---
 
 Plan the work for: **$ARGUMENTS**
