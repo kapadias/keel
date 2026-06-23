@@ -12,46 +12,54 @@ not what you remember writing.
 ## The method: Reproduce → Isolate → Diagnose → Fix → Prove
 
 ### 1. Reproduce
+
 Make it happen **on demand**. An intermittent bug you cannot trigger is a bug you cannot fix or
 verify. Drive the repro down to the smallest deterministic input. Ideally, **encode it as a failing
 test** — that test is now both your reproduction and your future regression guard. If you can't
 reproduce it, you're not debugging yet; you're guessing.
 
 ### 2. Isolate
+
 Form a **hypothesis**, then run an experiment that can falsify it. Binary-search the fault:
 
 - **History:** `git bisect` across commits — "what changed since it last worked?" is the single most
-  productive question. Bisect finds the commit in `log₂(n)` steps.
+  productive question. Bisect finds the commit in `log₂(n)` steps. The bundled helper
+  `scripts/bisect.sh` automates the whole run: `bisect.sh <good-ref> <test-command...>`, where the
+  test command exits 0 when the bug is **absent** and non-zero when **present**.
 - **Input:** halve the failing input until the minimal trigger remains.
 - **Code path:** disable/short-circuit halves of the pipeline to localize the stage.
 
 Change **one variable at a time**. If you change three things and it works, you've learned nothing.
 
 ### 3. Diagnose
+
 State the root cause in **one sentence** before touching the fix:
 
-> "The bug is *X* (a stale cache key), which causes *Y* (a deleted record reappears) under condition
-> *Z* (two writes within the TTL window)."
+> "The bug is _X_ (a stale cache key), which causes _Y_ (a deleted record reappears) under condition
+> _Z_ (two writes within the TTL window)."
 
 If you can't fill in X, Y, and Z, you haven't found it — keep isolating. A fix applied before
 diagnosis is a coin flip.
 
 ### 4. Fix minimally
+
 Fix the **cause, not the symptom**, with the **smallest diff** that removes it. Don't refactor
 surrounding code in the same change — a fix commit should be reviewable as exactly the fix. If the
 real fix is large, note it and do the surgical version now; schedule the rest.
 
 ### 5. Prove
+
 - The regression test from step 1 now **passes**.
 - The **full suite is green** — you fixed it without breaking a neighbor.
 - **Nothing was masked.** You didn't make the failure invisible; you made it not happen.
 
 ## Reading a stack trace
 
-Read it as a timeline, not a wall. The **top frame** is where it threw; walk **down** to the first
-frame in *your* code — that's usually the real site. The exception **type and message** tell you the
-category (null, bounds, type, timeout). The line that throws is a symptom; the line that set up the
-bad state is the cause — trace the bad value **backward** to its origin.
+Read it as a timeline: classify by the exception type, find the throw site, then trace the bad value
+**backward** to its origin — the throw is the symptom, the line that set up the value is the cause.
+Ordering and chaining differ per language (Python fails at the bottom; Java/JS at the top); see
+[references/stack-traces.md](references/stack-traces.md) for worked examples across Python, the JVM,
+and async Node.
 
 ## Anti-patterns
 
