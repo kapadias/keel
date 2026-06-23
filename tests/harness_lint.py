@@ -154,6 +154,33 @@ for md in glob.glob(f"{ROOT}/.claude/**/*.md", recursive=True):
             if DENY.search(line):
                 bad(f"{md}:{n}: domain-specific term in a domain-agnostic harness")
 
+# --- plugin packaging: manifests are valid JSON and wired scripts exist ---
+plugin_manifest = f"{ROOT}/.claude/.claude-plugin/plugin.json"
+marketplace = f"{ROOT}/.claude-plugin/marketplace.json"
+plugin_hooks = f"{ROOT}/.claude/hooks/hooks.json"
+for jf in (plugin_manifest, marketplace, plugin_hooks):
+    if not os.path.isfile(jf):
+        bad(f"plugin packaging: missing {os.path.relpath(jf, ROOT)}")
+        continue
+    try:
+        with open(jf, encoding="utf-8") as fh:
+            json.load(fh)
+    except json.JSONDecodeError as exc:
+        bad(f"plugin packaging: invalid JSON in {os.path.relpath(jf, ROOT)}: {exc}")
+
+if os.path.isfile(plugin_hooks):
+    with open(plugin_hooks, encoding="utf-8") as fh:
+        ph = json.load(fh)
+    for _event, entries in (ph.get("hooks") or {}).items():
+        for entry in entries:
+            for hook in entry.get("hooks", []):
+                # The keel plugin's root is .claude/ (marketplace source "./.claude").
+                m = re.search(
+                    r"\$\{CLAUDE_PLUGIN_ROOT\}/(\S+\.sh)", hook.get("command", "")
+                )
+                if m and not os.path.isfile(os.path.join(ROOT, ".claude", m.group(1))):
+                    bad(f"hooks.json: wired hook missing on disk: {m.group(1)}")
+
 if offenders:
     print("Harness lint FAILED:")
     for o in offenders:
