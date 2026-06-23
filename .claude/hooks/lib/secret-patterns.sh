@@ -1,45 +1,58 @@
 # shellcheck shell=bash
-# Single source of truth for high-confidence secret detection, shared by the
-# write-time gate (secret-scan.sh) and the push-time gate (require-status-sync.sh).
-# Bias: PRECISION over recall. A false positive blocks honest work and erodes
-# trust in the gate; the deny-read posture in settings.json and human review
-# cover the long tail. We match only shapes that are almost never anything but a
-# secret.
+# Single source of truth for high-confidence secret detection + the test-path
+# policy, shared by secret-scan.sh (write-time) and require-status-sync.sh
+# (push-time). Precision over recall — but NOT at the cost of trivial evasion:
+#   • the placeholder/example exemption is applied to the MATCHED VALUE, never to
+#     the whole line, so a trailing "# example" cannot smuggle a real key past;
+#   • the test/fixture exemption is anchored to path SEGMENTS, so an ordinary
+#     file like "latest_config.py" does not disarm the gate.
+
+# keel_is_test_path <path>  -> 0 if the path is a test/fixture/example location.
+keel_is_test_path() {
+  case "$1" in
+    */test/* | */tests/* | */fixture/* | */fixtures/* | */example/* | */examples/* | \
+      */sample/* | */samples/* | */spec/* | */specs/* | */testdata/* | */__tests__/*) return 0 ;;
+    test/* | tests/* | fixture/* | fixtures/* | example/* | examples/* | sample/* | \
+      samples/* | spec/* | specs/* | testdata/*) return 0 ;;
+    *_test.* | *.test.* | *_spec.* | *.spec.* | *.example | *.sample) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# _keel_is_placeholder <matched-value>  -> 0 if the match is an obvious non-secret.
+_keel_is_placeholder() {
+  printf '%s' "$1" | grep -qiE 'XXXX|EXAMPLE|YOUR[-_]|CHANGEME|DUMMY|REDACTED|PLACEHOLDER|FAKE|SAMPLE|\$\{|ENV\(|OS\.ENVIRON|PROCESS\.ENV|<[^>]+>'
+}
+
+# _keel_match <class> <regex> <text>  -> print class & return 0 if a
+# NON-placeholder match for <regex> exists in <text>.
+_keel_match() {
+  local class="$1" re="$2" text="$3" m
+  while IFS= read -r m; do
+    [ -n "$m" ] || continue
+    if _keel_is_placeholder "$m"; then continue; fi
+    printf '%s' "$class"
+    return 0
+  done < <(printf '%s' "$text" | grep -oiE -e "$re" 2>/dev/null || true)
+  return 1
+}
 
 # keel_scan_secrets  (reads candidate text on stdin)
-#   On a high-confidence match: prints the pattern CLASS (never the secret) and
-#   returns 0. Otherwise returns 1. Placeholder/example lines are dropped first so
-#   docs and fixtures that SHOW a secret's shape do not trip the gate.
+#   On a high-confidence, non-placeholder match: prints the pattern CLASS (never
+#   the secret) and returns 0. Otherwise returns 1.
 keel_scan_secrets() {
-  local text scan
+  local text
   text="$(cat 2>/dev/null || true)"
   [ -n "$text" ] || return 1
 
-  scan="$(printf '%s\n' "$text" \
-    | grep -ivE 'XXXX|your[-_]|example|changeme|dummy|redacted|placeholder|<[^>]+>|\$\{|env\(|os\.environ|process\.env|FAKE|TODO' \
-    || true)"
-  [ -n "$scan" ] || return 1
-
-  if printf '%s' "$scan" | grep -iqE -e 'AKIA[0-9A-Z]{16}'; then
-    printf 'AWS access key id'; return 0
-  fi
-  if printf '%s' "$scan" | grep -qE -e '-----BEGIN [A-Z ]*PRIVATE KEY-----'; then
-    printf 'private key block'; return 0
-  fi
-  if printf '%s' "$scan" | grep -qE -e 'gh[pousr]_[A-Za-z0-9]{36,}'; then
-    printf 'GitHub token'; return 0
-  fi
-  if printf '%s' "$scan" | grep -qE -e 'xox[baprs]-[0-9A-Za-z-]{10,}'; then
-    printf 'Slack token'; return 0
-  fi
-  if printf '%s' "$scan" | grep -qE -e 'AIza[0-9A-Za-z_-]{35}'; then
-    printf 'Google API key'; return 0
-  fi
-  if printf '%s' "$scan" | grep -iqE -e '(api[_-]?key|secret|token|password|passwd)[[:space:]]*[:=][[:space:]]*"[^"]{16,}"'; then
-    printf 'hardcoded secret assignment'; return 0
-  fi
-  if printf '%s' "$scan" | grep -iqE -e "(api[_-]?key|secret|token|password|passwd)[[:space:]]*[:=][[:space:]]*'[^']{16,}'"; then
-    printf 'hardcoded secret assignment'; return 0
-  fi
+  if _keel_match 'AWS access key id' 'AKIA[0-9A-Z]{16}' "$text"; then return 0; fi
+  if _keel_match 'GitHub token' 'gh[pousr]_[A-Za-z0-9]{36,}' "$text"; then return 0; fi
+  if _keel_match 'Slack token' 'xox[baprs]-[0-9A-Za-z-]{10,}' "$text"; then return 0; fi
+  if _keel_match 'Google API key' 'AIza[0-9A-Za-z_-]{35}' "$text"; then return 0; fi
+  if _keel_match 'Stripe secret key' 'sk_live_[0-9A-Za-z]{16,}' "$text"; then return 0; fi
+  if _keel_match 'OpenAI API key' 'sk-[A-Za-z0-9]{20,}' "$text"; then return 0; fi
+  if _keel_match 'private key block' '-----BEGIN [A-Z ]*PRIVATE KEY-----' "$text"; then return 0; fi
+  if _keel_match 'hardcoded secret assignment' '(api[_-]?key|secret|token|password|passwd)[[:space:]]*[:=][[:space:]]*"[^"]{16,}"' "$text"; then return 0; fi
+  if _keel_match 'hardcoded secret assignment' "(api[_-]?key|secret|token|password|passwd)[[:space:]]*[:=][[:space:]]*'[^']{16,}'" "$text"; then return 0; fi
   return 1
 }

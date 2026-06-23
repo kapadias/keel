@@ -36,7 +36,7 @@ fi
 # (consistent with the write-time gate, so sample-secret fixtures don't trip it).
 while IFS= read -r f; do
   [ -n "$f" ] || continue
-  case "$f" in *test* | *fixture* | *example* | *sample* | *spec*) continue ;; esac
+  if keel_is_test_path "$f"; then continue; fi
   added="$(git diff "$range" -- "$f" 2>/dev/null | grep -E '^\+' | grep -vE '^\+\+\+' || true)"
   [ -n "$added" ] || continue
   if class="$(printf '%s' "$added" | keel_scan_secrets)"; then

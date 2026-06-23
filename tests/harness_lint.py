@@ -103,7 +103,9 @@ with open(f"{ROOT}/.claude/settings.json", encoding="utf-8") as fh:
 for _event, entries in (settings.get("hooks") or {}).items():
     for entry in entries:
         for hook in entry.get("hooks", []):
-            m = re.search(r"\$CLAUDE_PROJECT_DIR/(\S+\.sh)", hook.get("command", ""))
+            m = re.search(
+                r"\$\{?CLAUDE_PROJECT_DIR\}?/(\S+\.sh)", hook.get("command", "")
+            )
             if m and not os.path.isfile(os.path.join(ROOT, m.group(1))):
                 bad(f"settings.json: wired hook missing on disk: {m.group(1)}")
 

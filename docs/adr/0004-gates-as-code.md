@@ -58,14 +58,17 @@ of how the session started.
      with full repo access bypass local hooks trivially, while CI has no opinion until push.
 
 3. **Make hooks blocking, deterministic, and auto-wired locally** (chosen). Hooks are not warnings;
-   they are gates. guard-branch exits non-zero on commits to `main`, `master`, or `develop`,
-   unconditionally. A secret-scan hook runs at pre-commit and blocks writes containing high-confidence
-   secret patterns (PEM headers, `sk-…` API key prefixes, bearer token shapes) with an explicit error
-   pointing to the offending match. require-status-sync is auto-installed as a symlink during
-   SessionStart — no manual setup, no opt-in. The `settings.json` deny-list is extended to cover
-   dangerous Bash patterns (force-push, `DROP TABLE`, `rm -rf`). `.claude/**` is treated as code, not
-   configuration: all hooks ship as executable scripts under version control, not as prose instructions.
-   CI remains the external backstop; local hooks are the first line.
+   they are gates. guard-branch exits non-zero on a `git commit`/`git merge` on a protected branch (and
+   on a `git push` that is on, targets, or `--all`/`--mirror`-spans one); edits to a protected branch
+   warn but do not block, because editing is not the irreversible step. A secret-scan hook runs at write
+   time (PreToolUse on Edit/Write/MultiEdit) and blocks content matching a high-confidence secret shape
+   (AWS/GitHub/Slack/Google/Stripe/OpenAI keys, PEM private-key headers, hardcoded credential
+   assignments), naming the match class; the pre-push hook scans the pushed range as a second line.
+   require-status-sync is auto-installed during SessionStart — no manual setup, no opt-in. The
+   `settings.json` deny-list blocks reading secret files and `git push --force`; coarser irreversible
+   Bash is left to review and the human gate rather than blunt prefix-matched denies. `.claude/**` is
+   treated as code: hooks ship as executable, version-controlled scripts, not prose. CI remains the
+   external backstop; local hooks are the first line.
    - Introduces the possibility of a false stop — a legitimate secret rotation commit blocked by the
      scanner, a developer who needs to hotfix `main` directly. These are recoverable: the developer
      overrides with explicit intent (the override itself becomes the audit trail). Per
@@ -76,17 +79,23 @@ of how the session started.
 
 Keel's gates are **code, not prose**: executable, blocking, and auto-wired from the first session.
 
-- **guard-branch** exits 2 on any commit to `main`, `master`, or `develop`. No warn mode. A legitimate
-  direct commit to a protected branch requires an explicit bypass that is itself auditable.
-- **secret-scan** runs as a pre-commit hook and blocks any staged hunk that matches a high-confidence
-  secret pattern. The scan is deterministic and pattern-matched — no model inference in the critical
-  path, so it cannot be prompted into silence.
-- **require-status-sync** is installed via a SessionStart hook. On first session in any clone, the
-  symlink is created; subsequent sessions are no-ops. The Definition of Done is enforced from day one,
-  not after the engineer discovers the manual step.
-- **settings.json deny-list** is extended with Bash patterns that reach across a safety boundary
-  (force-push, DDL drops, recursive deletes). These generate an explicit, actionable error, not a
-  silent failure.
+- **guard-branch** exits 2 on a `git commit`/`git merge` while on `main`/`master`/`develop`, and on a
+  `git push` that is on, targets (including a `refs/heads/<branch>` refspec), or `--all`/`--mirror`-spans
+  a protected branch. The matcher tolerates global options (`git -C`, `--git-dir`, a path-prefixed
+  binary) so it is not trivially evaded. Edits to a protected branch warn only — committing is the gated
+  step, not editing.
+- **secret-scan** runs at write time (PreToolUse on Edit/Write/MultiEdit) and blocks content matching a
+  high-confidence secret shape; the pre-push hook additionally scans the pushed range. The scan is
+  deterministic and pattern-matched — no model inference in the critical path — and **fails closed when
+  `jq` is absent** (it scans the raw payload rather than trusting a lossy parse), with the
+  placeholder/example exemption applied to the matched value (not the whole line) so a trailing comment
+  cannot smuggle a key past.
+- **require-status-sync** is installed via a SessionStart hook. On first session in any clone the
+  pre-push hook is created; subsequent sessions are no-ops. The Definition of Done is enforced from day
+  one, not after the engineer discovers the manual step.
+- **settings.json deny-list** blocks reading secret files (`.env`, `*.pem`, `*.key`, `~/.ssh`, `~/.aws`,
+  …) and `git push --force`. It is defense-in-depth, not the primary push gate — guard-branch is — so it
+  deliberately is not a comprehensive blunt-deny of every dangerous Bash string.
 - **CI remains the backstop.** Branch protection, secret scanning, and status-sync checks run server-
   side. Local hooks are the first gate; CI is the second. A change that slips past a misconfigured
   local environment is still caught before merge.

@@ -117,5 +117,34 @@ else
   echo "  (skip: dep-audit.sh not found)"
 fi
 
+echo "== bypass-resistance (review-finding regressions) =="
+SP="$HOOKS/lib/secret-patterns.sh"
+# A trailing placeholder word must NOT smuggle a real key (value-level, not line-level).
+(. "$SP" && printf 'AWS=AKIA1234567890ABCDEF # example' | keel_scan_secrets) >/dev/null; check "secret: trailing '# example' does not evade a real key" 0 "$?"
+# AWS's own EXAMPLE key (the value itself is a placeholder) IS exempt.
+(. "$SP" && printf 'key=AKIAIOSFODNN7EXAMPLE' | keel_scan_secrets) >/dev/null; check "secret: placeholder value (…EXAMPLE) is exempt" 1 "$?"
+# New high-confidence classes.
+(. "$SP" && printf 'k = "sk_live_0123456789abcdefABCD"' | keel_scan_secrets) >/dev/null; check "secret: detects Stripe sk_live_ key" 0 "$?"
+# Path allowlist is anchored to segments: an ordinary file with a 'test' substring is NOT exempt.
+printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"src/latest_config.py","content":"K=\"AKIA1234567890ABCDEF\""}}' | "$SS"; check "secret-scan: 'latest_config.py' is NOT allowlisted" 2 "$?"
+printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"src/app/tests/k.py","content":"K=\"AKIA1234567890ABCDEF\""}}' | "$SS"; check "secret-scan: a real tests/ segment IS allowlisted" 0 "$?"
+# Secret gate must fail CLOSED when jq is absent (raw-payload scan).
+NOJQ="$(mktemp -d)"
+for b in bash sh env cat grep sed head tr dirname; do
+  p="$(command -v "$b" 2>/dev/null || true)"
+  if [ -n "$p" ]; then ln -s "$p" "$NOJQ/$b" 2>/dev/null || true; fi
+done
+printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"c.py","content":"K = \"AKIA1234567890ABCDEF\""}}' | PATH="$NOJQ" "$SS"; check "secret-scan: blocks a secret when jq is absent" 2 "$?"
+rm -rf "$NOJQ"
+# Branch guard tolerates global options and blocks wide pushes.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; "${GIT[@]}" -C "$TMP" commit -q --allow-empty -m init; "${GIT[@]}" -C "$TMP" branch -M main
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git -C . commit -m x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "guard-branch: blocks 'git -C . commit' on main" 2 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"/usr/bin/git commit -m x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "guard-branch: blocks absolute-path git commit on main" 2 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git -C . status"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "guard-branch: allows non-mutating 'git -C . status' on main" 0 "$?"
+"${GIT[@]}" -C "$TMP" checkout -q -b feature/z
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push --all origin"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "guard-branch: blocks 'git push --all'" 2 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin HEAD:refs/heads/main"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "guard-branch: blocks qualified refs/heads/main push" 2 "$?"
+rm -rf "$TMP"
+
 printf '\n%s passed, %s failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
