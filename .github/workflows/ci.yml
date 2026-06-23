@@ -1,0 +1,74 @@
+# Keel CI — gates for the harness itself (markdown + shell).
+# Adopters: add your own lint/type/test gate as another job — see .claude/commands/test.md.
+name: Keel CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run shellcheck on hooks
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: .claude/hooks
+
+  harness-lint:
+    name: harness-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate agent and command frontmatter
+        run: |
+          python - <<'PY'
+          import glob
+          import sys
+
+          offenders: list[str] = []
+
+          def frontmatter(path: str) -> list[str] | None:
+              """Return the frontmatter lines, or None if the block is malformed/absent."""
+              with open(path, encoding="utf-8") as fh:
+                  lines = fh.read().splitlines()
+              if not lines or lines[0].strip() != "---":
+                  return None
+              for i in range(1, len(lines)):
+                  if lines[i].strip() == "---":
+                      return lines[1:i]
+              return None
+
+          def has_key(block: list[str], key: str) -> bool:
+              return any(line.lstrip().startswith(f"{key}:") for line in block)
+
+          for path in sorted(glob.glob(".claude/agents/*.md")):
+              block = frontmatter(path)
+              if block is None:
+                  offenders.append(f"{path}: missing or unterminated YAML frontmatter (--- ... ---)")
+                  continue
+              for key in ("name", "description", "model"):
+                  if not has_key(block, key):
+                      offenders.append(f"{path}: frontmatter missing '{key}:'")
+
+          for path in sorted(glob.glob(".claude/commands/*.md")):
+              block = frontmatter(path)
+              if block is None:
+                  offenders.append(f"{path}: missing or unterminated YAML frontmatter (--- ... ---)")
+                  continue
+              if not has_key(block, "description"):
+                  offenders.append(f"{path}: frontmatter missing 'description:'")
+
+          if offenders:
+              print("Harness frontmatter validation failed:")
+              for problem in offenders:
+                  print(f"  - {problem}")
+              sys.exit(1)
+
+          print("Harness frontmatter OK.")
+          PY

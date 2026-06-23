@@ -1,0 +1,33 @@
+# Secrets — never commit. Keel's settings.json also denies reading these.
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+
+# Claude Code local overrides (machine-specific permissions, not shared)
+.claude/settings.local.json
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Common build / dependency artifacts (harmless if unused)
+node_modules/
+dist/
+build/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+coverage/
+.coverage
+htmlcov/
+target/
