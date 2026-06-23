@@ -83,6 +83,14 @@ echo 'KEY = "AKIA1234567890ABCDEF"' > "$TMP/src/leak.py"
 echo 'more' >> "$TMP/docs/STATUS.md"
 "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m "leak with status"
 ( cd "$TMP" && "$RS" ); check "blocks push that introduces a secret" 1 "$?"
+# Installed AS a symlink (the way session-start wires it): must still resolve lib/.
+mkdir -p "$TMP/.claude/hooks/lib"
+cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"
+cp "$HOOKS/lib/secret-patterns.sh" "$TMP/.claude/hooks/lib/"
+ln -sf ../../.claude/hooks/require-status-sync.sh "$TMP/.git/hooks/pre-push"
+sl_out="$(cd "$TMP" && .git/hooks/pre-push 2>&1)"; sl_rc=$?
+check "blocks a secret when run via the installed symlink" 1 "$sl_rc"
+contains "symlinked hook resolved its lib (no 'command not found')" "looks like" "$sl_out"
 rm -rf "$TMP" "$BARE"
 
 echo "== format.sh (PostToolUse, best-effort) =="

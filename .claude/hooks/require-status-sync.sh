@@ -6,7 +6,17 @@
 #   ln -sf ../../.claude/hooks/require-status-sync.sh .git/hooks/pre-push
 # Bypass (only when you truly changed no code): git push --no-verify
 set -uo pipefail
-here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve through symlinks: this hook is installed AS a .git/hooks/pre-push
+# symlink, so BASH_SOURCE points at the link, not the real script beside its lib/.
+self="${BASH_SOURCE[0]}"
+while [ -L "$self" ]; do
+  link="$(readlink "$self")"
+  case "$link" in
+    /*) self="$link" ;;
+    *) self="$(dirname "$self")/$link" ;;
+  esac
+done
+here="$(cd "$(dirname "$self")" && pwd)"
 # shellcheck source=/dev/null
 . "$here/lib/secret-patterns.sh"
 

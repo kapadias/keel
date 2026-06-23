@@ -43,7 +43,8 @@ and Keel ships as an installable plugin with language stack packs. Language- and
   - **WS6 plugin distribution** — zero-duplication plugin reusing `.claude/`.
   - **WS7 evals** — the gate scenarios in `tests/run.sh`.
   - Hardened all gates against fail-open/bypass findings from an internal code + security review (each
-    fix carries a regression test).
+    fix carries a regression test), and fixed the pre-push hook's symlink path resolution so its
+    secret-scan loads when installed as a git hook. `tests/run.sh` is now 41 gate tests.
 - **2026-06-22** — v0.1.0: initial harness extracted and generalized; published to `kapadias/keel`.
 
 ## Next / open
