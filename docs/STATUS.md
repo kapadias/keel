@@ -27,10 +27,20 @@ disciplined, test-driven, review-gated AI-assisted development. Language- and do
 
 ## Recently changed
 
+- **2026-06-23** — Started **v0.2 "Gates as Code"** (see [`ROADMAP.md`](ROADMAP.md)): closing the gap
+  between Keel's stated principle ("deterministic gates decide") and its actual enforcement.
 - **2026-06-22** — Initial harness extracted and generalized; published to `kapadias/keel`.
+
+## In progress — v0.2 "Gates as Code"
+
+Seven workstreams across four phases (full detail in [`ROADMAP.md`](ROADMAP.md)):
+
+- **WS1** make the gates real · **WS2** self-verify the harness · **WS3** modernize · **WS4** complete
+  the loop · **WS5** stack packs · **WS6** plugin distribution · **WS7** evals.
 
 ## Next / open
 
 - Add language-specific quickstart recipes (Python, TypeScript, Go) wiring `/test` to a real gate.
+  _(WS5)_
 - Optional MCP server examples for the explorer and reviewer agents.
 - Expand the ADR set as load-bearing decisions accrue (via `/adr`).
