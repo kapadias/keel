@@ -215,6 +215,17 @@ for patt in (
 for md in sorted(set(md_files)):
     check_links(md)
 
+# --- backticked docs/ references must exist (the link lint only sees []()) ---
+# ADR-0006 cited `docs/INSTALL.md` in backticks for months while the file did
+# not exist; prose references to docs/ are promises and must resolve.
+TICK = re.compile(r"`(docs/[A-Za-z0-9._/-]+\.md)`")
+for md in sorted(set(md_files)):
+    with open(md, encoding="utf-8") as fh:
+        for n, line in enumerate(fh, 1):
+            for t in TICK.findall(line):
+                if not os.path.isfile(os.path.join(ROOT, t)):
+                    bad(f"{md}:{n}: backtick-referenced {t} does not exist")
+
 # --- domain leak: a domain-agnostic harness names no single domain ---
 DENY = re.compile(r"\b(trading|brokerage)\b", re.IGNORECASE)
 for md in glob.glob(f"{ROOT}/.claude/**/*.md", recursive=True):

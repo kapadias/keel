@@ -72,6 +72,9 @@ and Keel ships as an installable plugin with language stack packs. Language- and
   - **The token budget is now a gate, not a claim**: `harness_lint.py` fails CI if CLAUDE.md
     (>900 words), any rules file (>700), or the total always-on surface (>4,500 words ≈ 6k tokens)
     exceeds budget. Raising a budget is an explicit, reviewable act.
+  - `docs/INSTALL.md` created (ADR-0006 referenced it for months while it did not exist — the lint
+    now checks backticked `docs/` references resolve); ROADMAP WS5/WS7 updated to say honestly what
+    shipped vs. what is still open (stack auto-wiring; behavioral evals).
 - **2026-06-23** — Shipped **v0.2.0 "Gates as Code"** across seven workstreams:
   - **WS1 gates as code** — guard-branch/secret-scan block; DoD pre-push auto-installs; structured
     review verdict + `check-review.sh`.
