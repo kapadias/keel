@@ -63,11 +63,21 @@ is_critical() {
       .github/workflows/* | */migrations/* | migrations/*) return 0 ;;
   esac
   if [ -n "${KEEL_CRITICAL_PATHS:-}" ]; then
-    local IFS=':'
+    local IFS=':' g rc=1
+    # noglob: split KEEL_CRITICAL_PATHS on ':' WITHOUT pathname expansion, so a glob like
+    # 'src/billing/*' stays a pattern instead of being replaced by the dir's current
+    # children (which would fail open exactly when the protected directory exists).
+    set -f
     for g in $KEEL_CRITICAL_PATHS; do
       # shellcheck disable=SC2254
-      case "$1" in $g) return 0 ;; esac
+      case "$1" in $g)
+        rc=0
+        break
+        ;;
+      esac
     done
+    set +f
+    [ "$rc" -eq 0 ] && return 0
   fi
   return 1
 }
@@ -87,6 +97,9 @@ classify() { # <path> [changed-line-count | "-" for binary]
 }
 
 # Tracked delta: working tree vs merge-base (committed + staged + unstaged).
+# --no-renames so a rename appears as delete(old)+add(new) with real, individually
+# classifiable paths — otherwise `old => new` arrives as one mangled field and a
+# `git mv` into a critical-surface path (or onto a lockfile name) evades every check.
 while IFS=$'\t' read -r add del f; do
   [ -n "$f" ] || continue
   if [ "$add" = "-" ] || [ "$del" = "-" ]; then
@@ -95,13 +108,17 @@ while IFS=$'\t' read -r add del f; do
     classify "$f" "$((add + del))"
   fi
 done <<EOF
-$(git diff --numstat "$mb" 2>/dev/null)
+$(git diff --numstat --no-renames "$mb" 2>/dev/null)
 EOF
 
-# Untracked files count too — a brand-new source file is part of the delta.
+# Untracked files count too — a brand-new source file is part of the delta. Size them
+# the way git does (numstat vs /dev/null yields '-' for a binary), so an untracked
+# binary blob fails closed like a tracked one instead of being sized by newline count.
 while IFS= read -r f; do
   [ -n "$f" ] || continue
-  classify "$f" "$(wc -l <"$f" 2>/dev/null || echo "$((MAX_LINES + 1))")"
+  n="$(git diff --numstat --no-index -- /dev/null "$f" 2>/dev/null | cut -f1)"
+  [ -n "$n" ] || n="$((MAX_LINES + 1))"
+  classify "$f" "$n"
 done <<EOF
 $(git ls-files --others --exclude-standard 2>/dev/null)
 EOF

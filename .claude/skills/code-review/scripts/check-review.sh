@@ -74,27 +74,35 @@ if command -v jq >/dev/null 2>&1; then
     echo "✗ check-review: input is not valid JSON" >&2
     exit 2
   fi
-  verdict="$(printf '%s' "$review" | jq -r '.verdict // "" | ascii_downcase | gsub("^\\s+|\\s+$";"")')"
+  # tostring coerces a non-string verdict/severity (e.g. a number) so jq cannot die
+  # mid-substitution — an off-contract value flows into the enum checks and fails closed.
+  verdict="$(printf '%s' "$review" | jq -r '.verdict // "" | tostring | ascii_downcase | gsub("^\\s+|\\s+$";"")')"
   # Count findings whose severity (case-insensitive) is CRITICAL or HIGH.
   blocking="$(printf '%s' "$review" \
-    | jq '[.findings[]? | (.severity // "" | ascii_upcase) | select(. == "CRITICAL" or . == "HIGH")] | length')"
+    | jq '[.findings[]? | (.severity // "" | tostring | ascii_upcase) | select(. == "CRITICAL" or . == "HIGH")] | length')"
   # Count findings whose severity is outside the schema enum — those block, never pass silently.
   offschema="$(printf '%s' "$review" \
-    | jq '[.findings[]? | (.severity // "" | ascii_upcase)
+    | jq '[.findings[]? | (.severity // "" | tostring | ascii_upcase)
            | select(. != "CRITICAL" and . != "HIGH" and . != "MEDIUM" and . != "LOW")] | length')"
 else
   echo "ℹ check-review: jq not found — using conservative grep fallback." >&2
   # Extract the verdict value, lowercased. `|| true` so a no-match doesn't trip pipefail/set -e.
   verdict_raw="$(printf '%s' "$review" | grep -oE '"verdict"[[:space:]]*:[[:space:]]*"[^"]*"' | head -n1 || true)"
   verdict="$(printf '%s' "$verdict_raw" | sed -E 's/.*:[[:space:]]*"([^"]*)".*/\1/' | tr '[:upper:]' '[:lower:]')"
-  # Count CRITICAL/HIGH severity values. Match only severity fields, not prose mentioning the word.
-  blocking="$(printf '%s' "$review" | grep -coE '"severity"[[:space:]]*:[[:space:]]*"(CRITICAL|HIGH)"' || true)"
-  blocking="${blocking//[[:space:]]/}"
-  # Any severity value outside the enum (case-insensitive) counts as off-schema.
-  offschema="$(printf '%s' "$review" \
+  # Normalize every severity value ONCE, upper-cased, then derive both counts from the
+  # normalized list — so a lowercase/mixed-case CRITICAL blocks exactly as it does on the jq
+  # path (the two must never disagree). Guard the empty case: no severities → no off-schema.
+  sevs="$(printf '%s' "$review" \
     | grep -oE '"severity"[[:space:]]*:[[:space:]]*"[^"]*"' \
-    | sed -E 's/.*:[[:space:]]*"([^"]*)".*/\1/' | tr '[:lower:]' '[:upper:]' \
-    | grep -cvE '^(CRITICAL|HIGH|MEDIUM|LOW)$' || true)"
+    | sed -E 's/.*:[[:space:]]*"([^"]*)".*/\1/' | tr '[:lower:]' '[:upper:]' || true)"
+  if [ -n "$sevs" ]; then
+    blocking="$(printf '%s\n' "$sevs" | grep -cE '^(CRITICAL|HIGH)$' || true)"
+    offschema="$(printf '%s\n' "$sevs" | grep -cvE '^(CRITICAL|HIGH|MEDIUM|LOW)$' || true)"
+  else
+    blocking=0
+    offschema=0
+  fi
+  blocking="${blocking//[[:space:]]/}"
   offschema="${offschema//[[:space:]]/}"
 fi
 

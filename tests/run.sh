@@ -53,6 +53,9 @@ printf '%s' '{"tool_name":"Bash","tool_input":{"command":"head -5 secrets/creds.
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"cp ~/.ssh/id_rsa /tmp/x"}}' | "$SS"; check "blocks Bash copy of a private key" 2 "$?"
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"cat README.md"}}' | "$SS"; check "allows Bash read of a normal file" 0 "$?"
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"grep -r foo ."}}' | "$SS"; check "allows Bash grep with no secret target" 0 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"cat secrets/db.txt"}}' | "$SS"; check "blocks Bash read of a bare secrets/ path" 2 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"cat david_rsanchez.txt"}}' | "$SS"; check "does not false-block 'id_rsa' as a substring" 0 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"tail -f logs/app.env.log"}}' | "$SS"; check "does not false-block '.env' as an interior substring" 0 "$?"
 
 echo "== guard-branch.sh (PreToolUse branch gate) =="
 GB="$HOOKS/guard-branch.sh"
@@ -68,6 +71,8 @@ printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}' | 
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push -u origin feature/x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "allows push to feature branch" 0 "$?"
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin +main"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "blocks +refspec force push to main" 2 "$?"
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin +feature/x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "blocks +refspec force push to any ref" 2 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin \"+main\""}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "blocks quoted +refspec force push" 2 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git commit -m \"support +x mode\" && git push -u origin feature/x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "a + in an earlier compound command does not false-block the push" 0 "$?"
 rm -rf "$TMP"
 
 echo "== require-status-sync.sh (pre-push Definition of Done) =="
@@ -146,6 +151,22 @@ echo '{}' > "$TMP/package-lock.json"
 ( cd "$TMP" && bash "$CT" main ); check "lockfile touch disqualifies" 1 "$?"
 rm -f "$TMP/package-lock.json"
 ( cd "$TMP" && bash "$CT" nosuchref ); check "unresolvable base fails closed" 1 "$?"
+# A pure rename INTO a critical-surface path must not slip through (--no-renames).
+"${GIT[@]}" -C "$TMP" checkout -q -- . 2>/dev/null; "${GIT[@]}" -C "$TMP" clean -fdq
+"${GIT[@]}" -C "$TMP" checkout -q -b rename/crit main
+mkdir -p "$TMP/migrations"; "${GIT[@]}" -C "$TMP" mv src/app.py migrations/001_app.py
+( cd "$TMP" && bash "$CT" main ); check "rename into a critical path disqualifies" 1 "$?"
+"${GIT[@]}" -C "$TMP" checkout -q main; "${GIT[@]}" -C "$TMP" branch -qD rename/crit
+# KEEL_CRITICAL_PATHS glob must match nested paths even when the dir exists (no pathname expansion).
+# existing.py lives in the BASE (main) so it is NOT in the diff — only the nested untracked file is,
+# which the buggy pathname-expanding loop would miss exactly because src/billing/ exists.
+"${GIT[@]}" -C "$TMP" checkout -q main
+mkdir -p "$TMP/src/billing/deep"; echo 'existing' > "$TMP/src/billing/existing.py"
+"${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m "billing dir exists on main"
+"${GIT[@]}" -C "$TMP" checkout -q -b crit/env
+printf 'a\nb\n' > "$TMP/src/billing/deep/rates.py"
+( cd "$TMP" && KEEL_CRITICAL_PATHS='src/billing/*' bash "$CT" main ); check "KEEL_CRITICAL_PATHS glob catches nested path when dir exists" 1 "$?"
+"${GIT[@]}" -C "$TMP" checkout -q main; "${GIT[@]}" -C "$TMP" branch -qD crit/env
 NOREPO="$(mktemp -d)"
 ( cd "$NOREPO" && bash "$CT" ); check "not a git repo fails closed" 1 "$?"
 rm -rf "$TMP" "$NOREPO"
@@ -188,6 +209,15 @@ if [ -x "$CR" ] || [ -f "$CR" ]; then
   printf 'Prose before.\n```json\n{"verdict":"request_changes","summary":"x","findings":[]}\n```\nProse after.\n' | bash "$CR"; check "fenced request_changes block extracted and blocks" 1 "$?"
   printf 'Prose before.\n```json\n{"verdict":"approve","summary":"x","findings":[]}\n```\nProse after.\n' | bash "$CR"; check "fenced approve block extracted and passes" 0 "$?"
   printf '```json\n{"verdict":"approve","summary":"x","findings":[]}\n```\n```json\n{"verdict":"approve","summary":"y","findings":[]}\n```\n' | bash "$CR"; check "two fenced blocks is ambiguous, fails closed" 2 "$?"
+  printf '%s' '{"verdict":"approve","summary":"x","findings":[{"severity":123,"path":"a","line":1,"category":"x","issue":"i","fix":"f"}]}' | bash "$CR"; check "non-string severity fails closed, not a jq crash" 1 "$?"
+  # jq-absent fallback must be as strict as the jq path — including case.
+  NOJQ="$(mktemp -d)"
+  for b in bash sh env cat grep sed head tr printf awk dirname; do
+    p="$(command -v "$b" 2>/dev/null || true)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b" 2>/dev/null || true
+  done
+  printf '%s' '{"verdict":"approve","summary":"x","findings":[{"severity":"critical","path":"a","line":1,"category":"x","issue":"i","fix":"f"}]}' | PATH="$NOJQ" bash "$CR"; check "no-jq: lowercase blocking severity still blocks" 1 "$?"
+  printf '%s' '{"verdict":"approve","summary":"x","findings":[{"severity":"MEDIUM","path":"a","line":1,"category":"x","issue":"i","fix":"f"}]}' | PATH="$NOJQ" bash "$CR"; check "no-jq: MEDIUM-only still approves" 0 "$?"
+  rm -rf "$NOJQ"
 else
   echo "  (skip: check-review.sh not found)"
 fi

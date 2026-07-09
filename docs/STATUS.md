@@ -75,6 +75,16 @@ and Keel ships as an installable plugin with language stack packs. Language- and
   - `docs/INSTALL.md` created (ADR-0006 referenced it for months while it did not exist — the lint
     now checks backticked `docs/` references resolve); ROADMAP WS5/WS7 updated to say honestly what
     shipped vs. what is still open (stack auto-wiring; behavioral evals).
+  - **Adversarial self-review of the above** (three-lens fan-out + reproduced verification) found and
+    fixed fail-open defects in the new gates, each with a regression test: `check-review.sh` no-jq
+    fallback let a lowercase/mixed-case CRITICAL through (now normalized case-insensitively, matching
+    the jq path) and died with a jq error on a non-string verdict (now coerced, fails closed);
+    `check-trivial.sh` let a `git mv` into a critical-surface path bypass classification (now
+    `--no-renames`) and its `KEEL_CRITICAL_PATHS` globs fail-opened when the protected dir existed
+    (now `set -f` around the split); `guard-branch.sh` `+refspec` check false-blocked a `+` in an
+    earlier compound command and missed a quoted `"+main"` (now scoped to the push segment, quote
+    tolerated); `secret-scan.sh` Bash gate false-blocked `id_rsa`/`.env` interior substrings, missed
+    a bare `secrets/` path, and vanished without jq (now segment-anchored and jq-independent).
 - **2026-06-23** — Shipped **v0.2.0 "Gates as Code"** across seven workstreams:
   - **WS1 gates as code** — guard-branch/secret-scan block; DoD pre-push auto-installs; structured
     review verdict + `check-review.sh`.

@@ -15,27 +15,34 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 payload="$(cat 2>/dev/null || true)"
 [ -n "$payload" ] || exit 0
 
-if command -v jq >/dev/null 2>&1; then
-  tool="$(printf '%s' "$payload" | jq -r '.tool_name // empty' 2>/dev/null || true)"
-  if [ "$tool" = "Bash" ]; then
-    # Bash branch: parity with settings.json's Read-tool deny list — `cat .env`
-    # must not be the workaround. Block obvious read/copy verbs aimed at a
-    # secret-file path; anything ambiguous is allowed (defense-in-depth, the
-    # deny list and hooks on Write remain the primary gates).
+# Bash branch: parity with settings.json's Read-tool deny list — `cat .env` must not be the
+# workaround. Block obvious read/copy verbs aimed at a secret-file path; anything ambiguous is
+# allowed (defense-in-depth). Runs with OR without jq — the command text survives JSON escaping,
+# so on the no-jq path we scan the raw payload (which is why the pre-verb boundary allows a
+# preceding quote, as in "command":"cat .env"). Secret names are anchored to a path-segment
+# boundary so an interior substring (id_rsa in "david_rsanchez", .env in "app.env.log") does not
+# false-block, matching the basename semantics of the Read deny list.
+if printf '%s' "$payload" | grep -qE '"tool_name"[[:space:]]*:[[:space:]]*"Bash"'; then
+  if command -v jq >/dev/null 2>&1; then
     cmd="$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null || true)"
-    [ -n "$cmd" ] || exit 0
-    read_verbs='(cat|head|tail|less|more|strings|xxd|base64|od|cp|scp)'
-    secret_path='([^[:space:]"'\'']*(\.env(\.[A-Za-z0-9._-]+)?|\.pem|\.key|id_rsa[A-Za-z0-9._-]*|\.ssh/[^[:space:]"'\'']+|\.aws/[^[:space:]"'\'']+|(^|/)secrets/[^[:space:]"'\'']+))(["'\''[:space:]]|$)'
-    if printf '%s' "$cmd" | grep -qE "(^|[;&|(][[:space:]]*|[[:space:]])${read_verbs}[[:space:]]+([^;&|]*[[:space:]])?${secret_path}"; then
-      {
-        echo "✗ Keel secret-scan: blocked — that command reads or copies a secret file."
-        echo "  Secret files are read-denied (settings.json); reference an env var or use a"
-        echo "  secret manager instead (rules/safety.md)."
-      } >&2
-      exit 2
-    fi
-    exit 0
+  else
+    cmd="$payload"
   fi
+  [ -n "$cmd" ] || exit 0
+  read_verbs='(cat|head|tail|less|more|strings|xxd|base64|od|cp|scp)'
+  secret_path='(([^[:space:]"'\'']*/)?(\.env(\.[A-Za-z0-9._-]+)?|id_rsa[A-Za-z0-9._-]*)|[^[:space:]"'\'']*\.(pem|key)|([^[:space:]"'\'']*/)?(\.ssh|\.aws|secrets)/[^[:space:]"'\'']+)(["'\''[:space:]]|$)'
+  if printf '%s' "$cmd" | grep -qE "(^|[^A-Za-z])${read_verbs}[[:space:]]+([^;&|]*[[:space:]])?${secret_path}"; then
+    {
+      echo "✗ Keel secret-scan: blocked — that command reads or copies a secret file."
+      echo "  Secret files are read-denied (settings.json); reference an env var or use a"
+      echo "  secret manager instead (rules/safety.md)."
+    } >&2
+    exit 2
+  fi
+  exit 0
+fi
+
+if command -v jq >/dev/null 2>&1; then
   file="$(printf '%s' "$payload" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)"
   # Fixtures/tests/examples may legitimately contain sample secrets (anchored).
   if keel_is_test_path "$file"; then exit 0; fi
