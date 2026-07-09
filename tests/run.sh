@@ -181,7 +181,7 @@ TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 mkdir -p "$TMP/.claude/hooks"; cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"
 out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"; check "exits 0" 0 "$?"
 contains "emits additionalContext" "additionalContext" "$out"
-[ -e "$TMP/.git/hooks/pre-push" ]; check "auto-installs the pre-push DoD hook" 0 "$?"
+if [ -e "$TMP/.git/hooks/pre-push" ]; then rc=0; else rc=1; fi; check "auto-installs the pre-push DoD hook" 0 "$rc"
 out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"
 printf '%s' "$out" | grep -q "not Keel's DoD hook"; check "no warning when Keel's own hook is installed" 1 "$?"
 rm -rf "$TMP"
