@@ -69,6 +69,9 @@ and Keel ships as an installable plugin with language stack packs. Language- and
     and surgical-changes rule (engineering.md, reviewer now flags orthogonal changes as MEDIUM),
     and the **Assumptions / Changed / Verified / Remaining risk** reporting convention
     (dev-process §6, `/ship` output, PR template — lint-pinned).
+  - **The token budget is now a gate, not a claim**: `harness_lint.py` fails CI if CLAUDE.md
+    (>900 words), any rules file (>700), or the total always-on surface (>4,500 words ≈ 6k tokens)
+    exceeds budget. Raising a budget is an explicit, reviewable act.
 - **2026-06-23** — Shipped **v0.2.0 "Gates as Code"** across seven workstreams:
   - **WS1 gates as code** — guard-branch/secret-scan block; DoD pre-push auto-installs; structured
     review verdict + `check-review.sh`.

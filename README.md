@@ -115,11 +115,11 @@ Most "AI dev setups" fail the same way: they stuff every instruction into one al
 token in that file is re-read on **every** turn, the window fills, and the agent gets duller as the
 task gets longer. Keel is built the other way — **progressive disclosure**:
 
-|                 | Always-on (paid every turn) | On-demand (paid only when needed)                                        |
-| --------------- | --------------------------- | ------------------------------------------------------------------------ |
-| **What**        | `CLAUDE.md` + 8 rules       | 10 skills + 13 commands + 8 agents                                       |
-| **Footprint**   | ~510 lines · **≈5k tokens** | the bulk of Keel — loaded only when relevant                             |
-| **When loaded** | Every request               | Only when a trigger matches, a command runs, or a subagent is dispatched |
+|                 | Always-on (paid every turn)                                 | On-demand (paid only when needed)                                        |
+| --------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **What**        | `CLAUDE.md` + 8 rules                                       | 11 skills + 14 commands + 8 agents                                       |
+| **Footprint**   | **≈5k tokens** — budget-enforced by `tests/harness_lint.py` | the bulk of Keel — loaded only when relevant                             |
+| **When loaded** | Every request                                               | Only when a trigger matches, a command runs, or a subagent is dispatched |
 
 So **most of Keel's guidance never touches your main context** until the moment it is relevant. The
 mechanisms:
