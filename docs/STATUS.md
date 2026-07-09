@@ -76,6 +76,8 @@ and Keel ships as an installable plugin with language stack packs. Language- and
   - `docs/INSTALL.md` created (ADR-0006 referenced it for months while it did not exist — the lint
     now checks backticked `docs/` references resolve); ROADMAP WS5/WS7 updated to say honestly what
     shipped vs. what is still open (stack auto-wiring; behavioral evals).
+  - CI shellcheck (latest, via `action-shellcheck@master`) flagged `SC2319` on a pre-existing
+    `[ -e ]; check "$?"` idiom in `run.sh`; captured the status explicitly. All three CI jobs green.
   - **Adversarial self-review of the above** (three-lens fan-out + reproduced verification) found and
     fixed fail-open defects in the new gates, each with a regression test: `check-review.sh` no-jq
     fallback let a lowercase/mixed-case CRITICAL through (now normalized case-insensitively, matching
