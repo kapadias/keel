@@ -47,6 +47,11 @@ printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"config.py","content
 printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"tests/fixtures/keys.py","content":"TOKEN = \"ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\""}}' | "$SS"; check "allows secret under a test/fixture path" 0 "$?"
 printf '%s' '{"tool_name":"Edit","tool_input":{"file_path":"app.js","old_string":"a","new_string":"const k = \"AKIA1234567890ABCDEF\""}}' | "$SS"; check "blocks secret in Edit new_string" 2 "$?"
 printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"a.py"}}' | "$SS"; check "no content -> allow (fail safe)" 0 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"cat .env"}}' | "$SS"; check "blocks Bash read of .env" 2 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"head -5 secrets/creds.pem"}}' | "$SS"; check "blocks Bash read of a .pem" 2 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"cp ~/.ssh/id_rsa /tmp/x"}}' | "$SS"; check "blocks Bash copy of a private key" 2 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"cat README.md"}}' | "$SS"; check "allows Bash read of a normal file" 0 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"grep -r foo ."}}' | "$SS"; check "allows Bash grep with no secret target" 0 "$?"
 
 echo "== guard-branch.sh (PreToolUse branch gate) =="
 GB="$HOOKS/guard-branch.sh"
@@ -60,6 +65,8 @@ printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"a.txt"}}' | CLAUDE_
 "${GIT[@]}" -C "$TMP" checkout -q -b feature/x
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "allows commit on feature branch" 0 "$?"
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push -u origin feature/x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "allows push to feature branch" 0 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin +main"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "blocks +refspec force push to main" 2 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin +feature/x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "blocks +refspec force push to any ref" 2 "$?"
 rm -rf "$TMP"
 
 echo "== require-status-sync.sh (pre-push Definition of Done) =="
@@ -93,6 +100,28 @@ check "blocks a secret when run via the installed symlink" 1 "$sl_rc"
 contains "symlinked hook resolved its lib (no 'command not found')" "looks like" "$sl_out"
 rm -rf "$TMP" "$BARE"
 
+echo "== require-status-sync.sh (push-time fixture strictness) =="
+# Write-time stays ergonomic (fixture paths exempt); PUSH-time is strict — a
+# realistic-looking secret must use a placeholder-classed value even in fixtures.
+TMP="$(mktemp -d)"; BARE="$(mktemp -d)"
+"${GIT[@]}" init -q --bare "$BARE"
+"${GIT[@]}" -C "$TMP" init -q
+"${GIT[@]}" -C "$TMP" remote add origin "$BARE"
+"${GIT[@]}" -C "$TMP" commit -q --allow-empty -m init
+"${GIT[@]}" -C "$TMP" branch -M main
+"${GIT[@]}" -C "$TMP" push -q origin main
+"${GIT[@]}" -C "$TMP" checkout -q -b feature/z
+"${GIT[@]}" -C "$TMP" push -q -u origin feature/z
+mkdir -p "$TMP/tests/fixtures" "$TMP/docs"
+echo ok > "$TMP/docs/STATUS.md"
+printf 'KEY = "%s"\n' "AKIA""AB12CD34EF56GH78" > "$TMP/tests/fixtures/sample.py"
+"${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m "realistic secret in a fixture"
+( cd "$TMP" && "$RS" ); check "blocks a realistic secret even under a fixture path" 1 "$?"
+printf 'KEY = "%s"\n' "AKIAIOSFODNN7EXAMPLE" > "$TMP/tests/fixtures/sample.py"
+"${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m "placeholder fixture value"
+( cd "$TMP" && "$RS" ); check "allows a placeholder-classed fixture value" 0 "$?"
+rm -rf "$TMP" "$BARE"
+
 echo "== format.sh (PostToolUse, best-effort) =="
 TF="$(mktemp).py"; echo 'x=1' > "$TF"
 printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$TF" | "$HOOKS/format.sh"; check "exits 0 even if no formatter present" 0 "$?"
@@ -104,6 +133,17 @@ mkdir -p "$TMP/.claude/hooks"; cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/
 out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"; check "exits 0" 0 "$?"
 contains "emits additionalContext" "additionalContext" "$out"
 [ -e "$TMP/.git/hooks/pre-push" ]; check "auto-installs the pre-push DoD hook" 0 "$?"
+out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"
+printf '%s' "$out" | grep -q "not Keel's DoD hook"; check "no warning when Keel's own hook is installed" 1 "$?"
+rm -rf "$TMP"
+# A pre-existing foreign pre-push hook must never be overwritten — but going
+# silent about it means the DoD gate is off without anyone knowing. Warn.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+mkdir -p "$TMP/.claude/hooks"; cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"
+printf '#!/bin/sh\nexit 0\n' > "$TMP/.git/hooks/pre-push"; chmod +x "$TMP/.git/hooks/pre-push"
+out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"; check "exits 0 with a foreign pre-push hook" 0 "$?"
+contains "warns that DoD is not enforced" "not Keel's DoD hook" "$out"
+grep -q 'exit 0' "$TMP/.git/hooks/pre-push"; check "does not overwrite the foreign hook" 0 "$?"
 rm -rf "$TMP"
 
 echo "== check-review.sh (review verdict gate) =="

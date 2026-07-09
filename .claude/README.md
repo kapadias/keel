@@ -24,11 +24,13 @@ discipline is **enforced by code, not prose**. Start with [`../CLAUDE.md`](../CL
   `/debug`, `/ship`, `/release`, `/rollback`, `/sync`, `/adr`, `/intake`. Each declares its model tier;
   several use `!` bash injection / `@` refs to act on real repo state.
 - **`hooks/`** — the gates, now **blocking**: `guard-branch.sh` (blocks commits/pushes to
-  `main`/`master`/`develop`), `secret-scan.sh` (blocks writes that introduce a secret), `format.sh`
-  (post-edit auto-format), `require-status-sync.sh` (pre-push Definition-of-Done + secret scan,
-  auto-installed at `SessionStart`), `session-start.sh` (installs the pre-push hook, detects the stack,
-  injects context). Shared logic in `lib/` (`json.sh`, `secret-patterns.sh`); plugin wiring in
-  `hooks.json`.
+  `main`/`master`/`develop`, `--all`/`--mirror`, and `+refspec` force pushes), `secret-scan.sh`
+  (blocks writes that introduce a secret, and Bash reads/copies of secret files — parity with the
+  Read deny list), `format.sh` (post-edit auto-format), `require-status-sync.sh` (pre-push
+  Definition-of-Done + strict secret scan — no fixture exemption at push time; use
+  placeholder-classed values), `session-start.sh` (installs the pre-push hook — warns instead of
+  overwriting a foreign one — detects the stack, injects context). Shared logic in `lib/`
+  (`json.sh`, `secret-patterns.sh`); plugin wiring in `hooks.json`.
 - **`settings.json`** — denies reading secrets (`.env`/`*.pem`/`*.key`/`.ssh`/`.aws`/…) and
   `git push --force`; wires the hooks (PreToolUse, PostToolUse, SessionStart).
 - **`.claude-plugin/`** — `plugin.json`, so Keel installs as a Claude Code plugin.

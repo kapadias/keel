@@ -57,6 +57,13 @@ case "$tool" in
         echo "  Push one branch explicitly: git push origin <feature-branch> (rules/git-workflow.md)." >&2
         exit 2
       fi
+      # A refspec with a leading '+' is a force push in refspec syntax — parity
+      # with the blanket --force/--force-with-lease/-f denies in settings.json.
+      if printf '%s' "$cmd" | grep -qE '[[:space:]]\+[^[:space:]]+'; then
+        echo "✗ Keel branch guard: refusing 'git push' with a +refspec — that is a force push." >&2
+        echo "  Force-pushing is denied (settings.json, rules/git-workflow.md); push a new commit instead." >&2
+        exit 2
+      fi
       # On a protected branch, or naming a protected ref as the target.
       if is_protected "$branch" || printf '%s' "$cmd" | grep -qE '(:|/|[[:space:]])(main|master|develop)([[:space:]]|$)'; then
         echo "✗ Keel branch guard: refusing to push to a protected branch." >&2

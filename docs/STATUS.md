@@ -50,6 +50,13 @@ and Keel ships as an installable plugin with language stack packs. Language- and
   - `debugger` moved to **opus** per the model-tier policy (CLAUDE.md assigns debugging to Opus);
     the `security-review` skill's unparseable text verdict is replaced with the ADR-0005 JSON
     contract the `security-reviewer` agent already emits (lint now bans the text format).
+  - **Gate hardening** (each with golden tests): `guard-branch` blocks `+refspec` force pushes
+    (`git push origin +main` evaded the `--force` denies); `secret-scan` gains a Bash branch that
+    blocks read/copy commands aimed at secret files (`cat .env` was a workaround for the Read
+    deny) — wired into the Bash matcher in both `settings.json` and `hooks.json`; `session-start`
+    warns instead of silently no-oping when a foreign pre-push hook already occupies the DoD slot;
+    `require-status-sync` drops the fixture-path exemption at push time (fixtures must use
+    placeholder-classed values — write-time ergonomics unchanged).
 - **2026-06-23** — Shipped **v0.2.0 "Gates as Code"** across seven workstreams:
   - **WS1 gates as code** — guard-branch/secret-scan block; DoD pre-push auto-installs; structured
     review verdict + `check-review.sh`.

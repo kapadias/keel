@@ -54,9 +54,10 @@ Do not skip stages. The full definition lives in
              concurrency-performance · supply-chain  (most bundle scripts/templates/references)
   commands/  the pipeline (13): /plan /tdd /implement /review /test /debug /ship /sync /adr
              /intake /release /rollback /coverage
-  hooks/     guard-branch (BLOCKS commits/pushes to main/master/develop) · secret-scan (BLOCKS
-             writes with secrets) · format (post-edit) · require-status-sync (pre-push,
-             auto-installed at SessionStart) · session-start · lib/json.sh · lib/secret-patterns.sh
+  hooks/     guard-branch (BLOCKS commits/pushes to main/master/develop + force pushes) ·
+             secret-scan (BLOCKS secret writes + Bash reads of secret files) · format (post-edit) ·
+             require-status-sync (pre-push, auto-installed at SessionStart) · session-start ·
+             lib/json.sh · lib/secret-patterns.sh
   hooks.json   plugin hook wiring
   settings.json   denies reading secrets (.env/*.pem/*.key/.ssh/.aws/…) and force-push; wires hooks
 tests/       gate golden tests (tests/run.sh) + harness self-validation (tests/harness_lint.py)
