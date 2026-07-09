@@ -47,6 +47,9 @@ and Keel ships as an installable plugin with language stack packs. Language- and
     fails on any stale "N-gate / N golden" number in the living docs (CLAUDE.md, READMEs, this
     file's non-historical sections). The three stale hardcoded counts (28/28/39) are gone, and the
     "each skill bundles extras" overclaim is corrected to "most".
+  - `debugger` moved to **opus** per the model-tier policy (CLAUDE.md assigns debugging to Opus);
+    the `security-review` skill's unparseable text verdict is replaced with the ADR-0005 JSON
+    contract the `security-reviewer` agent already emits (lint now bans the text format).
 - **2026-06-23** — Shipped **v0.2.0 "Gates as Code"** across seven workstreams:
   - **WS1 gates as code** — guard-branch/secret-scan block; DoD pre-push auto-installs; structured
     review verdict + `check-review.sh`.

@@ -79,17 +79,18 @@ a retry (`.claude/rules/safety.md`).
 
 ## Finding & verdict format — identical contract to code-review
 
-One finding = **`path:line` + category + the exploit sketch + a concrete fix.** Close with a verdict
-so the two reviews merge cleanly:
+One finding = **`path:line` + category + the exploit sketch + a concrete fix.** Close by emitting
+the same structured JSON verdict as the correctness review — schema:
+[`../code-review/templates/verdict.json`](../code-review/templates/verdict.json). Each finding is
+one object (`severity`, `path`, `line`, `category: "security"`, `issue`, `fix`); the top-level
+`verdict` is `approve` or `request_changes`. Pipe it through the deterministic gate:
 
-```
-SECURITY VERDICT: CHANGES REQUIRED  (or: NO BLOCKING FINDINGS)
-CRITICAL: <n>   HIGH: <n>   MEDIUM: <n>   LOW: <n>
-- [CRITICAL] path:line — category — exploit in one line → fix
-- [HIGH]     path:line — ...
+```bash
+your-review-step | .claude/skills/code-review/scripts/check-review.sh
 ```
 
-Safe-to-merge once every CRITICAL and HIGH is closed. Prefer **few high-confidence findings with real
+The gate exits 1 on `request_changes` or any CRITICAL/HIGH — safe-to-merge once every CRITICAL and
+HIGH is closed. Prefer **few high-confidence findings with real
 abuse paths** over a long speculative list — ten "could be hardened" notes bury the one RCE. The
 deterministic gate decides, not the author's confidence. Route security-sensitive diffs through the
 `security-reviewer` agent; pair with the `code-review` skill for the correctness pass.

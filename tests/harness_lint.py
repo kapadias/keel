@@ -138,6 +138,15 @@ for rel in (
                     f"{rel}:{n}: stale gate-test count {m.group(1)} (run.sh has {ACTUAL_GATES})"
                 )
 
+# --- verdict format: no harness surface may teach the unparseable text verdict ---
+# The pre-ADR-0005 security skill printed "SECURITY VERDICT: ..." — a format
+# check-review.sh cannot parse. Every reviewer surface must use the JSON contract.
+for md in glob.glob(f"{ROOT}/.claude/**/*.md", recursive=True):
+    with open(md, encoding="utf-8") as fh:
+        for n, line in enumerate(fh, 1):
+            if "SECURITY VERDICT:" in line:
+                bad(f"{md}:{n}: text verdict format — use the ADR-0005 JSON contract")
+
 # --- settings.json wired hooks exist on disk ---
 with open(f"{ROOT}/.claude/settings.json", encoding="utf-8") as fh:
     settings = json.load(fh)
