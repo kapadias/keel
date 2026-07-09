@@ -7,7 +7,8 @@
 #
 # Run:  bash tests/run.sh      (exits non-zero if any gate misbehaves)
 # Deliberately NOT `set -e`: gates are EXPECTED to return non-zero.
-# shellcheck disable=SC1090,SC1091
+# SC2016: single-quoted printf payloads (JSON fixtures with backtick fences) are literal on purpose.
+# shellcheck disable=SC1090,SC1091,SC2016
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
