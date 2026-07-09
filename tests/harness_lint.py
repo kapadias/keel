@@ -97,6 +97,19 @@ for path in sorted(glob.glob(f"{ROOT}/.claude/skills/*/SKILL.md")):
     if fm_value(block, "description") is None:
         bad(f"{path}: frontmatter missing 'description:'")
 
+# --- review gate wiring: the machine-checkable verdict must be reachable ---
+# ADR-0005's parser is only a gate if the live pipeline invokes it. /review and
+# /ship must reference check-review.sh; a harness where the script exists but
+# nothing calls it re-creates the unwired-gate defect this pins against.
+for cmd in ("review", "ship"):
+    cmd_path = f"{ROOT}/.claude/commands/{cmd}.md"
+    try:
+        with open(cmd_path, encoding="utf-8") as fh:
+            if "check-review.sh" not in fh.read():
+                bad(f"{cmd_path}: does not wire check-review.sh (ADR-0005)")
+    except FileNotFoundError:
+        bad(f"review gate wiring: missing {os.path.relpath(cmd_path, ROOT)}")
+
 # --- settings.json wired hooks exist on disk ---
 with open(f"{ROOT}/.claude/settings.json", encoding="utf-8") as fh:
     settings = json.load(fh)

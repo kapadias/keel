@@ -31,3 +31,6 @@ coverage/
 .coverage
 htmlcov/
 target/
+
+# transient /review verdict files consumed by check-review.sh (ADR-0005)
+.claude/reviews/

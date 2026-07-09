@@ -2,7 +2,7 @@
 description: Run the full local gate, then commit on a feature branch, push, and open a PR to develop linked to its tracked issue — and update STATUS. The disciplined path to merge.
 argument-hint: "[optional: PR title / summary]"
 model: sonnet
-allowed-tools: Bash(git diff:*), Bash(git branch:*), Bash(git status:*), Bash(git push:*), Bash(git commit:*), Bash(git log:*), Read, Grep, Glob
+allowed-tools: Bash(git diff:*), Bash(git branch:*), Bash(git status:*), Bash(git push:*), Bash(git commit:*), Bash(git log:*), Bash(git rev-parse:*), Bash(ls:*), Bash(bash .claude/skills/code-review/scripts/check-review.sh:*), Bash(bash tests/run.sh:*), Bash(python3 tests/harness_lint.py:*), Read, Grep, Glob
 ---
 
 !git branch --show-current
@@ -16,16 +16,21 @@ Ship: **$ARGUMENTS**
 1. **Gate first — do not skip.** Run lint + type-check + tests + coverage (`/test`). If anything is
    red, stop and fix it. **Never ship with failing tests** (see
    [`.claude/rules/testing.md`](../rules/testing.md)).
-2. **Branch check.** Ensure you are on a `feature|fix|chore|refactor/<id>-<slug>` branch, not
+2. **Review gate — deterministic.** Verdict files for the **current** `git rev-parse --short HEAD`
+   must exist under `.claude/reviews/` (missing or stale — the SHA in the filename differs — means
+   `/review` has not run against this exact code: run it first). Then run
+   `bash .claude/skills/code-review/scripts/check-review.sh` on each file; **any non-zero exit blocks
+   the ship** (ADR-0005). Do not argue with the parser — fix the findings and re-review.
+3. **Branch check.** Ensure you are on a `feature|fix|chore|refactor/<id>-<slug>` branch, not
    `main`/`develop`. If not, create one and move your work (see
    [`.claude/rules/git-workflow.md`](../rules/git-workflow.md)).
-3. **Review the whole delta:** `git diff develop...HEAD`. Confirm there are no secrets, no debug spew,
+4. **Review the whole delta:** `git diff develop...HEAD`. Confirm there are no secrets, no debug spew,
    no unrelated changes.
-4. **Commit** in logical units with conventional-commit messages (`feat:`, `fix:`, …), referencing the
+5. **Commit** in logical units with conventional-commit messages (`feat:`, `fix:`, …), referencing the
    tracked issue.
-5. **Sync the mirrors** (`/sync`): update `docs/STATUS.md`, add an ADR if a decision was made, and move
+6. **Sync the mirrors** (`/sync`): update `docs/STATUS.md`, add an ADR if a decision was made, and move
    the tracked issue. The pre-push hook will block a code push that skips `docs/STATUS.md`.
-6. **Push & PR:** `git push -u origin <branch>`, open a PR **to `develop`** (never straight to `main`),
+7. **Push & PR:** `git push -u origin <branch>`, open a PR **to `develop`** (never straight to `main`),
    summarize the delta and the test plan, and **link the PR to the issue**. Paste the PR link back onto
    the issue.
 

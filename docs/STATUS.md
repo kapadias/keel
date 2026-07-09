@@ -35,9 +35,13 @@ and Keel ships as an installable plugin with language stack packs. Language- and
 - **2026-07-09** — Karpathy-alignment + gate-integrity pass (audit of the harness against Andrej
   Karpathy's published AI-coding principles):
   - `check-review.sh` now **fails closed on out-of-schema input**: unknown or missing verdict →
-    exit 2, unknown severity → exit 1, and it extracts exactly one ```json fenced block from
-reviewer prose (zero-after-fence or multiple blocks fail closed). 7 new golden tests.
-ADR-0005 amended to match the shipped schema (`CRITICAL|HIGH|MEDIUM|LOW`, category `tests`).
+    exit 2, unknown severity → exit 1, and it extracts exactly one json-fenced block from reviewer
+    prose (zero-after-fence or multiple blocks fail closed). 7 new golden tests. ADR-0005 amended
+    to match the shipped schema (`CRITICAL|HIGH|MEDIUM|LOW`, category `tests`).
+  - **The review gate is now wired**: `/review` persists each reviewer's JSON verdict verbatim to
+    `.claude/reviews/<sha>-{code,security}.json` and runs `check-review.sh` on each; `/ship` blocks
+    unless current-HEAD verdict files pass the script. Previously the parser existed but nothing
+    invoked it. `harness_lint.py` now fails if either command stops referencing it.
 - **2026-06-23** — Shipped **v0.2.0 "Gates as Code"** across seven workstreams:
   - **WS1 gates as code** — guard-branch/secret-scan block; DoD pre-push auto-installs; structured
     review verdict + `check-review.sh`.
