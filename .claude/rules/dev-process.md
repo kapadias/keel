@@ -7,6 +7,11 @@ stage well once, not from skipping the ones that catch mistakes.
 Research & Reuse → Plan → TDD (RED → GREEN → REFACTOR) → Implement → Review → Verify → Commit & PR → Sync
 ```
 
+**Proportionality — classify before you loop.** A trivial, reversible fix (≤15 lines, ≤3 files, no
+new deps, off the critical surface — `check-trivial.sh` decides, fail-closed) may take the bounded
+fast lane (`/fix`): regression test → gate → single machine-checked reviewer → ship. Everything else
+takes the full loop below; when in doubt, the full loop (see the `fast-lane` skill).
+
 ## 0. Research & Reuse — before writing new code
 
 Do not hand-roll what a battle-tested library already does correctly. Reinventing a parser, a date
@@ -56,13 +61,13 @@ close the loop: the work is not done until the **five mirrors** agree (see [sync
 
 ## Routing
 
-| Work type | Agent | Command |
-|---|---|---|
-| Cross-cutting / multi-step | `orchestrator` | — |
-| Plan a change | — | `/plan` |
-| Build it test-first | `test-engineer` + `implementer` | `/tdd` |
-| Find code / "where is…" | `explorer` | — |
-| Diagnose a failure | `debugger` | `/debug` |
-| Review before merge | `code-reviewer` + `security-reviewer` | `/review` |
-| Run the gate / ship | — | `/test` · `/ship` |
-| Decision / task / reconcile | — | `/adr` · `/intake` · `/sync` |
+| Work type                   | Agent                                 | Command                      |
+| --------------------------- | ------------------------------------- | ---------------------------- |
+| Cross-cutting / multi-step  | `orchestrator`                        | —                            |
+| Plan a change               | —                                     | `/plan`                      |
+| Build it test-first         | `test-engineer` + `implementer`       | `/tdd`                       |
+| Find code / "where is…"     | `explorer`                            | —                            |
+| Diagnose a failure          | `debugger`                            | `/debug`                     |
+| Review before merge         | `code-reviewer` + `security-reviewer` | `/review`                    |
+| Run the gate / ship         | —                                     | `/test` · `/ship`            |
+| Decision / task / reconcile | —                                     | `/adr` · `/intake` · `/sync` |

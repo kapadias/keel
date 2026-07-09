@@ -15,11 +15,12 @@ and Keel ships as an installable plugin with language stack packs. Language- and
   `safety`, `token-economy`. The dense, always-on policy surface.
 - **Agents ×8** — `orchestrator`, `planner`, `implementer`, `test-engineer`, `code-reviewer`,
   `security-reviewer`, `explorer`, `debugger`. Reviewers emit a structured JSON verdict.
-- **Skills ×10** — `tdd-workflow`, `code-review`, `debugging`, `refactoring`, `api-design`,
-  `security-review`, `migration-safety`, `observability`, `concurrency-performance`, `supply-chain` —
-  most bundling runnable scripts/templates/references.
-- **Commands ×13** — `/plan`, `/tdd`, `/implement`, `/review`, `/test`, `/coverage`, `/debug`, `/ship`,
-  `/release`, `/rollback`, `/sync`, `/adr`, `/intake`. Model-tiered; several use `!`/`@` injection.
+- **Skills ×11** — `tdd-workflow`, `code-review`, `debugging`, `refactoring`, `api-design`,
+  `security-review`, `migration-safety`, `observability`, `concurrency-performance`, `supply-chain`,
+  `fast-lane` — most bundling runnable scripts/templates/references.
+- **Commands ×14** — `/plan`, `/tdd`, `/implement`, `/review`, `/test`, `/coverage`, `/debug`, `/fix`,
+  `/ship`, `/release`, `/rollback`, `/sync`, `/adr`, `/intake`. Model-tiered; several use `!`/`@`
+  injection.
 - **Hooks** — `guard-branch` (blocks protected-branch commits/pushes), `secret-scan` (blocks secret
   writes), `format`, `require-status-sync` (pre-push DoD + secret scan, auto-installed at SessionStart),
   `session-start`; shared `lib/` + plugin `hooks.json`.
@@ -57,6 +58,12 @@ and Keel ships as an installable plugin with language stack packs. Language- and
     warns instead of silently no-oping when a foreign pre-push hook already occupies the DoD slot;
     `require-status-sync` drops the fixture-path exemption at push time (fixtures must use
     placeholder-classed values — write-time ergonomics unchanged).
+  - **The autonomy dial** (Karpathy's autonomy slider, bounded): new `/fix` command + `fast-lane`
+    skill bundling `check-trivial.sh` — a deterministic eligibility gate (≤15 changed lines, ≤3
+    files, no dependency/lockfile touch, no critical-surface path, fail-closed on any ambiguity;
+    7 golden tests). The fast lane skips plan/orchestrator/two-reviewer ceremony but never the
+    regression test, the gate, the hooks, the machine review verdict, or the STATUS entry. The
+    script decides the lane; prose cannot argue a change into it.
 - **2026-06-23** — Shipped **v0.2.0 "Gates as Code"** across seven workstreams:
   - **WS1 gates as code** — guard-branch/secret-scan block; DoD pre-push auto-installs; structured
     review verdict + `check-review.sh`.

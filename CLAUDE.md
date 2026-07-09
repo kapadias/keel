@@ -39,8 +39,9 @@ docs** is done.
 Research & Reuse → Plan → TDD (RED → GREEN → REFACTOR) → Implement → Review → Verify → Commit & PR → Sync
 ```
 
-Do not skip stages. The full definition lives in
-[.claude/rules/dev-process.md](.claude/rules/dev-process.md).
+Do not skip stages. One designed exception: a trivial, reversible fix may take the bounded `/fix`
+fast lane — `check-trivial.sh` decides eligibility, never prose (see **Proportionality** in
+[.claude/rules/dev-process.md](.claude/rules/dev-process.md)).
 
 ## The harness
 
@@ -49,10 +50,10 @@ Do not skip stages. The full definition lives in
   rules/     always-on operating discipline (dense, short — paid every turn)
   agents/    specialists (8): orchestrator · planner · implementer · test-engineer ·
              code-reviewer · security-reviewer · explorer · debugger
-  skills/    on-demand knowledge (10): tdd-workflow · code-review · debugging · refactoring ·
+  skills/    on-demand knowledge (11): tdd-workflow · code-review · debugging · refactoring ·
              api-design · security-review · migration-safety · observability ·
-             concurrency-performance · supply-chain  (most bundle scripts/templates/references)
-  commands/  the pipeline (13): /plan /tdd /implement /review /test /debug /ship /sync /adr
+             concurrency-performance · supply-chain · fast-lane  (most bundle scripts/templates/references)
+  commands/  the pipeline (14): /plan /tdd /implement /review /test /debug /fix /ship /sync /adr
              /intake /release /rollback /coverage
   hooks/     guard-branch (BLOCKS commits/pushes to main/master/develop + force pushes) ·
              secret-scan (BLOCKS secret writes + Bash reads of secret files) · format (post-edit) ·
@@ -71,6 +72,7 @@ Keel is also installable as a Claude Code plugin: `/plugin marketplace add kapad
 | Anything (router)                           | `orchestrator`                                                   |
 | Plan a change                               | `/plan` → `planner`                                              |
 | Build it test-first                         | `/tdd` → `test-engineer` + `implementer`                         |
+| Trivial fix (bounded fast lane)             | `/fix` — `check-trivial.sh` decides eligibility                  |
 | Find code / answer "where is…"              | `explorer` (read-only fan-out)                                   |
 | Diagnose a failure                          | `/debug` → `debugger`                                            |
 | Review before merge                         | `/review` → `code-reviewer` + `security-reviewer` (JSON verdict) |

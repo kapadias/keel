@@ -122,6 +122,33 @@ printf 'KEY = "%s"\n' "AKIAIOSFODNN7EXAMPLE" > "$TMP/tests/fixtures/sample.py"
 ( cd "$TMP" && "$RS" ); check "allows a placeholder-classed fixture value" 0 "$?"
 rm -rf "$TMP" "$BARE"
 
+echo "== check-trivial.sh (fast-lane eligibility gate) =="
+CT="$SKILLS/fast-lane/scripts/check-trivial.sh"
+TMP="$(mktemp -d)"
+"${GIT[@]}" -C "$TMP" init -q
+mkdir -p "$TMP/src"
+seq 1 50 | sed 's/^/line /' > "$TMP/src/app.py"
+"${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m base
+"${GIT[@]}" -C "$TMP" branch -M main
+"${GIT[@]}" -C "$TMP" checkout -q -b fix/tweak
+sed -i '1,3s/line/edited/' "$TMP/src/app.py"
+( cd "$TMP" && bash "$CT" main ); check "3-line change qualifies" 0 "$?"
+mkdir -p "$TMP/tests"; seq 1 30 > "$TMP/tests/test_app.py"
+( cd "$TMP" && bash "$CT" main ); check "test lines do not count against the budget" 0 "$?"
+sed -i 's/^line/edited/' "$TMP/src/app.py"
+( cd "$TMP" && bash "$CT" main ); check "40+ changed lines is over budget" 1 "$?"
+"${GIT[@]}" -C "$TMP" checkout -q -- src/app.py
+mkdir -p "$TMP/.claude/hooks"; echo 'x' > "$TMP/.claude/hooks/x.sh"
+( cd "$TMP" && bash "$CT" main ); check "critical-surface path disqualifies" 1 "$?"
+rm -rf "$TMP/.claude"
+echo '{}' > "$TMP/package-lock.json"
+( cd "$TMP" && bash "$CT" main ); check "lockfile touch disqualifies" 1 "$?"
+rm -f "$TMP/package-lock.json"
+( cd "$TMP" && bash "$CT" nosuchref ); check "unresolvable base fails closed" 1 "$?"
+NOREPO="$(mktemp -d)"
+( cd "$NOREPO" && bash "$CT" ); check "not a git repo fails closed" 1 "$?"
+rm -rf "$TMP" "$NOREPO"
+
 echo "== format.sh (PostToolUse, best-effort) =="
 TF="$(mktemp).py"; echo 'x=1' > "$TF"
 printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$TF" | "$HOOKS/format.sh"; check "exits 0 even if no formatter present" 0 "$?"

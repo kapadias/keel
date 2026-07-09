@@ -17,12 +17,13 @@ discipline is **enforced by code, not prose**. Start with [`../CLAUDE.md`](../CL
   `implementer`, `test-engineer`, `code-reviewer` (read-only; emits a machine-checkable JSON verdict),
   `security-reviewer` (read-only; same verdict contract), `explorer` (read-only fan-out, token-saver),
   `debugger`.
-- **`skills/`** — 10 on-demand playbooks, most bundling runnable scripts/templates/references that load
+- **`skills/`** — 11 on-demand playbooks, most bundling runnable scripts/templates/references that load
   only when opened: `tdd-workflow`, `code-review`, `debugging`, `refactoring`, `api-design`,
-  `security-review`, `migration-safety`, `observability`, `concurrency-performance`, `supply-chain`.
-- **`commands/`** — the pipeline (13): `/plan`, `/tdd`, `/implement`, `/review`, `/test`, `/coverage`,
-  `/debug`, `/ship`, `/release`, `/rollback`, `/sync`, `/adr`, `/intake`. Each declares its model tier;
-  several use `!` bash injection / `@` refs to act on real repo state.
+  `security-review`, `migration-safety`, `observability`, `concurrency-performance`, `supply-chain`,
+  `fast-lane` (bundles `check-trivial.sh` — the deterministic fast-lane eligibility gate).
+- **`commands/`** — the pipeline (14): `/plan`, `/tdd`, `/implement`, `/review`, `/test`, `/coverage`,
+  `/debug`, `/fix`, `/ship`, `/release`, `/rollback`, `/sync`, `/adr`, `/intake`. Each declares its
+  model tier; several use `!` bash injection / `@` refs to act on real repo state.
 - **`hooks/`** — the gates, now **blocking**: `guard-branch.sh` (blocks commits/pushes to
   `main`/`master`/`develop`, `--all`/`--mirror`, and `+refspec` force pushes), `secret-scan.sh`
   (blocks writes that introduce a secret, and Bash reads/copies of secret files — parity with the
