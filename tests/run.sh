@@ -7,7 +7,8 @@
 #
 # Run:  bash tests/run.sh      (exits non-zero if any gate misbehaves)
 # Deliberately NOT `set -e`: gates are EXPECTED to return non-zero.
-# shellcheck disable=SC1090,SC1091
+# SC2016: single-quoted printf payloads (JSON fixtures with backtick fences) are literal on purpose.
+# shellcheck disable=SC1090,SC1091,SC2016
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -47,6 +48,14 @@ printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"config.py","content
 printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"tests/fixtures/keys.py","content":"TOKEN = \"ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\""}}' | "$SS"; check "allows secret under a test/fixture path" 0 "$?"
 printf '%s' '{"tool_name":"Edit","tool_input":{"file_path":"app.js","old_string":"a","new_string":"const k = \"AKIA1234567890ABCDEF\""}}' | "$SS"; check "blocks secret in Edit new_string" 2 "$?"
 printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"a.py"}}' | "$SS"; check "no content -> allow (fail safe)" 0 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"cat .env"}}' | "$SS"; check "blocks Bash read of .env" 2 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"head -5 secrets/creds.pem"}}' | "$SS"; check "blocks Bash read of a .pem" 2 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"cp ~/.ssh/id_rsa /tmp/x"}}' | "$SS"; check "blocks Bash copy of a private key" 2 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"cat README.md"}}' | "$SS"; check "allows Bash read of a normal file" 0 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"grep -r foo ."}}' | "$SS"; check "allows Bash grep with no secret target" 0 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"cat secrets/db.txt"}}' | "$SS"; check "blocks Bash read of a bare secrets/ path" 2 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"cat david_rsanchez.txt"}}' | "$SS"; check "does not false-block 'id_rsa' as a substring" 0 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"tail -f logs/app.env.log"}}' | "$SS"; check "does not false-block '.env' as an interior substring" 0 "$?"
 
 echo "== guard-branch.sh (PreToolUse branch gate) =="
 GB="$HOOKS/guard-branch.sh"
@@ -60,6 +69,10 @@ printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"a.txt"}}' | CLAUDE_
 "${GIT[@]}" -C "$TMP" checkout -q -b feature/x
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "allows commit on feature branch" 0 "$?"
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push -u origin feature/x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "allows push to feature branch" 0 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin +main"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "blocks +refspec force push to main" 2 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin +feature/x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "blocks +refspec force push to any ref" 2 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin \"+main\""}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "blocks quoted +refspec force push" 2 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git commit -m \"support +x mode\" && git push -u origin feature/x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "a + in an earlier compound command does not false-block the push" 0 "$?"
 rm -rf "$TMP"
 
 echo "== require-status-sync.sh (pre-push Definition of Done) =="
@@ -93,6 +106,71 @@ check "blocks a secret when run via the installed symlink" 1 "$sl_rc"
 contains "symlinked hook resolved its lib (no 'command not found')" "looks like" "$sl_out"
 rm -rf "$TMP" "$BARE"
 
+echo "== require-status-sync.sh (push-time fixture strictness) =="
+# Write-time stays ergonomic (fixture paths exempt); PUSH-time is strict — a
+# realistic-looking secret must use a placeholder-classed value even in fixtures.
+TMP="$(mktemp -d)"; BARE="$(mktemp -d)"
+"${GIT[@]}" init -q --bare "$BARE"
+"${GIT[@]}" -C "$TMP" init -q
+"${GIT[@]}" -C "$TMP" remote add origin "$BARE"
+"${GIT[@]}" -C "$TMP" commit -q --allow-empty -m init
+"${GIT[@]}" -C "$TMP" branch -M main
+"${GIT[@]}" -C "$TMP" push -q origin main
+"${GIT[@]}" -C "$TMP" checkout -q -b feature/z
+"${GIT[@]}" -C "$TMP" push -q -u origin feature/z
+mkdir -p "$TMP/tests/fixtures" "$TMP/docs"
+echo ok > "$TMP/docs/STATUS.md"
+printf 'KEY = "%s"\n' "AKIA""AB12CD34EF56GH78" > "$TMP/tests/fixtures/sample.py"
+"${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m "realistic secret in a fixture"
+( cd "$TMP" && "$RS" ); check "blocks a realistic secret even under a fixture path" 1 "$?"
+printf 'KEY = "%s"\n' "AKIAIOSFODNN7EXAMPLE" > "$TMP/tests/fixtures/sample.py"
+"${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m "placeholder fixture value"
+( cd "$TMP" && "$RS" ); check "allows a placeholder-classed fixture value" 0 "$?"
+rm -rf "$TMP" "$BARE"
+
+echo "== check-trivial.sh (fast-lane eligibility gate) =="
+CT="$SKILLS/fast-lane/scripts/check-trivial.sh"
+TMP="$(mktemp -d)"
+"${GIT[@]}" -C "$TMP" init -q
+mkdir -p "$TMP/src"
+seq 1 50 | sed 's/^/line /' > "$TMP/src/app.py"
+"${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m base
+"${GIT[@]}" -C "$TMP" branch -M main
+"${GIT[@]}" -C "$TMP" checkout -q -b fix/tweak
+sed -i '1,3s/line/edited/' "$TMP/src/app.py"
+( cd "$TMP" && bash "$CT" main ); check "3-line change qualifies" 0 "$?"
+mkdir -p "$TMP/tests"; seq 1 30 > "$TMP/tests/test_app.py"
+( cd "$TMP" && bash "$CT" main ); check "test lines do not count against the budget" 0 "$?"
+sed -i 's/^line/edited/' "$TMP/src/app.py"
+( cd "$TMP" && bash "$CT" main ); check "40+ changed lines is over budget" 1 "$?"
+"${GIT[@]}" -C "$TMP" checkout -q -- src/app.py
+mkdir -p "$TMP/.claude/hooks"; echo 'x' > "$TMP/.claude/hooks/x.sh"
+( cd "$TMP" && bash "$CT" main ); check "critical-surface path disqualifies" 1 "$?"
+rm -rf "$TMP/.claude"
+echo '{}' > "$TMP/package-lock.json"
+( cd "$TMP" && bash "$CT" main ); check "lockfile touch disqualifies" 1 "$?"
+rm -f "$TMP/package-lock.json"
+( cd "$TMP" && bash "$CT" nosuchref ); check "unresolvable base fails closed" 1 "$?"
+# A pure rename INTO a critical-surface path must not slip through (--no-renames).
+"${GIT[@]}" -C "$TMP" checkout -q -- . 2>/dev/null; "${GIT[@]}" -C "$TMP" clean -fdq
+"${GIT[@]}" -C "$TMP" checkout -q -b rename/crit main
+mkdir -p "$TMP/migrations"; "${GIT[@]}" -C "$TMP" mv src/app.py migrations/001_app.py
+( cd "$TMP" && bash "$CT" main ); check "rename into a critical path disqualifies" 1 "$?"
+"${GIT[@]}" -C "$TMP" checkout -q main; "${GIT[@]}" -C "$TMP" branch -qD rename/crit
+# KEEL_CRITICAL_PATHS glob must match nested paths even when the dir exists (no pathname expansion).
+# existing.py lives in the BASE (main) so it is NOT in the diff — only the nested untracked file is,
+# which the buggy pathname-expanding loop would miss exactly because src/billing/ exists.
+"${GIT[@]}" -C "$TMP" checkout -q main
+mkdir -p "$TMP/src/billing/deep"; echo 'existing' > "$TMP/src/billing/existing.py"
+"${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m "billing dir exists on main"
+"${GIT[@]}" -C "$TMP" checkout -q -b crit/env
+printf 'a\nb\n' > "$TMP/src/billing/deep/rates.py"
+( cd "$TMP" && KEEL_CRITICAL_PATHS='src/billing/*' bash "$CT" main ); check "KEEL_CRITICAL_PATHS glob catches nested path when dir exists" 1 "$?"
+"${GIT[@]}" -C "$TMP" checkout -q main; "${GIT[@]}" -C "$TMP" branch -qD crit/env
+NOREPO="$(mktemp -d)"
+( cd "$NOREPO" && bash "$CT" ); check "not a git repo fails closed" 1 "$?"
+rm -rf "$TMP" "$NOREPO"
+
 echo "== format.sh (PostToolUse, best-effort) =="
 TF="$(mktemp).py"; echo 'x=1' > "$TF"
 printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$TF" | "$HOOKS/format.sh"; check "exits 0 even if no formatter present" 0 "$?"
@@ -103,7 +181,18 @@ TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 mkdir -p "$TMP/.claude/hooks"; cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"
 out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"; check "exits 0" 0 "$?"
 contains "emits additionalContext" "additionalContext" "$out"
-[ -e "$TMP/.git/hooks/pre-push" ]; check "auto-installs the pre-push DoD hook" 0 "$?"
+if [ -e "$TMP/.git/hooks/pre-push" ]; then rc=0; else rc=1; fi; check "auto-installs the pre-push DoD hook" 0 "$rc"
+out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"
+printf '%s' "$out" | grep -q "not Keel's DoD hook"; check "no warning when Keel's own hook is installed" 1 "$?"
+rm -rf "$TMP"
+# A pre-existing foreign pre-push hook must never be overwritten — but going
+# silent about it means the DoD gate is off without anyone knowing. Warn.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+mkdir -p "$TMP/.claude/hooks"; cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"
+printf '#!/bin/sh\nexit 0\n' > "$TMP/.git/hooks/pre-push"; chmod +x "$TMP/.git/hooks/pre-push"
+out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"; check "exits 0 with a foreign pre-push hook" 0 "$?"
+contains "warns that DoD is not enforced" "not Keel's DoD hook" "$out"
+grep -q 'exit 0' "$TMP/.git/hooks/pre-push"; check "does not overwrite the foreign hook" 0 "$?"
 rm -rf "$TMP"
 
 echo "== check-review.sh (review verdict gate) =="
@@ -113,6 +202,22 @@ if [ -x "$CR" ] || [ -f "$CR" ]; then
   printf '%s' '{"verdict":"request_changes","summary":"no","findings":[]}' | bash "$CR"; check "request_changes blocks" 1 "$?"
   printf '%s' '{"verdict":"approve","summary":"x","findings":[{"severity":"CRITICAL","path":"a","line":1,"category":"security","issue":"i","fix":"f"}]}' | bash "$CR"; check "CRITICAL finding blocks even if verdict says approve" 1 "$?"
   printf '%s' 'not json at all' | bash "$CR"; check "invalid JSON fails closed (non-zero)" 2 "$?"
+  printf '%s' '{"verdict":"approve","summary":"x","findings":[{"severity":"BLOCKER","path":"a","line":1,"category":"security","issue":"i","fix":"f"}]}' | bash "$CR"; check "out-of-schema severity blocks" 1 "$?"
+  printf '%s' '{"verdict":"lgtm","summary":"x","findings":[]}' | bash "$CR"; check "out-of-schema verdict fails closed" 2 "$?"
+  printf '%s' '{"summary":"x","findings":[]}' | bash "$CR"; check "missing verdict fails closed" 2 "$?"
+  printf '%s' '{"verdict":"approve","summary":"x","findings":[{"severity":"MEDIUM","path":"a","line":1,"category":"tests","issue":"i","fix":"f"}]}' | bash "$CR"; check "MEDIUM-only approve still passes" 0 "$?"
+  printf 'Prose before.\n```json\n{"verdict":"request_changes","summary":"x","findings":[]}\n```\nProse after.\n' | bash "$CR"; check "fenced request_changes block extracted and blocks" 1 "$?"
+  printf 'Prose before.\n```json\n{"verdict":"approve","summary":"x","findings":[]}\n```\nProse after.\n' | bash "$CR"; check "fenced approve block extracted and passes" 0 "$?"
+  printf '```json\n{"verdict":"approve","summary":"x","findings":[]}\n```\n```json\n{"verdict":"approve","summary":"y","findings":[]}\n```\n' | bash "$CR"; check "two fenced blocks is ambiguous, fails closed" 2 "$?"
+  printf '%s' '{"verdict":"approve","summary":"x","findings":[{"severity":123,"path":"a","line":1,"category":"x","issue":"i","fix":"f"}]}' | bash "$CR"; check "non-string severity fails closed, not a jq crash" 1 "$?"
+  # jq-absent fallback must be as strict as the jq path — including case.
+  NOJQ="$(mktemp -d)"
+  for b in bash sh env cat grep sed head tr printf awk dirname; do
+    p="$(command -v "$b" 2>/dev/null || true)"; [ -n "$p" ] && ln -s "$p" "$NOJQ/$b" 2>/dev/null || true
+  done
+  printf '%s' '{"verdict":"approve","summary":"x","findings":[{"severity":"critical","path":"a","line":1,"category":"x","issue":"i","fix":"f"}]}' | PATH="$NOJQ" bash "$CR"; check "no-jq: lowercase blocking severity still blocks" 1 "$?"
+  printf '%s' '{"verdict":"approve","summary":"x","findings":[{"severity":"MEDIUM","path":"a","line":1,"category":"x","issue":"i","fix":"f"}]}' | PATH="$NOJQ" bash "$CR"; check "no-jq: MEDIUM-only still approves" 0 "$?"
+  rm -rf "$NOJQ"
 else
   echo "  (skip: check-review.sh not found)"
 fi

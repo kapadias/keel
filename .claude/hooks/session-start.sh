@@ -15,11 +15,18 @@ cd "$root" 2>/dev/null || exit 0
 #    source EXISTING — never create a dangling symlink, which git would try to
 #    exec and fail, wedging every push.
 src=".claude/hooks/require-status-sync.sh"
-if [ -d .git ] && [ -f "$src" ] && [ ! -e .git/hooks/pre-push ] && [ ! -L .git/hooks/pre-push ]; then
-  ln -sf "../../$src" .git/hooks/pre-push 2>/dev/null \
-    || cp "$src" .git/hooks/pre-push 2>/dev/null \
-    || true
-  chmod +x "$src" 2>/dev/null || true
+dod_warn=""
+if [ -d .git ] && [ -f "$src" ]; then
+  if [ ! -e .git/hooks/pre-push ] && [ ! -L .git/hooks/pre-push ]; then
+    ln -sf "../../$src" .git/hooks/pre-push 2>/dev/null \
+      || cp "$src" .git/hooks/pre-push 2>/dev/null \
+      || true
+    chmod +x "$src" 2>/dev/null || true
+  elif ! grep -qs 'require-status-sync' .git/hooks/pre-push; then
+    # A foreign pre-push hook is installed. Never overwrite it (destructive) —
+    # but going silent would disable the DoD gate without anyone knowing.
+    dod_warn=" WARNING: .git/hooks/pre-push exists and is not Keel's DoD hook — Definition of Done is NOT enforced; chain .claude/hooks/require-status-sync.sh from your hook manually."
+  fi
 fi
 
 # 2. Detect toolchain.
@@ -33,7 +40,7 @@ stack="$(printf '%s' "$stack" | sed 's/^ //')"
 [ -n "$stack" ] || stack="undetected"
 
 # 3. Emit additionalContext (JSON on stdout; exit 0).
-msg="Keel harness active. Gates live: branch-guard (no commits/pushes to main/master/develop), secret-scan on writes, Definition-of-Done pre-push (docs/STATUS.md). Detected stack: ${stack}."
+msg="Keel harness active. Gates live: branch-guard (no commits/pushes to main/master/develop, no force pushes), secret-scan on writes and Bash secret reads, Definition-of-Done pre-push (docs/STATUS.md). Detected stack: ${stack}.${dod_warn}"
 [ -n "$testcmd" ] && msg="${msg} Likely test gate: '${testcmd}' — wire /test to your gate (see stacks/)."
 
 if command -v jq >/dev/null 2>&1; then

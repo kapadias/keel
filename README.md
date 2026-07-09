@@ -115,11 +115,11 @@ Most "AI dev setups" fail the same way: they stuff every instruction into one al
 token in that file is re-read on **every** turn, the window fills, and the agent gets duller as the
 task gets longer. Keel is built the other way — **progressive disclosure**:
 
-|                 | Always-on (paid every turn) | On-demand (paid only when needed)                                        |
-| --------------- | --------------------------- | ------------------------------------------------------------------------ |
-| **What**        | `CLAUDE.md` + 8 rules       | 10 skills + 13 commands + 8 agents                                       |
-| **Footprint**   | ~510 lines · **≈5k tokens** | the bulk of Keel — loaded only when relevant                             |
-| **When loaded** | Every request               | Only when a trigger matches, a command runs, or a subagent is dispatched |
+|                 | Always-on (paid every turn)                                 | On-demand (paid only when needed)                                        |
+| --------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **What**        | `CLAUDE.md` + 8 rules                                       | 11 skills + 14 commands + 8 agents                                       |
+| **Footprint**   | **≈5k tokens** — budget-enforced by `tests/harness_lint.py` | the bulk of Keel — loaded only when relevant                             |
+| **When loaded** | Every request                                               | Only when a trigger matches, a command runs, or a subagent is dispatched |
 
 So **most of Keel's guidance never touches your main context** until the moment it is relevant. The
 mechanisms:
@@ -188,23 +188,24 @@ and refuses to mark work done while a mirror is out of sync. Next, [make it your
 
 ## The pipeline
 
-Thirteen commands cover the development loop. Invoke them with `/<name>` in Claude Code.
+Fourteen commands cover the development loop. Invoke them with `/<name>` in Claude Code.
 
-| Command      | Does                                                                                     |
-| ------------ | ---------------------------------------------------------------------------------------- |
-| `/plan`      | Restate the requirement, research reuse, surface risks, decompose into reviewable steps. |
-| `/tdd`       | Run RED → GREEN → REFACTOR for a unit of behavior. The default way to build.             |
-| `/implement` | Write minimal, typed, reviewable code against an existing failing test.                  |
-| `/review`    | Path-aware parallel review — correctness always, security when the change warrants it.   |
-| `/test`      | Run the project's lint + type-check + test + coverage gate and summarize.                |
-| `/coverage`  | Report line + branch coverage; spotlight the survival-critical surface and its gaps.     |
-| `/debug`     | Reproduce → isolate → root-cause → fix the cause → leave a regression test.              |
-| `/ship`      | Full gate → conventional commit → push → PR to `develop`, linked to the issue.           |
-| `/release`   | Promote `develop → main` — human-gated production release with tag + notes.              |
-| `/rollback`  | Revert a bad change or roll back a deploy — the risk-reducing counterpart to `/ship`.    |
-| `/sync`      | Reconcile the five mirrors so every record of the system agrees.                         |
-| `/adr`       | Write a numbered Architecture Decision Record with real alternatives.                    |
-| `/intake`    | Turn a raw idea or bug into a well-formed, de-duplicated tracked issue.                  |
+| Command      | Does                                                                                      |
+| ------------ | ----------------------------------------------------------------------------------------- |
+| `/plan`      | Restate the requirement, research reuse, surface risks, decompose into reviewable steps.  |
+| `/tdd`       | Run RED → GREEN → REFACTOR for a unit of behavior. The default way to build.              |
+| `/implement` | Write minimal, typed, reviewable code against an existing failing test.                   |
+| `/fix`       | Bounded fast lane for a trivial, reversible fix — `check-trivial.sh` decides eligibility. |
+| `/review`    | Path-aware parallel review — correctness always, security when the change warrants it.    |
+| `/test`      | Run the project's lint + type-check + test + coverage gate and summarize.                 |
+| `/coverage`  | Report line + branch coverage; spotlight the survival-critical surface and its gaps.      |
+| `/debug`     | Reproduce → isolate → root-cause → fix the cause → leave a regression test.               |
+| `/ship`      | Full gate → conventional commit → push → PR to `develop`, linked to the issue.            |
+| `/release`   | Promote `develop → main` — human-gated production release with tag + notes.               |
+| `/rollback`  | Revert a bad change or roll back a deploy — the risk-reducing counterpart to `/ship`.     |
+| `/sync`      | Reconcile the five mirrors so every record of the system agrees.                          |
+| `/adr`       | Write a numbered Architecture Decision Record with real alternatives.                     |
+| `/intake`    | Turn a raw idea or bug into a well-formed, de-duplicated tracked issue.                   |
 
 ---
 
@@ -221,11 +222,11 @@ Eight specialist agents, each model-tiered so you never burn a frontier model on
 | `code-reviewer`     | Opus   | Independent, read-only correctness review; emits a machine-checkable JSON verdict.      |
 | `security-reviewer` | Opus   | Read-only security review — injection, secrets, authz, supply chain.                    |
 | `explorer`          | Haiku  | Read-only fan-out search. Returns conclusions, not file dumps. The token-saver.         |
-| `debugger`          | Sonnet | Reproduce, isolate, root-cause, and fix — the cause, not the symptom.                   |
+| `debugger`          | Opus   | Reproduce, isolate, root-cause, and fix — the cause, not the symptom.                   |
 
-**On-demand skills** deepen the agents when triggered — each bundling runnable scripts/templates/
+**On-demand skills** deepen the agents when triggered — most bundling runnable scripts/templates/
 references: `tdd-workflow`, `code-review`, `debugging`, `refactoring`, `api-design`, `security-review`,
-`migration-safety`, `observability`, `concurrency-performance`, `supply-chain`.
+`migration-safety`, `observability`, `concurrency-performance`, `supply-chain`, `fast-lane`.
 
 ---
 
@@ -234,13 +235,16 @@ references: `tdd-workflow`, `code-review`, `debugging`, `refactoring`, `api-desi
 Hooks turn the rules into deterministic guards — gates, not suggestions:
 
 - **`guard-branch.sh`** — **blocks** `git commit` / `git push` to `main` / `master` / `develop` (warns
-  on edits there). The "never commit to a protected branch" rule, actually enforced.
+  on edits there), plus `--all` / `--mirror` and `+refspec` force pushes. The "never commit to a
+  protected branch" rule, actually enforced.
 - **`secret-scan.sh`** — **blocks** any edit/write that introduces a high-confidence secret (AWS /
-  GitHub / Slack / Google keys, private-key blocks, hardcoded credentials).
+  GitHub / Slack / Google keys, private-key blocks, hardcoded credentials), and Bash reads/copies of
+  secret files (`cat .env`) — parity with the Read deny list.
 - **`format.sh`** — auto-formats the file you just touched (ruff / prettier / gofmt / rustfmt —
   best-effort, never blocking).
-- **`require-status-sync.sh`** (pre-push, **auto-installed at `SessionStart`**) — blocks a code push
-  that skips `docs/STATUS.md` or that introduces a secret. The Definition of Done, enforced.
+- **`require-status-sync.sh`** (pre-push, **auto-installed at `SessionStart`** — warns instead of
+  overwriting a foreign pre-push hook) — blocks a code push that skips `docs/STATUS.md` or that
+  introduces a secret (no fixture exemption at push time). The Definition of Done, enforced.
 
 `settings.json` denies reading `.env`, `secrets/**`, `*.pem`, `*.key`, `~/.ssh`, `~/.aws`, and more —
 and denies `git push --force`. The harness even **tests its own gates**: `bash tests/run.sh` runs
@@ -279,8 +283,8 @@ keel/
 │   ├── .claude-plugin/        # plugin manifest (plugin.json)
 │   ├── rules/                 # 8 always-on rules
 │   ├── agents/                # 8 specialists
-│   ├── skills/                # 10 on-demand playbooks (with bundled scripts/templates)
-│   ├── commands/              # 13 pipeline commands
+│   ├── skills/                # 11 on-demand playbooks (most with bundled scripts/templates)
+│   ├── commands/              # 14 pipeline commands
 │   └── hooks/                 # enforcing hooks + lib/ + hooks.json
 ├── tests/                     # gate golden tests + harness self-validation
 ├── stacks/                    # python · typescript · go · rust gate packs

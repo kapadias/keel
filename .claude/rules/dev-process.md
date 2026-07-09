@@ -1,11 +1,17 @@
 # Rule: The Development Loop
 
-Every change moves through these stages **in order**. Do not skip stages. Speed comes from doing each
-stage well once, not from skipping the ones that catch mistakes.
+Every change moves through these stages **in order**. Do not skip stages — with one designed
+exception, the bounded fast lane below. Speed comes from doing each stage well once, not from
+skipping the ones that catch mistakes.
 
 ```
 Research & Reuse → Plan → TDD (RED → GREEN → REFACTOR) → Implement → Review → Verify → Commit & PR → Sync
 ```
+
+**Proportionality — classify before you loop.** A trivial, reversible fix (≤15 lines, ≤3 files, no
+new deps, off the critical surface — `check-trivial.sh` decides, fail-closed) may take the bounded
+fast lane (`/fix`): regression test → gate → single machine-checked reviewer → ship. Everything else
+takes the full loop below; when in doubt, the full loop (see the `fast-lane` skill).
 
 ## 0. Research & Reuse — before writing new code
 
@@ -21,9 +27,12 @@ library, an auth flow, or a crypto primitive is a correctness and security risk,
 ## 1. Plan
 
 Restate the requirement in your own words, surface risks and unknowns, and decompose into reviewable
-steps. For anything spanning multiple modules, write the plan down before coding (`/plan`). Name what
-could break and how you will know. A plan that fits in your head is fine; a plan that doesn't must be
-on disk.
+steps. **State the assumptions you are coding under.** If the request admits more than one reasonable
+interpretation, present them and ask — never pick silently; push back when the requested approach
+looks wrong, and **stop when confused**: "this seems off" beats plausible-looking wrong code. For
+anything spanning multiple modules, write the plan down before coding (`/plan`). Name what could
+break and how you will know. A plan that fits in your head is fine; a plan that doesn't must be on
+disk.
 
 ## 2. TDD — RED → GREEN → REFACTOR
 
@@ -54,15 +63,20 @@ required. **Never proceed with failing tests** (see [testing.md](./testing.md)).
 Feature branch, conventional commits, PR to `develop` (see [git-workflow.md](./git-workflow.md)). Then
 close the loop: the work is not done until the **five mirrors** agree (see [sync.md](./sync.md)).
 
+**Report every completed unit in four lines** (mirrored by the PR template): **Assumptions** (what
+you took as given), **Changed** (files/behavior), **Verified** (the gate you ran and its _observed_
+result — never inferred), **Remaining risk** (what is not covered).
+
 ## Routing
 
-| Work type | Agent | Command |
-|---|---|---|
-| Cross-cutting / multi-step | `orchestrator` | — |
-| Plan a change | — | `/plan` |
-| Build it test-first | `test-engineer` + `implementer` | `/tdd` |
-| Find code / "where is…" | `explorer` | — |
-| Diagnose a failure | `debugger` | `/debug` |
-| Review before merge | `code-reviewer` + `security-reviewer` | `/review` |
-| Run the gate / ship | — | `/test` · `/ship` |
-| Decision / task / reconcile | — | `/adr` · `/intake` · `/sync` |
+| Work type                   | Agent                                 | Command                      |
+| --------------------------- | ------------------------------------- | ---------------------------- |
+| Cross-cutting / multi-step  | `orchestrator`                        | —                            |
+| Plan a change               | —                                     | `/plan`                      |
+| Build it test-first         | `test-engineer` + `implementer`       | `/tdd`                       |
+| Trivial, reversible fix     | — (`check-trivial.sh` decides)        | `/fix`                       |
+| Find code / "where is…"     | `explorer`                            | —                            |
+| Diagnose a failure          | `debugger`                            | `/debug`                     |
+| Review before merge         | `code-reviewer` + `security-reviewer` | `/review`                    |
+| Run the gate / ship         | —                                     | `/test` · `/ship`            |
+| Decision / task / reconcile | —                                     | `/adr` · `/intake` · `/sync` |

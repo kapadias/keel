@@ -42,11 +42,13 @@ if [ -n "$code_touched" ] && [ -z "$status_touched" ]; then
   fail=1
 fi
 
-# Secret scan over added lines, per file, skipping fixture/test/example paths
-# (consistent with the write-time gate, so sample-secret fixtures don't trip it).
+# Secret scan over added lines, per file. Unlike the write-time gate, there is
+# NO fixture-path exemption here: a push is outward-facing, and a realistic-
+# looking credential under tests/ leaks exactly like one under src/. Fixtures
+# must use placeholder-classed values (AKIAIOSFODNN7EXAMPLE, XXXX, CHANGEME, …)
+# — those are value-exempt in lib/secret-patterns.sh.
 while IFS= read -r f; do
   [ -n "$f" ] || continue
-  if keel_is_test_path "$f"; then continue; fi
   added="$(git diff "$range" -- "$f" 2>/dev/null | grep -E '^\+' | grep -vE '^\+\+\+' || true)"
   [ -n "$added" ] || continue
   if class="$(printf '%s' "$added" | keel_scan_secrets)"; then

@@ -49,7 +49,8 @@ Turn prose gates into wired, deterministic ones.
 ### WS5 · Deliver on "language-agnostic"
 
 Stack packs (Python / TypeScript / Go / Rust): real `/test` wiring, formatter config, golden+property
-test templates, auto-selected by toolchain detection at `SessionStart`.
+test templates. _Shipped as documented packs adopted manually (`stacks/README.md`); `SessionStart`
+detects the toolchain and points at the pack — the auto-selection/auto-wiring promise is still open._
 
 ### WS6 · Distribution & adoption
 
@@ -62,7 +63,10 @@ test templates, auto-selected by toolchain detection at `SessionStart`.
 
 A scenario suite that proves the gates fire: a change with a failing test is blocked; a secret in a
 diff is blocked; a push without STATUS is blocked; a review with a CRITICAL finding blocks `/ship`.
-The meta-gate — `boundaries.md` applied to Keel itself.
+The meta-gate — `boundaries.md` applied to Keel itself. _Shipped: the gate golden tests in
+`tests/run.sh` prove every gate blocks vs. allows. Still open: behavioral evals — transcript-graded
+scenarios showing the harness changes agent behavior (a RED test before the first production edit, a
+stopped ship on a red verdict, a question instead of code on an ambiguous prompt)._
 
 ## Phasing
 

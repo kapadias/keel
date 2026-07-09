@@ -17,18 +17,21 @@ discipline is **enforced by code, not prose**. Start with [`../CLAUDE.md`](../CL
   `implementer`, `test-engineer`, `code-reviewer` (read-only; emits a machine-checkable JSON verdict),
   `security-reviewer` (read-only; same verdict contract), `explorer` (read-only fan-out, token-saver),
   `debugger`.
-- **`skills/`** — 10 on-demand playbooks, each bundling runnable scripts/templates/references that load
+- **`skills/`** — 11 on-demand playbooks, most bundling runnable scripts/templates/references that load
   only when opened: `tdd-workflow`, `code-review`, `debugging`, `refactoring`, `api-design`,
-  `security-review`, `migration-safety`, `observability`, `concurrency-performance`, `supply-chain`.
-- **`commands/`** — the pipeline (13): `/plan`, `/tdd`, `/implement`, `/review`, `/test`, `/coverage`,
-  `/debug`, `/ship`, `/release`, `/rollback`, `/sync`, `/adr`, `/intake`. Each declares its model tier;
-  several use `!` bash injection / `@` refs to act on real repo state.
+  `security-review`, `migration-safety`, `observability`, `concurrency-performance`, `supply-chain`,
+  `fast-lane` (bundles `check-trivial.sh` — the deterministic fast-lane eligibility gate).
+- **`commands/`** — the pipeline (14): `/plan`, `/tdd`, `/implement`, `/review`, `/test`, `/coverage`,
+  `/debug`, `/fix`, `/ship`, `/release`, `/rollback`, `/sync`, `/adr`, `/intake`. Each declares its
+  model tier; several use `!` bash injection / `@` refs to act on real repo state.
 - **`hooks/`** — the gates, now **blocking**: `guard-branch.sh` (blocks commits/pushes to
-  `main`/`master`/`develop`), `secret-scan.sh` (blocks writes that introduce a secret), `format.sh`
-  (post-edit auto-format), `require-status-sync.sh` (pre-push Definition-of-Done + secret scan,
-  auto-installed at `SessionStart`), `session-start.sh` (installs the pre-push hook, detects the stack,
-  injects context). Shared logic in `lib/` (`json.sh`, `secret-patterns.sh`); plugin wiring in
-  `hooks.json`.
+  `main`/`master`/`develop`, `--all`/`--mirror`, and `+refspec` force pushes), `secret-scan.sh`
+  (blocks writes that introduce a secret, and Bash reads/copies of secret files — parity with the
+  Read deny list), `format.sh` (post-edit auto-format), `require-status-sync.sh` (pre-push
+  Definition-of-Done + strict secret scan — no fixture exemption at push time; use
+  placeholder-classed values), `session-start.sh` (installs the pre-push hook — warns instead of
+  overwriting a foreign one — detects the stack, injects context). Shared logic in `lib/`
+  (`json.sh`, `secret-patterns.sh`); plugin wiring in `hooks.json`.
 - **`settings.json`** — denies reading secrets (`.env`/`*.pem`/`*.key`/`.ssh`/`.aws`/…) and
   `git push --force`; wires the hooks (PreToolUse, PostToolUse, SessionStart).
 - **`.claude-plugin/`** — `plugin.json`, so Keel installs as a Claude Code plugin.
@@ -55,9 +58,10 @@ that load only when needed, and delegate fan-out so the main thread keeps conclu
 
 - **Branch safety:** `guard-branch.sh` **blocks** `git commit`/`git push` to `main`/`master`/`develop`
   (warns on edits there). It tolerates `git -C`/`--git-dir`/path-prefixed git and blocks
-  `push --all/--mirror`.
-- **Secrets:** `secret-scan.sh` **blocks** any edit/write introducing a high-confidence secret; it
-  fails closed when `jq` is absent. The pre-push hook re-scans the pushed range.
+  `push --all/--mirror` and `+refspec` force pushes.
+- **Secrets:** `secret-scan.sh` **blocks** any edit/write introducing a high-confidence secret, and
+  Bash reads/copies of secret files (`cat .env`); it fails closed when `jq` is absent. The pre-push
+  hook re-scans the pushed range with no fixture exemption.
 - **Definition of Done:** `require-status-sync.sh` blocks a code push that skips `docs/STATUS.md`. It is
   **auto-installed** as the git `pre-push` hook at `SessionStart` — no manual symlink. Run `/sync` to
   reconcile drift across the five mirrors.
