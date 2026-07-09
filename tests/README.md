@@ -19,15 +19,23 @@ Exercises each deterministic gate with fixed inputs and asserts the exit code:
 
 - **secret detection** (`lib/secret-patterns.sh`): catches AWS/GitHub/Slack/Google
   keys and hardcoded assignments; ignores placeholders and env-var refs.
-- **secret-scan** (PreToolUse): blocks a write that introduces a secret; allows
-  clean writes and sample secrets under `test/fixture/example` paths.
+- **secret-scan** (PreToolUse): blocks a write that introduces a secret and Bash
+  reads/copies of secret files (segment-anchored, jq-independent); allows clean
+  writes and sample secrets under `test/fixture/example` paths.
 - **guard-branch** (PreToolUse): blocks `git commit`/`git push` on `main`/`master`/
-  `develop`; allows work on a feature branch.
+  `develop` and `+refspec` force pushes (scoped to the push segment); allows work on
+  a feature branch.
 - **require-status-sync** (pre-push): blocks a code push without a `docs/STATUS.md`
-  update or that introduces a secret; allows a synced push.
-- **session-start**: emits context and auto-installs the pre-push hook.
-- **check-review** (review verdict gate): blocks on `request_changes` or any
-  CRITICAL/HIGH finding; fails closed on invalid JSON.
+  update or that introduces a secret (no fixture exemption at push time); allows a
+  synced push.
+- **session-start**: emits context, auto-installs the pre-push hook, and warns
+  instead of overwriting a foreign one.
+- **check-review** (review verdict gate): blocks on `request_changes`, any
+  CRITICAL/HIGH, or an out-of-schema verdict/severity; extracts one fenced json
+  block; fails closed on invalid JSON — same on the jq and no-jq paths.
+- **check-trivial** (fast-lane eligibility): qualifies a small reversible change;
+  disqualifies over-budget, lockfile, critical-surface, and rename-into-critical
+  changes; fails closed off a repo.
 - **dep-audit** (supply-chain): exits non-zero when a required scanner is missing
   (a skipped scan is not a pass).
 

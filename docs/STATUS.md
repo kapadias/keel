@@ -21,9 +21,10 @@ and Keel ships as an installable plugin with language stack packs. Language- and
 - **Commands ×14** — `/plan`, `/tdd`, `/implement`, `/review`, `/test`, `/coverage`, `/debug`, `/fix`,
   `/ship`, `/release`, `/rollback`, `/sync`, `/adr`, `/intake`. Model-tiered; several use `!`/`@`
   injection.
-- **Hooks** — `guard-branch` (blocks protected-branch commits/pushes), `secret-scan` (blocks secret
-  writes), `format`, `require-status-sync` (pre-push DoD + secret scan, auto-installed at SessionStart),
-  `session-start`; shared `lib/` + plugin `hooks.json`.
+- **Hooks** — `guard-branch` (blocks protected-branch commits/pushes + `--all`/`--mirror`/`+refspec`
+  force pushes), `secret-scan` (blocks secret writes + Bash reads of secret files), `format`,
+  `require-status-sync` (pre-push DoD + strict secret scan, auto-installed at SessionStart — warns on
+  a foreign hook), `session-start`; shared `lib/` + plugin `hooks.json`.
 - **Settings** — denies reading secrets and force-push; wires all hooks.
 - **Tests** — `tests/run.sh` (gate golden tests; the count is derived and drift-linted, never
   hardcoded) + `tests/harness_lint.py` (self-validation).

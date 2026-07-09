@@ -40,7 +40,7 @@ stack="$(printf '%s' "$stack" | sed 's/^ //')"
 [ -n "$stack" ] || stack="undetected"
 
 # 3. Emit additionalContext (JSON on stdout; exit 0).
-msg="Keel harness active. Gates live: branch-guard (no commits/pushes to main/master/develop), secret-scan on writes, Definition-of-Done pre-push (docs/STATUS.md). Detected stack: ${stack}.${dod_warn}"
+msg="Keel harness active. Gates live: branch-guard (no commits/pushes to main/master/develop, no force pushes), secret-scan on writes and Bash secret reads, Definition-of-Done pre-push (docs/STATUS.md). Detected stack: ${stack}.${dod_warn}"
 [ -n "$testcmd" ] && msg="${msg} Likely test gate: '${testcmd}' — wire /test to your gate (see stacks/)."
 
 if command -v jq >/dev/null 2>&1; then

@@ -58,9 +58,10 @@ that load only when needed, and delegate fan-out so the main thread keeps conclu
 
 - **Branch safety:** `guard-branch.sh` **blocks** `git commit`/`git push` to `main`/`master`/`develop`
   (warns on edits there). It tolerates `git -C`/`--git-dir`/path-prefixed git and blocks
-  `push --all/--mirror`.
-- **Secrets:** `secret-scan.sh` **blocks** any edit/write introducing a high-confidence secret; it
-  fails closed when `jq` is absent. The pre-push hook re-scans the pushed range.
+  `push --all/--mirror` and `+refspec` force pushes.
+- **Secrets:** `secret-scan.sh` **blocks** any edit/write introducing a high-confidence secret, and
+  Bash reads/copies of secret files (`cat .env`); it fails closed when `jq` is absent. The pre-push
+  hook re-scans the pushed range with no fixture exemption.
 - **Definition of Done:** `require-status-sync.sh` blocks a code push that skips `docs/STATUS.md`. It is
   **auto-installed** as the git `pre-push` hook at `SessionStart` — no manual symlink. Run `/sync` to
   reconcile drift across the five mirrors.

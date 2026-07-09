@@ -22,9 +22,10 @@ Review: **$ARGUMENTS** (if empty, review the current branch's diff vs `develop`)
    - **If the change touches auth / data / money / input / secrets / outward-facing surfaces:** also
      `security-reviewer` — injection, secret leakage, broken authz, unsafe deserialization, supply
      chain.
-3. **Persist each verdict — verbatim.** Every reviewer ends with exactly one fenced ```json verdict
-block. Write each block **byte-for-byte** — no merging, no rewriting, no "cleanup" — to
-`.claude/reviews/<sha>-code.json`and (when the security reviewer ran)`.claude/reviews/<sha>-security.json`, where `<sha>`is`git rev-parse --short HEAD`. These are
+3. **Persist each verdict — verbatim.** Every reviewer ends with exactly one fenced json verdict
+   block. Write each block **byte-for-byte** — no merging, no rewriting, no "cleanup" — to
+   `.claude/reviews/<sha>-code.json` and (when the security reviewer ran)
+   `.claude/reviews/<sha>-security.json`, where `<sha>` is `git rev-parse --short HEAD`. These are
    transient gate inputs, git-ignored; a new commit invalidates them by construction.
 4. **Run the gate — the script decides.** Run
    `bash .claude/skills/code-review/scripts/check-review.sh` on **each** verdict file. A non-zero

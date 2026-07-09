@@ -1,7 +1,8 @@
 # Rule: The Development Loop
 
-Every change moves through these stages **in order**. Do not skip stages. Speed comes from doing each
-stage well once, not from skipping the ones that catch mistakes.
+Every change moves through these stages **in order**. Do not skip stages — with one designed
+exception, the bounded fast lane below. Speed comes from doing each stage well once, not from
+skipping the ones that catch mistakes.
 
 ```
 Research & Reuse → Plan → TDD (RED → GREEN → REFACTOR) → Implement → Review → Verify → Commit & PR → Sync
@@ -73,6 +74,7 @@ result — never inferred), **Remaining risk** (what is not covered).
 | Cross-cutting / multi-step  | `orchestrator`                        | —                            |
 | Plan a change               | —                                     | `/plan`                      |
 | Build it test-first         | `test-engineer` + `implementer`       | `/tdd`                       |
+| Trivial, reversible fix     | — (`check-trivial.sh` decides)        | `/fix`                       |
 | Find code / "where is…"     | `explorer`                            | —                            |
 | Diagnose a failure          | `debugger`                            | `/debug`                     |
 | Review before merge         | `code-reviewer` + `security-reviewer` | `/review`                    |
