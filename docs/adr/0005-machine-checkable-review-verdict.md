@@ -121,3 +121,23 @@ that must be flagged.
   enforce that the reviewer _found_ every bug. The quality of findings is still a function of the
   review agents' capability. The gate catches structurally defective verdicts and flagged findings; it
   does not substitute for good review prompts and sufficient coverage.
+
+## Amendment (2026-07-09)
+
+The implementation as shipped had drifted from this record in three ways; the schema is amended to
+match the code where the code is right, and the code was fixed where it failed open:
+
+- **Severity enum is `CRITICAL | HIGH | MEDIUM | LOW`** — `INFO` is dropped (it added nothing over
+  LOW and no reviewer emits it). The category for test gaps is `tests`, matching the agents and
+  `templates/verdict.json`.
+- **Fail-closed is now provable, not promised.** As first shipped, `check-review.sh` blocked only on
+  the literal `request_changes` / `CRITICAL|HIGH` values: an out-of-schema verdict (`"lgtm"`, or a
+  missing field) exited 0, and an out-of-schema severity (`"BLOCKER"`) did not block. Both now fail
+  as this ADR always claimed — unknown verdict → exit 2, unknown severity → exit 1 — with golden
+  tests in `tests/run.sh` pinning each case.
+- **Extraction lives in the script.** `check-review.sh` accepts either pure JSON or reviewer prose
+  containing exactly one ```json fenced block; zero-after-fence or multiple blocks fail closed as
+  ambiguous. The orchestrating LLM never hand-extracts the block — that step is deterministic.
+
+`/ship` and `/review` are wired to run the script (see the commands); the "the parser decides" claim
+in this ADR is true as of this amendment.
