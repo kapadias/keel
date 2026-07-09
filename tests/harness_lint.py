@@ -110,6 +110,34 @@ for cmd in ("review", "ship"):
     except FileNotFoundError:
         bad(f"review gate wiring: missing {os.path.relpath(cmd_path, ROOT)}")
 
+# --- test-count drift: no doc may hardcode a stale gate-test count ---
+# The suite size is derived from run.sh (its `check`/`contains` helper calls);
+# any "N-gate" / "N golden" number in the living docs must equal it. Historical
+# entries under STATUS.md's "Recently changed" are records, not claims — skipped.
+with open(f"{ROOT}/tests/run.sh", encoding="utf-8") as fh:
+    ACTUAL_GATES = len(re.findall(r'\b(?:check|contains) "', fh.read()))
+COUNT = re.compile(r"\b(\d+)[- ](?:gate|golden)\b", re.IGNORECASE)
+for rel in (
+    "CLAUDE.md",
+    "README.md",
+    "tests/README.md",
+    ".claude/README.md",
+    "docs/STATUS.md",
+):
+    path = os.path.join(ROOT, rel)
+    if not os.path.isfile(path):
+        continue
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    if rel == "docs/STATUS.md":
+        text = text.split("## Recently changed")[0]
+    for n, line in enumerate(text.splitlines(), 1):
+        for m in COUNT.finditer(line):
+            if int(m.group(1)) != ACTUAL_GATES:
+                bad(
+                    f"{rel}:{n}: stale gate-test count {m.group(1)} (run.sh has {ACTUAL_GATES})"
+                )
+
 # --- settings.json wired hooks exist on disk ---
 with open(f"{ROOT}/.claude/settings.json", encoding="utf-8") as fh:
     settings = json.load(fh)

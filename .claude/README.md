@@ -17,7 +17,7 @@ discipline is **enforced by code, not prose**. Start with [`../CLAUDE.md`](../CL
   `implementer`, `test-engineer`, `code-reviewer` (read-only; emits a machine-checkable JSON verdict),
   `security-reviewer` (read-only; same verdict contract), `explorer` (read-only fan-out, token-saver),
   `debugger`.
-- **`skills/`** — 10 on-demand playbooks, each bundling runnable scripts/templates/references that load
+- **`skills/`** — 10 on-demand playbooks, most bundling runnable scripts/templates/references that load
   only when opened: `tdd-workflow`, `code-review`, `debugging`, `refactoring`, `api-design`,
   `security-review`, `migration-safety`, `observability`, `concurrency-performance`, `supply-chain`.
 - **`commands/`** — the pipeline (13): `/plan`, `/tdd`, `/implement`, `/review`, `/test`, `/coverage`,

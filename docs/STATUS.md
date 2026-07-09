@@ -17,14 +17,15 @@ and Keel ships as an installable plugin with language stack packs. Language- and
   `security-reviewer`, `explorer`, `debugger`. Reviewers emit a structured JSON verdict.
 - **Skills ×10** — `tdd-workflow`, `code-review`, `debugging`, `refactoring`, `api-design`,
   `security-review`, `migration-safety`, `observability`, `concurrency-performance`, `supply-chain` —
-  each bundling runnable scripts/templates/references.
+  most bundling runnable scripts/templates/references.
 - **Commands ×13** — `/plan`, `/tdd`, `/implement`, `/review`, `/test`, `/coverage`, `/debug`, `/ship`,
   `/release`, `/rollback`, `/sync`, `/adr`, `/intake`. Model-tiered; several use `!`/`@` injection.
 - **Hooks** — `guard-branch` (blocks protected-branch commits/pushes), `secret-scan` (blocks secret
   writes), `format`, `require-status-sync` (pre-push DoD + secret scan, auto-installed at SessionStart),
   `session-start`; shared `lib/` + plugin `hooks.json`.
 - **Settings** — denies reading secrets and force-push; wires all hooks.
-- **Tests** — `tests/run.sh` (39 gate golden tests) + `tests/harness_lint.py` (self-validation).
+- **Tests** — `tests/run.sh` (gate golden tests; the count is derived and drift-linted, never
+  hardcoded) + `tests/harness_lint.py` (self-validation).
 - **Stacks** — `stacks/{python,typescript,go,rust}` wiring the test gate.
 - **Plugin** — `.claude/.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json`.
 - **Docs** — this `STATUS.md`, `ROADMAP.md`, the `docs/adr/` index, and ADRs 0001–0006.
@@ -42,6 +43,10 @@ and Keel ships as an installable plugin with language stack packs. Language- and
     `.claude/reviews/<sha>-{code,security}.json` and runs `check-review.sh` on each; `/ship` blocks
     unless current-HEAD verdict files pass the script. Previously the parser existed but nothing
     invoked it. `harness_lint.py` now fails if either command stops referencing it.
+  - **Gate counts are drift-linted**: `harness_lint.py` derives the suite size from `run.sh` and
+    fails on any stale "N-gate / N golden" number in the living docs (CLAUDE.md, READMEs, this
+    file's non-historical sections). The three stale hardcoded counts (28/28/39) are gone, and the
+    "each skill bundles extras" overclaim is corrected to "most".
 - **2026-06-23** — Shipped **v0.2.0 "Gates as Code"** across seven workstreams:
   - **WS1 gates as code** — guard-branch/secret-scan block; DoD pre-push auto-installs; structured
     review verdict + `check-review.sh`.

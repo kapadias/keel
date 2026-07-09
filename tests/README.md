@@ -8,10 +8,10 @@ itself: if a gate is silently wrong, CI goes red.
 
 ## What runs
 
-| File                                 | What it proves                                                         | How                                               |
-| ------------------------------------ | ---------------------------------------------------------------------- | ------------------------------------------------- |
-| [`run.sh`](run.sh)                   | **Every gate blocks vs. allows correctly** — the WS7 eval scenarios.   | 28 golden tests over real hook/script invocations |
-| [`harness_lint.py`](harness_lint.py) | **The harness is internally consistent** — structural self-validation. | static checks over `.claude/` + docs              |
+| File                                 | What it proves                                                         | How                                            |
+| ------------------------------------ | ---------------------------------------------------------------------- | ---------------------------------------------- |
+| [`run.sh`](run.sh)                   | **Every gate blocks vs. allows correctly** — gate golden tests.        | golden tests over real hook/script invocations |
+| [`harness_lint.py`](harness_lint.py) | **The harness is internally consistent** — structural self-validation. | static checks over `.claude/` + docs           |
 
 ### `run.sh` — gate golden tests
 

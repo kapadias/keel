@@ -51,7 +51,7 @@ Do not skip stages. The full definition lives in
              code-reviewer · security-reviewer · explorer · debugger
   skills/    on-demand knowledge (10): tdd-workflow · code-review · debugging · refactoring ·
              api-design · security-review · migration-safety · observability ·
-             concurrency-performance · supply-chain  (each bundles scripts/templates/references)
+             concurrency-performance · supply-chain  (most bundle scripts/templates/references)
   commands/  the pipeline (13): /plan /tdd /implement /review /test /debug /ship /sync /adr
              /intake /release /rollback /coverage
   hooks/     guard-branch (BLOCKS commits/pushes to main/master/develop) · secret-scan (BLOCKS
@@ -59,7 +59,7 @@ Do not skip stages. The full definition lives in
              auto-installed at SessionStart) · session-start · lib/json.sh · lib/secret-patterns.sh
   hooks.json   plugin hook wiring
   settings.json   denies reading secrets (.env/*.pem/*.key/.ssh/.aws/…) and force-push; wires hooks
-tests/       28-gate golden tests (tests/run.sh) + harness self-validation (tests/harness_lint.py)
+tests/       gate golden tests (tests/run.sh) + harness self-validation (tests/harness_lint.py)
 stacks/      language pack wiring the test gate: python · typescript · go · rust
 ```
 
