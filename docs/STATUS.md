@@ -64,6 +64,11 @@ and Keel ships as an installable plugin with language stack packs. Language- and
     7 golden tests). The fast lane skips plan/orchestrator/two-reviewer ceremony but never the
     regression test, the gate, the hooks, the machine review verdict, or the STATUS entry. The
     script decides the lane; prose cannot argue a change into it.
+  - **Karpathy's behavioral rules codified** at ~150 always-on words: assumption-surfacing /
+    stop-when-confused / pushback (dev-process §1 + implementer guardrail), a Simplicity section
+    and surgical-changes rule (engineering.md, reviewer now flags orthogonal changes as MEDIUM),
+    and the **Assumptions / Changed / Verified / Remaining risk** reporting convention
+    (dev-process §6, `/ship` output, PR template — lint-pinned).
 - **2026-06-23** — Shipped **v0.2.0 "Gates as Code"** across seven workstreams:
   - **WS1 gates as code** — guard-branch/secret-scan block; DoD pre-push auto-installs; structured
     review verdict + `check-review.sh`.

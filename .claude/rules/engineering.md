@@ -30,11 +30,20 @@ These are hard rules in core/decision logic:
 - **Fail closed.** When a dependency is unavailable or input is invalid, default to the safe,
   defensive behavior — not to "proceed anyway."
 
+## Simplicity
+
+- Write the **minimum code that solves the stated problem**. No speculative features, parameters,
+  config, or abstraction layers for futures nobody asked for — wait for the third concrete use
+  before abstracting. Every line is a liability; prefer deleting to adding.
+
 ## Naming & structure
 
 - Small, composable, single-responsibility functions. Clear names beat clever comments.
 - A change should read like the code around it: match local naming, style, and idiom. Reviewability is
   a feature.
+- **Surgical changes only.** Touch only what the task requires — do not reformat, rename, or
+  "improve" orthogonal code in the same change; clean up only orphans your own change created.
+  Unrelated fixes are separate commits (`/intake` them).
 - Comment the **why**, not the **what**. The what is the code.
 
 ## Secrets & logging

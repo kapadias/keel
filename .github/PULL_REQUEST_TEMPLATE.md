@@ -6,13 +6,24 @@ PR targets `develop`, not `main`.
 
 <!-- One or two lines: what this change does and why. -->
 
-## Changes
+## Assumptions
 
-<!-- Modules / files touched. Note which parts of the .claude harness changed, if any. -->
+<!-- What was taken as given — explicit and inferred. If the request admitted more than one
+     reasonable interpretation, say which was chosen and why. -->
 
-## Test plan
+## Changed
 
-<!-- How this was verified: commands run, gates that passed, manual checks. -->
+<!-- Modules / files touched and the behavior change. Note which parts of the .claude harness
+     changed, if any. Nothing orthogonal to the stated task belongs in this diff. -->
+
+## Verified
+
+<!-- The gate you RAN and its OBSERVED result — commands, test counts, review verdict. Never an
+     inferred or expected result. -->
+
+## Remaining risk
+
+<!-- What is not covered: untested paths, deferred follow-ups, known limitations. -->
 
 ## Definition of Done
 

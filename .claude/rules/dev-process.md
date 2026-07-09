@@ -26,9 +26,12 @@ library, an auth flow, or a crypto primitive is a correctness and security risk,
 ## 1. Plan
 
 Restate the requirement in your own words, surface risks and unknowns, and decompose into reviewable
-steps. For anything spanning multiple modules, write the plan down before coding (`/plan`). Name what
-could break and how you will know. A plan that fits in your head is fine; a plan that doesn't must be
-on disk.
+steps. **State the assumptions you are coding under.** If the request admits more than one reasonable
+interpretation, present them and ask — never pick silently; push back when the requested approach
+looks wrong, and **stop when confused**: "this seems off" beats plausible-looking wrong code. For
+anything spanning multiple modules, write the plan down before coding (`/plan`). Name what could
+break and how you will know. A plan that fits in your head is fine; a plan that doesn't must be on
+disk.
 
 ## 2. TDD — RED → GREEN → REFACTOR
 
@@ -58,6 +61,10 @@ required. **Never proceed with failing tests** (see [testing.md](./testing.md)).
 
 Feature branch, conventional commits, PR to `develop` (see [git-workflow.md](./git-workflow.md)). Then
 close the loop: the work is not done until the **five mirrors** agree (see [sync.md](./sync.md)).
+
+**Report every completed unit in four lines** (mirrored by the PR template): **Assumptions** (what
+you took as given), **Changed** (files/behavior), **Verified** (the gate you ran and its _observed_
+result — never inferred), **Remaining risk** (what is not covered).
 
 ## Routing
 

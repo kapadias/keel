@@ -41,4 +41,6 @@ Ship: **$ARGUMENTS**
 
 ## Output
 
-The branch, the commit(s), the PR link, and a checked-off Definition-of-Done list.
+The branch, the commit(s), the PR link, and a checked-off Definition-of-Done list — reported as
+**Assumptions / Changed / Verified / Remaining risk** (rules/dev-process.md §6), with the gate and
+review results you _observed_, never inferred.

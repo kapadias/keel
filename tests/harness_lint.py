@@ -147,6 +147,22 @@ for md in glob.glob(f"{ROOT}/.claude/**/*.md", recursive=True):
             if "SECURITY VERDICT:" in line:
                 bad(f"{md}:{n}: text verdict format — use the ADR-0005 JSON contract")
 
+# --- A/C/V/R reporting convention: pinned in the PR template and dev-process ---
+# Every completed unit reports Assumptions / Changed / Verified / Remaining risk
+# (dev-process.md §6). The PR template is the artifact form of the convention.
+pr_template = f"{ROOT}/.github/PULL_REQUEST_TEMPLATE.md"
+if not os.path.isfile(pr_template):
+    bad("missing .github/PULL_REQUEST_TEMPLATE.md (A/C/V/R reporting convention)")
+else:
+    with open(pr_template, encoding="utf-8") as fh:
+        tpl = fh.read()
+    for heading in ("Assumptions", "Changed", "Verified", "Remaining risk"):
+        if heading not in tpl:
+            bad(f"PULL_REQUEST_TEMPLATE.md: missing '{heading}' section (A/C/V/R)")
+with open(f"{ROOT}/.claude/rules/dev-process.md", encoding="utf-8") as fh:
+    if "Assumptions" not in fh.read():
+        bad(".claude/rules/dev-process.md: A/C/V/R reporting convention missing")
+
 # --- settings.json wired hooks exist on disk ---
 with open(f"{ROOT}/.claude/settings.json", encoding="utf-8") as fh:
     settings = json.load(fh)
