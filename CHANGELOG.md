@@ -3,6 +3,31 @@
 All notable changes to Keel. Format follows [Keep a Changelog](https://keepachangelog.com/1.1.0/);
 versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Automated releases.** Pushing a `v*` tag now publishes the GitHub Release itself, with notes read
+  from this file. v1.0.0 was assembled by hand, and the hand-assembly is exactly what argued for
+  this: `git tag -F` defaults to `--cleanup=strip`, which deletes every `#`-prefixed line, so the
+  annotation lost all its markdown headings and a breaking change read like a feature. The tag is now
+  the trigger; `CHANGELOG.md` is the source of truth. The workflow refuses to publish when the
+  section is missing or empty, and refuses when the tag disagrees with the plugin manifests.
+- `.github/scripts/release-notes.sh` — the extractor, as a script rather than inline YAML so it is
+  golden-tested like every other gate here. Nine tests, including that a version matches literally so
+  `1.0.0` cannot select a `1x0x0` section. The first implementation built a dynamic regex and escaped
+  the dots; CI caught that awk's `-v` assignment strips those backslashes on some builds (mawk on the
+  runner) but not others (the same nominal version locally), leaving `.` live as a wildcard. `index()`
+  removes the class of bug rather than the instance.
+
+### Changed
+
+- **The banner carries no version and no licence.** `assets/keel-banner.svg` hardcoded `v0.1.0` and
+  `MIT` — the version was two releases stale and nobody noticed, which is the argument against
+  putting expiring facts in a hand-edited image. The `License` and `release` badges are gone from the
+  README header for the same reason. The live version lives in `CHANGELOG.md` and the manifests; the
+  licence lives in `LICENSE`.
+
 ## [1.0.0] — 2026-08-01 — "The Model Cannot Ship Itself"
 
 The first published release. Keel has existed since 2026-06-22 and reached v0.2.0 internally, but no

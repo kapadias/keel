@@ -1,0 +1,65 @@
+name: release
+
+# Publish a GitHub Release when a version tag is pushed.
+#
+# Why this exists: v1.0.0 had to be released by hand, and hand-assembly showed
+# exactly why that is a bad idea — `git tag -F` defaults to --cleanup=strip,
+# which deletes every '#'-prefixed line, so the annotation lost all its markdown
+# headings and a breaking change read like a feature. The notes here are read
+# from CHANGELOG.md instead, which is reviewed in a PR like any other file.
+#
+# The tag is the trigger, never the source of truth.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # required to create a release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract the release notes for this tag
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          # Fails closed on a missing or empty section — see the script. Golden-tested
+          # in tests/run.sh, because an extractor nobody tests will one day publish
+          # an empty release and nothing downstream can tell.
+          if ! bash .github/scripts/release-notes.sh "$version" CHANGELOG.md > notes.md; then
+            echo "::error::CHANGELOG.md has no usable '## [$version]' section — refusing to publish an empty release." >&2
+            exit 1
+          fi
+          echo "Extracted $(wc -l < notes.md) lines for $version"
+
+      - name: Verify the manifests agree with the tag
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          for f in .claude/.claude-plugin/plugin.json .claude-plugin/marketplace.json; do
+            got="$(python3 -c "
+          import json,sys
+          d = json.load(open(sys.argv[1]))
+          print(d.get('version') or d['plugins'][0]['version'])" "$f")"
+            if [ "$got" != "$version" ]; then
+              echo "::error::$f says $got but the tag says $version — bump the manifest or fix the tag." >&2
+              exit 1
+            fi
+          done
+          echo "Manifests agree: $version"
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file notes.md \
+            --latest \
+            --repo "$GITHUB_REPOSITORY"

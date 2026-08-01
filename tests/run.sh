@@ -373,6 +373,28 @@ printf '{"transcript_path":"/nonexistent/x.jsonl"}' | CLAUDE_PROJECT_DIR="$ROOT"
 printf '{}' | CLAUDE_PROJECT_DIR="$ROOT" "$SV" >/dev/null; check "no transcript path: fails open" 0 "$?"
 rm -rf "$(dirname "$TR")"
 
+echo "== release-notes.sh (the release gate) =="
+# v1.0.0 was released by hand, and the hand-assembly showed why that is a bad
+# idea: `git tag -F` strips '#' lines by default, so the annotation lost every
+# markdown heading and a breaking change read like a feature. The workflow reads
+# CHANGELOG.md instead — so the extractor is now load-bearing and gets tested.
+RN="$ROOT/.github/scripts/release-notes.sh"
+out="$(bash "$RN" 1.0.0 "$ROOT/CHANGELOG.md")"; check "extracts an existing version" 0 "$?"
+contains "keeps the section headings git would have stripped" "### Added" "$out"
+contains "leads with the breaking change" "Breaking" "$out"
+printf '%s' "$out" | grep -q "Gates as Code"; check "stops at the next version (no bleed)" 1 "$?"
+bash "$RN" 9.9.9 "$ROOT/CHANGELOG.md" >/dev/null 2>&1; check "absent version fails closed" 1 "$?"
+bash "$RN" "" "$ROOT/CHANGELOG.md" >/dev/null 2>&1; check "empty version fails closed" 1 "$?"
+bash "$RN" 1.0.0 /nonexistent/CHANGELOG.md >/dev/null 2>&1; check "missing changelog fails closed" 1 "$?"
+# A whitespace-only section must not publish as a release with an empty body.
+TMP="$(mktemp -d)"; printf '# Changelog\n\n## [2.0.0] - x\n\n\n## [1.0.0] - y\n\nreal notes\n' > "$TMP/CH.md"
+bash "$RN" 2.0.0 "$TMP/CH.md" >/dev/null 2>&1; check "whitespace-only section fails closed" 1 "$?"
+# A version must match literally: 1.0.0 must never select a 1x0x0 section. The
+# first implementation built a dynamic regex, which mawk and gawk disagree about.
+printf '# Changelog\n\n## [1x0x0] - x\n\nwrong section\n' > "$TMP/CH2.md"
+bash "$RN" 1.0.0 "$TMP/CH2.md" >/dev/null 2>&1; check "version matches literally, not as a regex" 1 "$?"
+rm -rf "$TMP"
+
 echo "== harness_lint.py (the linter is itself a gate) =="
 # A linter with no failing-case test is an unverified gate: it would still print
 # "OK" if a check silently stopped firing. Each case copies the real tree, breaks

@@ -5,9 +5,7 @@
 <br/>
 
 [![Built for Claude Code](https://img.shields.io/badge/Built%20for-Claude%20Code-D97757?style=for-the-badge)](https://claude.com/claude-code)
-[![License: MIT](https://img.shields.io/badge/License-MIT-2b6cb0?style=for-the-badge)](LICENSE)
 [![Language agnostic](https://img.shields.io/badge/Language-agnostic-2f855a?style=for-the-badge)](#make-it-yours)
-[![Release](https://img.shields.io/badge/release-v1.0.0-1a3a52?style=for-the-badge)](docs/STATUS.md)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-d97757?style=for-the-badge)](CONTRIBUTING.md)
 
 **The backbone that keeps an AI coding agent upright.**
