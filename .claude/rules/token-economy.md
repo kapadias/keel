@@ -1,33 +1,30 @@
 # Rule: Token Economy
 
-Context is a budget, and every token in the window is paid on **every** turn until it leaves. Spending
-it deliberately is what lets the agent stay sharp on long tasks. **The discipline is to spend fewer
-tokens for the same or better result — never to cut corners on the work itself.** If thrift would lower
-quality, spend the tokens.
+Every token in the window is paid on **every** turn until it leaves, and recall degrades as the
+window fills. Spend fewer tokens for the same or better result — never cut corners on the work
+itself. If thrift would lower quality, spend the tokens.
 
 ## Keep the always-on surface tiny
 
-`CLAUDE.md` and `rules/` load on every turn. They are dense and short by design. Depth lives in
-on-demand surfaces:
+`CLAUDE.md` and `rules/` load on every turn, and the linter budgets them. Depth lives in on-demand
+surfaces:
 
 - **Skills** load only when their trigger matches — that is where long playbooks, examples, and
   reference material belong. A 2,000-token skill costs nothing until it is needed.
 - **Commands** encode repeatable workflows once, so you do not re-explain them every time.
 - **Rules** state the principle in a sentence and **link** to the detail; they do not inline it.
 
-When you add to the harness, ask: *does this need to be paid every turn, or can it load on demand?*
+When you add to the harness, ask: _does this need to be paid every turn, or can it load on demand?_
 Default to on-demand.
 
 ## Delegate fan-out to subagents — keep conclusions, not dumps
 
-When answering means reading across many files, dispatch a subagent (e.g. `explorer`). A subagent burns
-its **own** context reading the files and returns the **conclusion** — the three relevant paths, the
-answer, the verdict — not the raw file contents. The main thread stays lean and focused.
+When answering means reading across many files, dispatch a subagent (e.g. `explorer`): it spends its
+own context and returns the conclusion — the paths, the answer, the verdict — not the file contents.
 
-- Use this for "where is X?", "how is Y wired?", broad audits, and parallel independent work.
-- Run independent subagents concurrently (one message, multiple dispatches) — faster and no more
-  expensive than serial.
-- Do not also do the search yourself after delegating it. Wait for the result.
+- Use it for "where is X?", "how is Y wired?", broad audits, and parallel independent work.
+- Dispatch independent subagents concurrently, in one message. No slower, no more expensive.
+- Do not also run the search yourself after delegating it. Wait for the result.
 
 ## Reference, don't inline
 
@@ -50,5 +47,5 @@ the rest.
 ## The one hard line
 
 Token thrift **never** justifies skipping a test, a review, a validation step, or a safety gate. Those
-are the product. Save tokens on *how you find and present information*, never on *the correctness and
-safety of the work*.
+are the product. Save tokens on _how you find and present information_, never on _the correctness and
+safety of the work_.

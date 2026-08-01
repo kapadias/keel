@@ -1,6 +1,6 @@
 ---
 name: refactoring
-description: Apply when restructuring existing code without changing behavior — extracting, renaming, replacing conditionals, untangling a module. Use when the REFACTOR phase of the loop runs, or when deciding whether code is safe to refactor at all.
+description: Restructuring existing code without changing behavior — extract, rename, replace conditionals, untangle a module. The REFACTOR phase.
 ---
 
 # Refactoring

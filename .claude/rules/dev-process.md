@@ -1,12 +1,7 @@
 # Rule: The Development Loop
 
-Every change moves through these stages **in order**. Do not skip stages — with one designed
-exception, the bounded fast lane below. Speed comes from doing each stage well once, not from
-skipping the ones that catch mistakes.
-
-```
-Research & Reuse → Plan → TDD (RED → GREEN → REFACTOR) → Implement → Review → Verify → Commit & PR → Sync
-```
+The stages of the loop ([00-core.md](./00-core.md)), and what each one owes. Speed comes from doing
+each stage well once, not from skipping the ones that catch mistakes.
 
 **Proportionality — classify before you loop.** A trivial, reversible fix (≤15 lines, ≤3 files, no
 new deps, off the critical surface — `check-trivial.sh` decides, fail-closed) may take the bounded
@@ -36,12 +31,8 @@ disk.
 
 ## 2. TDD — RED → GREEN → REFACTOR
 
-Tests come first. See [testing.md](./testing.md) for the full policy.
-
-- **RED:** write the failing test that pins the desired behavior. No production logic lands without a
-  test that would have failed before it.
-- **GREEN:** the minimal implementation that passes.
-- **REFACTOR:** clean it up with the tests green as your safety net.
+Tests come first — the cycle and the full policy are in [testing.md](./testing.md). The stage gate:
+**a test that would have failed before this change exists, and you watched it fail.**
 
 ## 3. Implement
 
@@ -56,27 +47,13 @@ feasible. Changes that touch auth, data, money, or anything outward-facing also 
 ## 5. Verify
 
 Run the project's gate — typically lint + type-check + tests + coverage. A green local gate is
-required. **Never proceed with failing tests** (see [testing.md](./testing.md)).
+required, and **observed**, never inferred.
 
 ## 6. Commit & PR → Sync
 
-Feature branch, conventional commits, PR to `develop` (see [git-workflow.md](./git-workflow.md)). Then
-close the loop: the work is not done until the **five mirrors** agree (see [sync.md](./sync.md)).
+Branch, commit, PR, and the five mirrors: [00-core.md](./00-core.md),
+[git-workflow.md](./git-workflow.md), [sync.md](./sync.md).
 
 **Report every completed unit in four lines** (mirrored by the PR template): **Assumptions** (what
 you took as given), **Changed** (files/behavior), **Verified** (the gate you ran and its _observed_
 result — never inferred), **Remaining risk** (what is not covered).
-
-## Routing
-
-| Work type                   | Agent                                 | Command                      |
-| --------------------------- | ------------------------------------- | ---------------------------- |
-| Cross-cutting / multi-step  | `orchestrator`                        | —                            |
-| Plan a change               | —                                     | `/plan`                      |
-| Build it test-first         | `test-engineer` + `implementer`       | `/tdd`                       |
-| Trivial, reversible fix     | — (`check-trivial.sh` decides)        | `/fix`                       |
-| Find code / "where is…"     | `explorer`                            | —                            |
-| Diagnose a failure          | `debugger`                            | `/debug`                     |
-| Review before merge         | `code-reviewer` + `security-reviewer` | `/review`                    |
-| Run the gate / ship         | —                                     | `/test` · `/ship`            |
-| Decision / task / reconcile | —                                     | `/adr` · `/intake` · `/sync` |

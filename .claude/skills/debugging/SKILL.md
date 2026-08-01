@@ -1,6 +1,6 @@
 ---
 name: debugging
-description: Apply when chasing a bug, regression, or failing test to root cause — building a deterministic repro, isolating by bisection, stating the cause, fixing minimally, and proving the fix. Use when `/debug` runs or the debugger agent engages.
+description: Chasing a bug, regression, or failing test to root cause: deterministic repro, bisection, minimal fix, proof. Used by /debug and the debugger agent.
 ---
 
 # Debugging

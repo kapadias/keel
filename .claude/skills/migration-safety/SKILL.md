@@ -1,6 +1,6 @@
 ---
 name: migration-safety
-description: Apply when changing a database schema, backfilling or transforming data, or running any destructive/irreversible migration (drop/rename/type-change, large UPDATE, dual-write rollout). Use when planning zero-downtime rollout, reversibility, and idempotent backfills. Bundles templates/migration-checklist.md.
+description: Changing a database schema, backfilling or transforming data, or any destructive migration — drop/rename/type-change, large UPDATE, dual-write rollout, zero-downtime, reversibility.
 ---
 
 # Migration Safety

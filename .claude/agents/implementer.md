@@ -1,6 +1,6 @@
 ---
 name: implementer
-description: Builds and modifies features to make failing tests pass and requirements real. The bulk of day-to-day engineering. Use after a plan and a failing test exist.
+description: Builds and modifies features to make failing tests pass. The bulk of day-to-day engineering. Use after a plan and a failing test exist.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
 ---

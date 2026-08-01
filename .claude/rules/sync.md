@@ -5,30 +5,19 @@ mirror is a silent lie about the state of the system, and that lie is where inci
 
 ## The five mirrors
 
-Update these **together**, as part of completing the work — not "later."
+The list is in [00-core.md](./00-core.md). Update them **together**, as part of completing the work —
+not "later." What each one owes:
 
-1. **Issue tracker** — the system of record. Move the issue to its correct status; paste the PR link
-   onto it.
-2. **Docs** (`docs/`)
-   - `docs/STATUS.md` — always update what changed and the current state.
-   - `README` / product docs — update **if behavior or usage changed**.
-   - `docs/adr/` — add an ADR **if a non-trivial decision was made** (`/adr`).
-3. **Git / PR** — branch + PR open and linked to the issue (see [git-workflow.md](./git-workflow.md)).
+1. **Tracker** — move the issue to its real status; paste the PR link onto it.
+2. **Docs** — `docs/STATUS.md` always; `README`/product docs **if behavior or usage changed**; an
+   ADR (`/adr`) **if a non-trivial decision was made**.
+3. **Git / PR** — branch + PR open and linked to the issue ([git-workflow.md](./git-workflow.md)).
 4. **Harness** (`.claude/`) — **if you changed an agent, skill, command, rule, or hook**, update
    `.claude/README.md` and `CLAUDE.md` so the index matches reality.
-5. **Memory** — record **durable decisions**: the why behind a choice, a rejected alternative, a
-   learned invariant — so it survives a context reset.
+5. **Memory** — durable decisions only: the why behind a choice, a rejected alternative, a learned
+   invariant — so it survives a context reset.
 
-## Checklist (per completed unit)
-
-- [ ] Tracker status updated + PR linked
-- [ ] `docs/STATUS.md` updated
-- [ ] Docs/README updated *(if usage changed)*
-- [ ] ADR added *(if a decision was made)*
-- [ ] Branch + PR open and linked
-- [ ] `.claude/README.md` + `CLAUDE.md` updated *(if the harness changed)*
-- [ ] Durable decisions captured in memory
-- [ ] Tests green (see [testing.md](./testing.md))
+A mirror you _considered and deliberately skipped_ is synced; one you forgot is drift. Say which.
 
 ## Enforcement
 

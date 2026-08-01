@@ -1,6 +1,6 @@
 ---
 name: concurrency-performance
-description: Apply when writing or reviewing parallel/async/threaded code, anything sharing mutable state or taking locks, or when optimizing a hot path. Use for data-race/deadlock/lost-update risks, idempotency and "exactly-once" claims, profile-before-optimize, back-pressure, and benchmark discipline.
+description: Parallel, async or threaded code, shared mutable state, locks, or a hot path. Data races, deadlock, lost updates, idempotency, back-pressure, profile-before-optimize.
 ---
 
 # Concurrency & Performance

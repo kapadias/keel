@@ -15,7 +15,7 @@ Three principles govern everything here:
 
 ## Project layout
 
-- **`.claude/`** — the harness: `rules/` (always-on policy), `agents/`, `skills/`, `commands/`,
+- **`.claude/`** — the harness: `rules/` (always-on policy), `agents/`, `skills/` (playbooks + workflows),
   `hooks/`, and `settings.json`. This is the product.
 - **`docs/`** — `STATUS.md` (the living state) and `adr/` (numbered decisions).
 - **`.github/`** — CI (`workflows/ci.yml`) and the PR template.
@@ -30,13 +30,15 @@ Pick the smallest surface that fits. The default bias is **on-demand, not always
 - **A skill** (`.claude/skills/*`) — a procedure or body of knowledge loaded **only when invoked**. This
   is the default home for depth: workflows, checklists, domain method. Prefer a skill over enlarging a
   rule.
-- **A command** (`.claude/commands/*.md`) — an explicit, user-triggered action (`/plan`, `/review`,
-  `/ship`, …). Use when a contributor should be able to *invoke* a step by name.
+- **A workflow skill** (`.claude/skills/<name>/SKILL.md`) — an explicit action invoked by name
+  (`/plan`, `/review`, `/ship`, …). Claude Code merged commands into skills, so these live under
+  `skills/` too. If it has side effects, set `disable-model-invocation: true` so only a human can
+  trigger it; the linter enforces that for the six that do.
 - **An agent** (`.claude/agents/*.md`) — a delegated role with its own context window
   (`orchestrator`, `implementer`, `explorer`, …). Add one when work should fan out and return
-  *conclusions, not raw context* to the main session.
+  _conclusions, not raw context_ to the main session.
 
-When in doubt, ship it as a skill or command. Growing the always-on rules is the expensive choice and
+When in doubt, ship it as a skill. Growing the always-on rules is the expensive choice and
 must be justified (see [ADR 0003](docs/adr/0003-progressive-disclosure-token-economy.md)).
 
 ## Style guide
@@ -57,9 +59,12 @@ model: <model id>
 ```
 
 ```yaml
-# command — .claude/commands/<name>.md
+# workflow skill — .claude/skills/<name>/SKILL.md
 ---
-description: One line on what the command does.
+name: <name>
+description: One line on what it does and when to invoke it.
+model: sonnet
+disable-model-invocation: true   # if it has side effects: human-triggered only
 ---
 ```
 
@@ -84,7 +89,7 @@ A unit of work is **done** only when the **five mirrors** agree:
 1. **Issue tracker** — the issue is updated and linked.
 2. **`docs/STATUS.md`** — reflects what changed and the current state.
 3. **Git / PR** — branch and PR open, linked to the issue, targeting `develop`.
-4. **The `.claude/` harness** — index/README updated if any agent, skill, command, or rule changed.
+4. **The `.claude/` harness** — index/README updated if any agent, skill, or rule changed.
 5. **Memory** — durable decisions captured (an ADR via `/adr` when a real decision was made).
 
 `/sync` reconciles drift across the five mirrors. The pre-push hook `require-status-sync.sh` blocks code

@@ -17,7 +17,7 @@ Before any action, ask: **is this reversible, and how far does it reach?**
 ## Gates on risk-increasing actions
 
 - **Pre-action checks are deterministic and blocking.** No deploy/migration/delete runs that fails its
-  checks. Risk-*reducing* actions (rollback, revert, halt) may be automatic; risk-*increasing* actions
+  checks. Risk-_reducing_ actions (rollback, revert, halt) may be automatic; risk-_increasing_ actions
   are gated.
 - **Idempotency.** Operations that may be retried (submissions, webhooks, jobs) use stable keys so a
   retry never double-applies.
@@ -33,10 +33,9 @@ costs time (recoverable). A missed stop can cost the system (terminal). The asym
 
 ## Human-in-the-loop — non-negotiable gates
 
-A human approves: (1) first promotion to production, (2) anything that widens blast radius — raising a
-limit, broadening a permission, deleting at scale, (3) overriding a safety gate, (4) onboarding a new
-external dependency with access to data or money. Everything risk-*reducing* may be automatic;
-everything risk-*increasing* requires a human.
+The list is in [00-core.md](./00-core.md). What it means in practice: the human sees the diff, the
+blast radius, and the rollback path _before_ approving — an approval given without those is a
+rubber stamp, and approval for one action never extends to the next.
 
 ## Secrets & audit
 

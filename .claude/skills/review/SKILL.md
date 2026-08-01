@@ -1,4 +1,5 @@
 ---
+name: review
 description: Path-aware parallel review before merge — always a correctness review; adds a security review when the change touches auth, data, money, input handling, or anything outward-facing.
 argument-hint: "[scope — paths/files; defaults to the current branch diff vs develop]"
 model: opus
@@ -28,9 +29,11 @@ Review: **$ARGUMENTS** (if empty, review the current branch's diff vs `develop`)
    `.claude/reviews/<sha>-security.json`, where `<sha>` is `git rev-parse --short HEAD`. These are
    transient gate inputs, git-ignored; a new commit invalidates them by construction.
 4. **Run the gate — the script decides.** Run
-   `bash .claude/skills/code-review/scripts/check-review.sh` on **each** verdict file. A non-zero
-   exit means the review gate is red. Report the script's output as the verdict and **never
-   override it** — the parser, not the model, decides merge-readiness (ADR-0005).
+   `bash $KEEL/skills/code-review/scripts/check-review.sh` on **each** verdict file, where `$KEEL`
+   is the harness root announced at SessionStart (`.claude` in a standalone checkout; the plugin
+   directory in a plugin install — never guess it). A non-zero exit means the review gate is red.
+   Report the script's output as the verdict and **never override it** — the parser, not the model,
+   decides merge-readiness (ADR-0005).
 5. **Synthesize for the human.** Merge findings into one report, deduplicated, grouped by severity —
    **CRITICAL / HIGH / MEDIUM / LOW** — each with `path:line`, the issue, and a concrete fix. Any breach
    of a trust boundary, a safety gate, or "fail-closed" is automatically CRITICAL. The prose explains;

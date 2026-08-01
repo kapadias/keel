@@ -9,26 +9,16 @@ Write tests first. **RED** (a failing test pins the behavior) → **GREEN** (min
 **REFACTOR** (clean up with tests green). No production logic lands without a test that would have
 failed before it. This is not ceremony — it is how you know the code does what you think.
 
-## Golden tests — exact, hand-verifiable oracles
+## Two kinds of test, both required on the critical surface
 
-For core logic, assert against **known, hand-verifiable values**, not just "it ran without error."
+- **Golden** — assert against a **known, hand-verifiable value**, not "it ran without error": a
+  worked example you computed by hand, a fixed input → fixed output pair, a published result. Pin
+  exact values (explicit tolerance for floats). Cross-check against a battle-tested library rather
+  than trusting your implementation as its own oracle.
+- **Property** — assert invariants over generated inputs, not just the cases you thought of:
+  round-trips, idempotence, declared bounds, order independence where the contract promises it.
 
-- A pure function against a worked example you computed by hand.
-- A formatter/parser against a fixed input → fixed output pair.
-- An algorithm against a published or closed-form result.
-
-Pin exact values (with an explicit tolerance for floats). Cross-check against a battle-tested library
-where one exists rather than trusting your own implementation as its own oracle.
-
-## Property tests — invariants over generated inputs
-
-Use property-based testing (e.g. Hypothesis, fast-check, proptest) to assert invariants across many
-generated inputs, not just the cases you thought of:
-
-- Round-trips: `decode(encode(x)) == x`.
-- Idempotence: `f(f(x)) == f(x)` where claimed.
-- Bounds and conservation: outputs stay within declared limits under any valid input.
-- Order independence where the contract promises it.
+Worked examples and per-language templates: the `tdd-workflow` skill, preloaded into `test-engineer`.
 
 ## Coverage gate
 

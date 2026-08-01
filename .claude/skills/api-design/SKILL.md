@@ -1,6 +1,6 @@
 ---
 name: api-design
-description: Apply when designing or changing an interface — a library API, a service endpoint, or a module boundary. Use when defining contracts (inputs, outputs, errors), validating untrusted input, planning idempotency and versioning, or shaping a public surface.
+description: Designing or changing an interface — library API, service endpoint, or module boundary. Contracts, input validation, idempotency, versioning, public surface.
 ---
 
 # API Design

@@ -1,4 +1,5 @@
 ---
+name: test
 description: Run the project's test gate — lint, type-check, tests, and coverage — then summarize failures and coverage gaps. Adapt the commands to your stack.
 argument-hint: "[optional: a subset/path to test; defaults to the whole suite]"
 model: sonnet
@@ -23,13 +24,13 @@ Run the gate for: **$ARGUMENTS** (if empty, the whole suite).
    failures to `/debug`.
 4. **Report coverage** against the project's floor. Hold the **highest bar on the survival-critical
    surface** (money, auth, data, persistence, irreversible actions) — flag any such code lacking golden
-   or property tests (see [`.claude/rules/testing.md`](../rules/testing.md)).
+   or property tests (see [`.claude/rules/testing.md`](../../rules/testing.md)).
 
 ## Guardrails
 
 - **Never report green you did not observe.** If tests failed, say so with the output. If a step was
   skipped, say that.
-- Do not mark any task done with failing tests (see [`.claude/rules/sync.md`](../rules/sync.md)).
+- Do not mark any task done with failing tests (see [`.claude/rules/sync.md`](../../rules/sync.md)).
 
 ## Output
 

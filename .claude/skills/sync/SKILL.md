@@ -1,4 +1,6 @@
 ---
+name: sync
+disable-model-invocation: true
 description: Reconcile drift across the five mirrors — issue tracker, docs/STATUS, git/PR, the .claude harness, and memory — so every record of the system agrees.
 argument-hint: "[optional: the unit of work to reconcile; defaults to the current branch]"
 model: sonnet
@@ -10,7 +12,7 @@ Reconcile the five mirrors for: **$ARGUMENTS** (if empty, the current branch's w
 
 ## Steps
 
-Walk the five-mirror Definition of Done (full checklist: [`.claude/rules/sync.md`](../rules/sync.md)) and fix any drift:
+Walk the five-mirror Definition of Done (full checklist: [`.claude/rules/sync.md`](../../rules/sync.md)) and fix any drift:
 
 1. **Tracker** — issue in the right status, PR linked?
 2. **Docs** — `docs/STATUS.md` current? Usage changed → README/docs updated? Non-trivial decision made → `/adr` filed?
