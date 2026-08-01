@@ -194,6 +194,32 @@ out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"; check "exits 0 wit
 contains "warns that DoD is not enforced" "not Keel's DoD hook" "$out"
 grep -q 'exit 0' "$TMP/.git/hooks/pre-push"; check "does not overwrite the foreign hook" 0 "$?"
 rm -rf "$TMP"
+# Plugin install: the repo has no .claude/ at all — the harness lives at
+# CLAUDE_PLUGIN_ROOT. Guarding only on the project-local path made this case
+# silently skip the DoD gate. A gate that is off without saying so is exactly
+# what ADR-0004 forbids, so this must either install or warn — never both quiet.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"; check "plugin install: exits 0" 0 "$?"
+if [ -e "$TMP/.git/hooks/pre-push" ]; then rc=0; else rc=1; fi; check "plugin install: installs the DoD hook from CLAUDE_PLUGIN_ROOT" 0 "$rc"
+contains "plugin install: announces the resolved harness root" "$ROOT/.claude" "$out"
+rm -rf "$TMP"
+# Neither source present: the gate cannot be installed, so it must say so loudly.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"; check "unlocatable harness: still exits 0" 0 "$?"
+contains "unlocatable harness: warns DoD is NOT enforced" "NOT enforced" "$out"
+if [ -e "$TMP/.git/hooks/pre-push" ]; then rc=0; else rc=1; fi; check "unlocatable harness: installs no dangling hook" 1 "$rc"
+rm -rf "$TMP"
+# Standalone checkout: the announced root must be the project's own .claude/.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+mkdir -p "$TMP/.claude/hooks"; cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"
+out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"
+contains "standalone: announces the project harness root" "$TMP/.claude" "$out"
+if [ -L "$TMP/.git/hooks/pre-push" ]; then
+  contains "standalone: wires a relative symlink (survives a move)" "../../.claude" "$(readlink "$TMP/.git/hooks/pre-push")"
+else
+  check "standalone: pre-push hook exists" 0 0
+fi
+rm -rf "$TMP"
 
 echo "== check-review.sh (review verdict gate) =="
 CR="$SKILLS/code-review/scripts/check-review.sh"
@@ -304,6 +330,19 @@ import sys; p=sys.argv[1]
 open(p,'a').write('\n' + ('filler ' * 5000) + '\n')" "$FX/.claude/rules/sync.md"
 out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: always-on word budget blocks bloat" 1 "$?"
 contains "lint: names the rule budget" "word budget" "$out"
+rm -rf "$FX"
+
+# allowed-tools completeness: /release shipped granting `git tag` but not `git push`
+# while its own step said "Push the tag" — a command that cannot run its own steps.
+FX="$(lint_fixture)"
+sed -i 's/, Bash(git push origin v:\*)//' "$FX/.claude/commands/release.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a command that cannot run its own git step" 1 "$?"
+contains "lint: names the ungranted git verb" "Bash(git push" "$out"
+rm -rf "$FX"
+# A negated mention ("Do not reset --hard") must not be read as a step the command runs.
+FX="$(lint_fixture)"
+printf '\nDo not use `git reset --hard` here.\n' >> "$FX/.claude/commands/rollback.md"
+KEEL_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: a negated git mention is not an under-grant" 0 "$?"
 rm -rf "$FX"
 
 # review-gate wiring (ADR-0005) must stay pinned: unwiring it is the defect it guards.

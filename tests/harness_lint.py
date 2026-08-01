@@ -233,6 +233,36 @@ for md in sorted(set(md_files)):
                 if not os.path.isfile(os.path.join(ROOT, t)):
                     bad(f"{md}:{n}: backtick-referenced {t} does not exist")
 
+# --- allowed-tools completeness: a command must be able to run its own steps ---
+# `allowed-tools` is a PRE-APPROVAL grant, not a restriction: a missing entry
+# falls through to the permission system, so the command halts for approval
+# interactively and is denied outright in dontAsk / non-interactive runs — it
+# degrades exactly where unattended operation matters. /release shipped with
+# `git tag` but no `git push` while its own step 4 said "Push the tag".
+# Only the mechanically provable case is checked: a backticked `git <verb>` in
+# the body of a command that declares allowed-tools but does not grant that verb.
+FRONT = re.compile(r"^---\n(.*?)\n---\n", re.S)
+GIT_IN_SPAN = re.compile(r"`[^`]*\bgit\s+([a-z-]+)")
+NEGATED = re.compile(r"\b(do not|don't|never|instead of)\b", re.I)
+for path in sorted(glob.glob(f"{ROOT}/.claude/commands/*.md")):
+    raw = open(path, encoding="utf-8").read()
+    m = FRONT.match(raw)
+    if not m:
+        continue
+    at = re.search(r"^allowed-tools:\s*(.+)$", m.group(1), re.M)
+    if not at:
+        continue  # unrestricted by design — nothing can be under-granted
+    granted = set(re.findall(r"Bash\(git\s+([a-z-]+)", at.group(1)))
+    used: set[str] = set()
+    for line in raw[m.end() :].splitlines():
+        if not NEGATED.search(line):
+            used |= set(GIT_IN_SPAN.findall(line))
+    for verb in sorted(used - granted):
+        bad(
+            f"{os.path.relpath(path, ROOT)}: body runs `git {verb}` but "
+            f"allowed-tools does not grant Bash(git {verb}:*)"
+        )
+
 # --- slash references: every `/name` the harness advertises must be invocable ---
 # Descriptions and rules route the agent by naming commands. A `/name` that no
 # longer exists is a routing dead end the agent cannot detect at runtime, so it

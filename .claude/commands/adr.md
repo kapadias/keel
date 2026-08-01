@@ -2,7 +2,7 @@
 description: Write a numbered Architecture Decision Record in docs/adr/NNNN-<slug>.md capturing the context, the options considered, the decision, and its consequences.
 argument-hint: "[the decision to record]"
 model: opus
-allowed-tools: Bash(ls:*), Read, Write, Glob
+allowed-tools: Bash(ls:*), Read, Write, Edit, Glob
 ---
 
 !ls docs/adr 2>/dev/null || echo "(no docs/adr directory yet — NNNN starts at 0001)"

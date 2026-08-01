@@ -2,7 +2,7 @@
 description: Promote develop→main — human-gated production release. Creates the PR, requires explicit human approval before merge, then tags and publishes release notes.
 argument-hint: "<version> [release notes summary]"
 model: opus
-allowed-tools: Bash(git diff:*), Bash(git branch:*), Bash(git status:*), Bash(git log:*), Bash(git tag:*), Read, Grep, Glob
+allowed-tools: Bash(git diff:*), Bash(git branch:*), Bash(git status:*), Bash(git log:*), Bash(git tag:*), Bash(git push origin v:*), Bash(gh pr create:*), Read, Grep, Glob
 ---
 
 !git branch --show-current

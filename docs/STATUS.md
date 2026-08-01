@@ -30,10 +30,34 @@ and Keel ships as an installable plugin with language stack packs. Language- and
   hardcoded) + `tests/harness_lint.py` (self-validation).
 - **Stacks** — `stacks/{python,typescript,go,rust}` wiring the test gate.
 - **Plugin** — `.claude/.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json`.
-- **Docs** — this `STATUS.md`, `ROADMAP.md`, the `docs/adr/` index, and ADRs 0001–0006.
+- **Docs** — this `STATUS.md`, `ROADMAP.md`, `INSTALL.md`, the `docs/adr/` index, and ADRs 0001–0007.
 - **CI** — `.github/workflows/ci.yml`: shellcheck (all scripts) + harness-lint + gate self-tests.
 
 ## Recently changed
+
+- **2026-08-01** — Harness optimization, stage 1 (the plugin install path was not the harness):
+  - **The Definition-of-Done gate was silently absent under a plugin install.** `session-start.sh`
+    guarded the pre-push install on `[ -f .claude/hooks/… ]` — a path that does not exist when Keel
+    is installed as a plugin — so it no-opped without a word. It now resolves the harness root from
+    the project first, then `${CLAUDE_PLUGIN_ROOT}`, and **warns that DoD is NOT enforced** when it
+    finds neither. A gate that is off must say so (ADR-0004). Four golden tests pin plugin,
+    standalone, and neither-locatable modes.
+  - **Gate scripts were unreachable under a plugin install.** `/review`, `/ship` and `/fix` invoked
+    `check-review.sh` / `check-trivial.sh` through hardcoded `.claude/skills/…` literals. They now
+    use the harness root announced at SessionStart. (These failed _closed_ — exit 127 blocks the
+    ship — so the commands were unusable rather than unsafe.)
+  - **ADR-0007** supersedes ADR-0006's claim that `rules/` is a plugin component. It is not: Claude
+    Code's plugin schema has no `rules` component, so a plugin install loads none of the always-on
+    discipline. `docs/INSTALL.md` no longer claims both paths "end with the same harness" and now
+    documents both gaps with a copy-in remedy.
+  - **Four commands could not run their own instructions.** `allowed-tools` is a pre-approval grant,
+    so a missing entry halts for approval interactively and is denied outright in non-interactive
+    runs. `/ship` lacked `git add` and any branch verb; `/release` lacked `git push` while step 4
+    says "Push the tag"; `/adr` lacked `Edit` while step 3 says "Link it from the ADR index";
+    `/rollback` lacked a branch verb. All granted.
+  - **New check — allowed-tools completeness.** A backticked `git <verb>` in a command body must be
+    granted by that command's `allowed-tools`. Catches the mechanically provable subset (it would
+    have caught `/release`); negated mentions ("Do not `git reset --hard`") are not counted.
 
 - **2026-08-01** — Harness optimization, stage 0 (the linter becomes a tested gate):
   - **`harness_lint.py` had no failing-case test.** It was the one gate the harness never proved:
