@@ -22,7 +22,7 @@ release; v1.0.0 is the first tagged artifact.
 
 - **Rules ×9** — `00-core` (the constitution; also the plugin carrier), `dev-process`, `testing`,
   `engineering`, `git-workflow`, `sync`, `boundaries`, `safety`, `token-economy`. The dense,
-  always-on policy surface — **3,602 words, budgeted at 3,700 by `harness_lint.py`**.
+  always-on policy surface — **3599 words, budgeted at 3,700 by `harness_lint.py`**.
 - **Agents ×8** — `orchestrator`, `planner`, `implementer`, `test-engineer`, `code-reviewer`,
   `security-reviewer`, `explorer`, `debugger`. Reviewers emit a structured JSON verdict.
 - **Skills ×11** — `tdd-workflow`, `code-review`, `debugging`, `refactoring`, `api-design`,
@@ -60,8 +60,12 @@ release; v1.0.0 is the first tagged artifact.
     publish, and a tag that disagrees with `plugin.json` / `marketplace.json` refuses too. An empty
     release body is undetectable downstream, so it must be caught here.
   - Extraction lives in `.github/scripts/release-notes.sh`, not inline YAML, so it is golden-tested
-    like every other gate — 9 tests, including that dots in a version are escaped rather than
-    matching as regex wildcards (`1.0.0` must not select a `1x0x0` section).
+    like every other gate — 9 tests, including that a version matches **literally** (`1.0.0` must not
+    select a `1x0x0` section). That test earned its keep immediately: the first implementation built a
+    dynamic awk regex and escaped the dots, which passed locally and **failed in CI**, because awk's
+    `-v` assignment strips those backslashes on the runner's mawk build but not on the local one —
+    same nominal version, different behaviour. Rewritten to use `index()`, a literal search with
+    nothing to escape and nothing to differ between awk implementations.
   - **`assets/keel-banner.svg` hardcoded `v0.1.0` and `MIT`.** The version was two releases stale
     and nobody noticed — the argument against putting expiring facts in a hand-edited image. Both
     chips removed, along with the `License` and `release` badges in the README header. Version lives

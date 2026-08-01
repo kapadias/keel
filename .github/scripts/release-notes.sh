@@ -23,14 +23,21 @@ if [ ! -f "$changelog" ]; then
   exit 1
 fi
 
-# Match `## [<version>]` exactly. The version is embedded in a regex, so escape
-# the dots — otherwise 1.0.0 would also match 1x0x0 and pick the wrong section.
-escaped="$(printf '%s' "$version" | sed 's/\./\\./g')"
-
-notes="$(awk -v v="$escaped" '
-  $0 ~ "^## \\[" v "\\]" { grab = 1; next }
-  grab && /^## \[/       { exit }
-  grab                   { print }
+# Match `## [<version>]` as a LITERAL prefix — no regex, no escaping.
+#
+# The obvious version of this builds a dynamic regex and escapes the dots. It is
+# wrong, and portably wrong in a way that only shows up off your laptop: awk's
+# `-v` assignment applies escape processing before the value is ever used, so
+# mawk (the Ubuntu default, and what GitHub runners have) strips the backslashes
+# and warns, leaving `.` as a live wildcard — while gawk keeps them and the bug
+# is invisible. `1.0.0` would then happily match a `1x0x0` section.
+#
+# index() sidesteps the whole class: it is a literal substring search, so there
+# is nothing to escape and nothing to differ between awk implementations.
+notes="$(awk -v prefix="## [$version]" '
+  index($0, prefix) == 1      { grab = 1; next }
+  grab && index($0, "## [") == 1 { exit }
+  grab                        { print }
 ' "$changelog")"
 
 # Fail closed on an absent OR whitespace-only section.

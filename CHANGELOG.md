@@ -14,8 +14,11 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
   the trigger; `CHANGELOG.md` is the source of truth. The workflow refuses to publish when the
   section is missing or empty, and refuses when the tag disagrees with the plugin manifests.
 - `.github/scripts/release-notes.sh` — the extractor, as a script rather than inline YAML so it is
-  golden-tested like every other gate here. Nine tests, including that dots in a version are escaped
-  rather than acting as regex wildcards.
+  golden-tested like every other gate here. Nine tests, including that a version matches literally so
+  `1.0.0` cannot select a `1x0x0` section. The first implementation built a dynamic regex and escaped
+  the dots; CI caught that awk's `-v` assignment strips those backslashes on some builds (mawk on the
+  runner) but not others (the same nominal version locally), leaving `.` live as a wildcard. `index()`
+  removes the class of bug rather than the instance.
 
 ### Changed
 

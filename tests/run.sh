@@ -389,9 +389,10 @@ bash "$RN" 1.0.0 /nonexistent/CHANGELOG.md >/dev/null 2>&1; check "missing chang
 # A whitespace-only section must not publish as a release with an empty body.
 TMP="$(mktemp -d)"; printf '# Changelog\n\n## [2.0.0] - x\n\n\n## [1.0.0] - y\n\nreal notes\n' > "$TMP/CH.md"
 bash "$RN" 2.0.0 "$TMP/CH.md" >/dev/null 2>&1; check "whitespace-only section fails closed" 1 "$?"
-# The version is interpolated into a regex: dots must not act as wildcards.
+# A version must match literally: 1.0.0 must never select a 1x0x0 section. The
+# first implementation built a dynamic regex, which mawk and gawk disagree about.
 printf '# Changelog\n\n## [1x0x0] - x\n\nwrong section\n' > "$TMP/CH2.md"
-bash "$RN" 1.0.0 "$TMP/CH2.md" >/dev/null 2>&1; check "dots are escaped, not wildcards" 1 "$?"
+bash "$RN" 1.0.0 "$TMP/CH2.md" >/dev/null 2>&1; check "version matches literally, not as a regex" 1 "$?"
 rm -rf "$TMP"
 
 echo "== harness_lint.py (the linter is itself a gate) =="
