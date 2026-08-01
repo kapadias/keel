@@ -230,11 +230,12 @@ TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 mkdir -p "$TMP/.claude/hooks"; cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"
 out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"
 contains "standalone: announces the project harness root" "$TMP/.claude" "$out"
-if [ -L "$TMP/.git/hooks/pre-push" ]; then
-  contains "standalone: wires a relative symlink (survives a move)" "../../.claude" "$(readlink "$TMP/.git/hooks/pre-push")"
-else
-  check "standalone: pre-push hook exists" 0 0
-fi
+# One assertion, always executed: a branch that only sometimes runs makes the
+# derived suite count (harness_lint's ACTUAL_GATES) disagree with what the run
+# reports, and a test count that is off by one is a test count nobody trusts.
+link="$(readlink "$TMP/.git/hooks/pre-push" 2>/dev/null || printf 'copied-not-symlink')"
+case "$link" in /*) target="absolute" ;; *) target="relative-or-copied" ;; esac
+check "standalone: pre-push target is not absolute (survives a repo move)" "relative-or-copied" "$target"
 rm -rf "$TMP"
 
 echo "== check-review.sh (review verdict gate) =="

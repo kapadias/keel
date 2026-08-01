@@ -7,8 +7,8 @@
     {
       "name": "keel",
       "source": "./.claude",
-      "description": "The Keel harness: rules, agents, skills, commands, and enforcing hooks for disciplined, gate-driven AI-assisted development. Install once; the same loop applies in any repository.",
-      "version": "0.2.0"
+      "description": "The Keel harness: rules, agents, skills, pipeline workflows, and enforcing hooks for disciplined, gate-driven AI-assisted development. Install once; the same loop applies in any repository.",
+      "version": "1.0.0"
     }
   ]
 }

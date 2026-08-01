@@ -5,9 +5,18 @@ pre-push hook (`require-status-sync.sh`) blocks code pushes that leave it stale.
 
 ## Current state
 
-**v0.2.0 "Gates as Code"** — Keel's discipline is now **enforced**, not just described. The hooks
-block (rather than warn), the harness tests its own gates, review produces a machine-checkable verdict,
-and Keel ships as an installable plugin with language stack packs. Language- and domain-agnostic.
+**v1.0.0 "The Model Cannot Ship Itself"** — the first published release. Keel's discipline is
+enforced by code at six lifecycle events, the harness tests its own gates _and its own linter_, and
+the model can no longer invoke the six workflows that have side effects: `/ship`, `/release`,
+`/rollback`, `/adr`, `/sync` and `/intake` are human-triggered only. A plugin install now carries the
+operating rules it was silently missing, and every token budget is enforced by the linter rather than
+asserted in a README. Language- and domain-agnostic.
+
+Always-on surface: **3,599 words** of prose (3,700-word budget) plus ~1.1k tokens of skill/agent
+descriptions (5,600-char budget) — roughly **6.9k tokens per turn**, down from ~9.1k.
+
+Previous: v0.2.0 "Gates as Code" turned prose discipline into blocking scripts. Never published as a
+release; v1.0.0 is the first tagged artifact.
 
 ## What exists
 
@@ -40,6 +49,24 @@ and Keel ships as an installable plugin with language stack packs. Language- and
 - **CI** — `.github/workflows/ci.yml`: shellcheck (all scripts) + harness-lint + gate self-tests.
 
 ## Recently changed
+
+- **2026-08-01** — v1.0.0 release prep (documentation caught up with the code):
+  - Both manifests bumped `0.2.0` → **`1.0.0`**; `plugin.json` gained `license` and `keywords`.
+  - **`README.md`'s token-economy table was wrong, and had been for a while.** It claimed "≈5k
+    tokens" for `CLAUDE.md` + 8 rules — a number never measured against the real surface, and it
+    omitted description metadata entirely. Now states what the linter actually enforces: 3,599 words
+    of prose under a 3,700-word budget, plus ~1.1k tokens of descriptions under a 5,600-char cap.
+    Counts corrected (9 rules, 25 skills), and the pipeline table marks the six human-only workflows.
+  - **`CHANGELOG.md` created.** This GitHub server exposes no `create_release` tool, so the release
+    notes need a durable home in-repo rather than living only in a Release body.
+  - `docs/ROADMAP.md`: WS2 and WS3 marked mostly-shipped with what actually landed; statusline,
+    orphan detection, markdownlint and behavioral evals stay open; the `memory:` rejection is
+    recorded with its rationale.
+  - `tests/README.md`: documents the three new gates and the "linter is itself a gate" section.
+  - **Test count made honest.** `harness_lint.py` derives the suite size from `run.sh`'s assertion
+    call-sites (137) but only 136 ran — one sat inside an `if/else` branch. Collapsed to a single
+    always-executed assertion, so the derived count and the observed count now agree at **136**.
+    A test count that is off by one is a test count nobody trusts.
 
 - **2026-08-01** — Harness optimization, stage 6 (commands became skills; `/release` became a gate):
   - Claude Code merged custom commands into skills, and only skills support **invocation control**.
