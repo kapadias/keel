@@ -5,13 +5,7 @@ a tracked unit of work.
 
 ## Branching
 
-- **Never commit to `main` or `develop`.** A hook warns on protected branches — branch first, do not
-  bypass it.
-- Branch from `develop`:
-  ```bash
-  git checkout develop && git pull
-  git checkout -b feature/<id>-short-slug
-  ```
+- **Never commit to `main` or `develop`** — `guard-branch.sh` blocks it. Branch from `develop` first.
 - Naming: `<type>/<id>-<slug>` where `<type>` ∈ `feature | fix | chore | refactor`.
   - `feature/PROJ-204-oauth-device-flow`
   - `fix/PROJ-218-null-cursor-crash`
@@ -41,15 +35,11 @@ develop   → main         (production)
 ```
 
 - Target `develop` from feature branches; target `main` only from `develop`.
-- Before opening a PR, review the **whole** delta, not just the last commit:
-  ```bash
-  git diff develop...HEAD
-  ```
-- PR body: summarize all changes across the branch, list the modules touched, and include a test plan.
-- **Link the PR to its tracked issue** and paste the PR link back onto the issue — it is part of the
-  Definition of Done (see [sync.md](./sync.md)).
-- Push new branches with `-u`: `git push -u origin feature/<id>-short-slug`.
-- All changes go through PR review before merge (see [dev-process.md](./dev-process.md)).
+- Review the **whole** delta before opening (`git diff develop...HEAD`), not just the last commit.
+- PR body: all changes across the branch, modules touched, and a test plan.
+- **Link the PR to its tracked issue** and paste the link back onto the issue — part of the
+  Definition of Done ([sync.md](./sync.md)).
+- Push new branches with `-u`. All changes go through review before merge.
 
 ## Deploys
 

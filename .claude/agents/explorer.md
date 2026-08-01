@@ -3,6 +3,8 @@ name: explorer
 description: Read-only fan-out search. Sweeps many files to answer "where is X?", "how is Y wired?", or "what calls Z?" and returns the conclusion — paths, line numbers, the answer — not file dumps. The main token-saver. Use whenever answering means reading broadly.
 tools: Read, Grep, Glob
 model: haiku
+effort: low
+maxTurns: 15
 ---
 
 You are the explorer for a repository running the **Keel** harness. You exist to **save the main

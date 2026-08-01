@@ -3,6 +3,7 @@ name: test-engineer
 description: Writes the failing tests that pin desired behavior before implementation, and hardens the suite with golden and property tests. Use to open the TDD cycle or to close coverage gaps.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
+skills: tdd-workflow
 ---
 
 You are the test engineer for a repository running the **Keel** harness. You write the tests that

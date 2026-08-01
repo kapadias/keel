@@ -35,6 +35,7 @@ def bad(msg: str) -> None:
 
 
 ALLOWED_MODELS = {"opus", "sonnet", "haiku", "fable", "inherit"}
+ALLOWED_EFFORT = {"low", "medium", "high", "xhigh", "max"}
 READ_ONLY_AGENTS = {
     "orchestrator",
     "planner",
@@ -82,6 +83,16 @@ for path in sorted(glob.glob(f"{ROOT}/.claude/agents/*.md")):
     leaked = granted & MUTATING_TOOLS
     if name in READ_ONLY_AGENTS and leaked:
         bad(f"{path}: read-only agent grants mutating tools {sorted(leaked)}")
+    # `skills:` preloads FULL skill content at startup, turning a probabilistic
+    # description-trigger into a deterministic one. That guarantee is why depth
+    # may live in the skill instead of an always-on rule — so a name that does
+    # not resolve silently removes the depth it was trusted to carry.
+    for skill in (s.strip() for s in (fm_value(block, "skills") or "").split(",")):
+        if skill and not os.path.isfile(f"{ROOT}/.claude/skills/{skill}/SKILL.md"):
+            bad(f"{path}: preloads skill '{skill}' which has no SKILL.md")
+    effort = fm_value(block, "effort")
+    if effort and effort not in ALLOWED_EFFORT:
+        bad(f"{path}: effort '{effort}' not in {sorted(ALLOWED_EFFORT)}")
 
 # --- commands ---
 for path in sorted(glob.glob(f"{ROOT}/.claude/commands/*.md")):
@@ -299,9 +310,14 @@ for md in glob.glob(f"{ROOT}/.claude/**/*.md", recursive=True):
 # budget is an explicit, reviewable act — that is the point.
 # Calibrated 2026-08-01: CLAUDE.md 836, largest rule 679 (dev-process.md), total
 # 4,252 by this metric (str.split() counts slightly above `wc -w`).
-MAX_CLAUDE_MD_WORDS = 900
-MAX_RULE_WORDS = 700
-MAX_ALWAYS_ON_WORDS = 4500
+MAX_CLAUDE_MD_WORDS = 300
+MAX_RULE_WORDS = 520
+MAX_ALWAYS_ON_WORDS = 3700
+# 00-core.md is also what a plugin install receives through SessionStart
+# additionalContext (ADR-0007), which Claude Code caps at 10,000 characters.
+# Overrun does not error — it truncates, silently dropping the tail of the
+# constitution for exactly the install mode that has nothing else. Budget under.
+MAX_CORE_CHARS = 9000
 
 
 def word_count(path: str) -> int:
@@ -322,6 +338,19 @@ if always_on > MAX_ALWAYS_ON_WORDS:
         f"always-on surface (CLAUDE.md + rules/) is {always_on} words — "
         f"exceeds the {MAX_ALWAYS_ON_WORDS}-word budget (token-economy.md)"
     )
+core = f"{ROOT}/.claude/rules/00-core.md"
+if not os.path.isfile(core):
+    bad(
+        "missing .claude/rules/00-core.md — the constitution and the plugin carrier (ADR-0007)"
+    )
+else:
+    core_chars = len(open(core, encoding="utf-8").read())
+    if core_chars > MAX_CORE_CHARS:
+        bad(
+            f"00-core.md is {core_chars} chars — exceeds the {MAX_CORE_CHARS}-char budget; "
+            f"SessionStart additionalContext truncates at 10,000 and a plugin install "
+            f"would silently lose the tail (ADR-0007)"
+        )
 
 # --- plugin packaging: manifests are valid JSON and wired scripts exist ---
 plugin_manifest = f"{ROOT}/.claude/.claude-plugin/plugin.json"

@@ -209,6 +209,22 @@ out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"; check "unlocatable
 contains "unlocatable harness: warns DoD is NOT enforced" "NOT enforced" "$out"
 if [ -e "$TMP/.git/hooks/pre-push" ]; then rc=0; else rc=1; fi; check "unlocatable harness: installs no dangling hook" 1 "$rc"
 rm -rf "$TMP"
+# Plugin install: rules/ never loads (no `rules` plugin component, ADR-0007), so the
+# constitution must ride additionalContext or the user gets agents with no policy.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
+contains "plugin install: carries the constitution in additionalContext" "The three principles" "$out"
+contains "plugin install: says the rules are not loaded" "NOT loaded" "$out"
+contains "plugin install: carries the never-list" "Mark work done" "$out"
+rm -rf "$TMP"
+# Standalone checkout: rules/ loads natively — carrying it again would double-pay.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+mkdir -p "$TMP/.claude/hooks" "$TMP/.claude/rules"
+cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"
+cp "$ROOT/.claude/rules/00-core.md" "$TMP/.claude/rules/"
+out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"
+printf '%s' "$out" | grep -q "The three principles"; check "standalone: does NOT double-pay for the constitution" 1 "$?"
+rm -rf "$TMP"
 # Standalone checkout: the announced root must be the project's own .claude/.
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 mkdir -p "$TMP/.claude/hooks"; cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"

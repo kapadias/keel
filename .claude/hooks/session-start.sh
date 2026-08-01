@@ -67,6 +67,24 @@ msg="Keel harness active. Gates live: branch-guard (no commits/pushes to main/ma
 [ -n "$keel_root" ] && msg="${msg} Harness root: ${keel_root} — gate scripts live at \${KEEL}/skills/<skill>/scripts/, e.g. ${keel_root}/skills/code-review/scripts/check-review.sh."
 [ -n "$testcmd" ] && msg="${msg} Likely test gate: '${testcmd}' — wire /test to your gate (see stacks/)."
 
+# 4. Plugin install: carry the constitution in. Claude Code's plugin schema has
+#    no `rules` component (ADR-0007), so .claude/rules/ never loads for a plugin
+#    user — they would get every agent, skill and command but none of the policy
+#    that governs them. additionalContext is the only channel that reaches them.
+#    Only 00-core.md rides it: budgeted under 9,000 chars against the 10,000 cap,
+#    because an overrun truncates silently rather than erroring.
+#    A standalone checkout already loads rules/ natively — do not double-pay.
+if [ ! -f ".claude/rules/00-core.md" ] && [ -n "$keel_root" ] && [ -f "$keel_root/rules/00-core.md" ]; then
+  core="$(cat "$keel_root/rules/00-core.md" 2>/dev/null)"
+  if [ -n "$core" ]; then
+    msg="${msg}
+
+Keel's operating rules are NOT loaded in this install (plugin installs cannot carry .claude/rules/ — see ADR-0007). The constitution follows; the full rules are readable at ${keel_root}/rules/.
+
+${core}"
+  fi
+fi
+
 if command -v jq >/dev/null 2>&1; then
   jq -cn --arg c "$msg" '{hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: $c}}'
 else

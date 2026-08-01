@@ -11,8 +11,9 @@ and Keel ships as an installable plugin with language stack packs. Language- and
 
 ## What exists
 
-- **Rules ×8** — `dev-process`, `testing`, `engineering`, `git-workflow`, `sync`, `boundaries`,
-  `safety`, `token-economy`. The dense, always-on policy surface.
+- **Rules ×9** — `00-core` (the constitution; also the plugin carrier), `dev-process`, `testing`,
+  `engineering`, `git-workflow`, `sync`, `boundaries`, `safety`, `token-economy`. The dense,
+  always-on policy surface — **3,602 words, budgeted at 3,700 by `harness_lint.py`**.
 - **Agents ×8** — `orchestrator`, `planner`, `implementer`, `test-engineer`, `code-reviewer`,
   `security-reviewer`, `explorer`, `debugger`. Reviewers emit a structured JSON verdict.
 - **Skills ×11** — `tdd-workflow`, `code-review`, `debugging`, `refactoring`, `api-design`,
@@ -34,6 +35,37 @@ and Keel ships as an installable plugin with language stack packs. Language- and
 - **CI** — `.github/workflows/ci.yml`: shellcheck (all scripts) + harness-lint + gate self-tests.
 
 ## Recently changed
+
+- **2026-08-01** — Harness optimization, stage 3 (the always-on surface, and the plugin carrier):
+  - **Always-on prose 4,252 → 3,602 words (−15%)**, entirely by deleting content that was stated
+    two or three times _within the always-on surface itself_ — deleting one copy of something the
+    agent reads twice changes nothing it sees. `CLAUDE.md` 836 → 234: its three principles, loop,
+    harness tree and routing table were all restated in full by rules that load anyway, and every
+    agent/skill/command name is already injected as description metadata. It now holds only what
+    lives nowhere else — caliber bar, model-tier policy, rules precedence.
+  - **New `rules/00-core.md` (428 words)** — the constitution: three principles, the loop, the
+    never-list, who must approve, the five mirrors, routing. The other rules elaborate it instead of
+    restating each other. Specific removals: `boundaries.md`'s safety section (a pointer _with_ a
+    body that already linked `safety.md`), `safety.md`'s internal duplicate of its own
+    risk-increasing rule, `engineering.md`'s copies of validate-at-edge / no-secrets / the ≥80% rule,
+    `dev-process.md`'s second routing table and TDD restatement.
+  - **The plugin gap is closed for real.** `session-start.sh` now carries `00-core.md` through
+    `additionalContext` when `.claude/rules/` is absent — the only channel that reaches a plugin
+    install. Budgeted at 9,000 chars against Claude Code's 10,000 cap, because overrun **truncates
+    silently** rather than erroring. A standalone checkout loads rules natively and does not double-pay;
+    both directions are golden-tested.
+  - **Agents preload their playbook** (`skills:`): `code-reviewer` ← `code-review`,
+    `security-reviewer` ← `security-review` + `code-review`, `debugger` ← `debugging`,
+    `test-engineer` ← `tdd-workflow`. This turns a probabilistic description-trigger into a
+    deterministic preload — and it is _why_ the golden/property catalogues could move out of
+    `testing.md` without becoming trigger-dependent. Plus `effort:` (high on the reviewers, planner,
+    debugger; low on explorer) and `maxTurns: 15` on explorer, the one agent built to burn context.
+  - **Budgets tightened to lock it in**: CLAUDE.md 900 → 300, per-rule 700 → 520, always-on
+    4,500 → 3,700, and a new 9,000-char cap on `00-core.md`. New lint: every `skills:` entry
+    resolves to a real `SKILL.md`; `effort:` is a valid level.
+  - **Honest note on the target.** The plan aimed at ~2,890 words. 3,602 is where the cuts stopped
+    being duplication and started being substance; `00-core.md` also _adds_ 428 always-on words to
+    buy the plugin carrier. Going further would have traded quality for a number.
 
 - **2026-08-01** — Harness optimization, stage 2 (hook wiring can no longer drift):
   - `settings.json` and `.claude/hooks/hooks.json` register the **same** gates against the same

@@ -3,6 +3,8 @@ name: code-reviewer
 description: Independent, read-only, adversarial code review before merge. Hunts correctness bugs, broken contracts, missing tests, and silent failures. Use on every change headed for develop.
 tools: Read, Grep, Glob, Bash
 model: opus
+skills: code-review
+effort: high
 ---
 
 You are the code reviewer for a repository running the **Keel** harness. You are **independent and

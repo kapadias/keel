@@ -6,17 +6,21 @@ discipline is **enforced by code, not prose**. Start with [`../CLAUDE.md`](../CL
 
 ## Layout
 
-- **`rules/`** — always-on operating discipline (dense and short; you pay for them every turn). The
-  three load-bearing ones: [`boundaries.md`](rules/boundaries.md) (the LLM-proposes / gates-decide
-  line), [`safety.md`](rules/safety.md) (blast radius & irreversible actions), and
-  [`token-economy.md`](rules/token-economy.md) (spend context deliberately). Plus
-  [`dev-process.md`](rules/dev-process.md), [`testing.md`](rules/testing.md),
-  [`engineering.md`](rules/engineering.md), [`git-workflow.md`](rules/git-workflow.md),
-  [`sync.md`](rules/sync.md). Project rules override global `~/.claude/rules/`.
+- **`rules/`** — always-on operating discipline (dense and short; you pay for them every turn), and
+  budgeted by `harness_lint.py`. Start at [`00-core.md`](rules/00-core.md) — the constitution: three
+  principles, the loop, the never-list, who must approve, and routing. It is also the **only** thing
+  a plugin install receives (ADR-0007), so it is budgeted under 9,000 chars to ride `SessionStart`.
+  The rest elaborate it: [`boundaries.md`](rules/boundaries.md) (LLM proposes / gates decide),
+  [`safety.md`](rules/safety.md) (blast radius & irreversible actions),
+  [`token-economy.md`](rules/token-economy.md), [`dev-process.md`](rules/dev-process.md),
+  [`testing.md`](rules/testing.md), [`engineering.md`](rules/engineering.md),
+  [`git-workflow.md`](rules/git-workflow.md), [`sync.md`](rules/sync.md). Project rules override
+  global `~/.claude/rules/`.
 - **`agents/`** — 8 specialists. `orchestrator` (router), `planner` (read-only plan author),
   `implementer`, `test-engineer`, `code-reviewer` (read-only; emits a machine-checkable JSON verdict),
   `security-reviewer` (read-only; same verdict contract), `explorer` (read-only fan-out, token-saver),
-  `debugger`.
+  `debugger`. Each pins a model tier; the four that own a playbook **preload it** via `skills:`, so
+  the depth arrives deterministically instead of by description-trigger.
 - **`skills/`** — 11 on-demand playbooks, most bundling runnable scripts/templates/references that load
   only when opened: `tdd-workflow`, `code-review`, `debugging`, `refactoring`, `api-design`,
   `security-review`, `migration-safety`, `observability`, `concurrency-performance`, `supply-chain`,
@@ -44,7 +48,8 @@ distribution).
 ## How the pieces fit
 
 ```
-CLAUDE.md + rules/   →  always-on    (tiny, dense, paid every turn)
+rules/00-core.md     →  constitution (also the plugin carrier — ADR-0007)
+CLAUDE.md + rules/   →  always-on    (tiny, dense, paid every turn; lint-budgeted)
 skills/              →  on-demand    (load when the trigger matches; depth in bundled files)
 commands/            →  workflows    (invoke an encoded pipeline)
 agents/              →  delegation   (spend a subagent's context, keep the conclusion)

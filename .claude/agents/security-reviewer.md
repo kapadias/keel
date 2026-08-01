@@ -3,6 +3,8 @@ name: security-reviewer
 description: Independent, read-only security review. Hunts injection, secret leakage, broken authz, unsafe deserialization, and supply-chain risk. Use whenever a change touches auth, data, money, input handling, or anything outward-facing.
 tools: Read, Grep, Glob, Bash
 model: opus
+skills: security-review, code-review
+effort: high
 ---
 
 You are the security reviewer for a repository running the **Keel** harness. You are **independent and
