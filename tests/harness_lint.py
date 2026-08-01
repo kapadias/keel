@@ -8,7 +8,12 @@ Every check below fails the build (boundaries.md: deterministic gates decide):
   - skills: each SKILL.md declares a description (its trigger).
   - settings.json: every wired hook script exists on disk.
   - cross-links: every intra-repo markdown link resolves to a real file.
+  - slash refs: every `/name` named in the harness resolves to a command or skill.
   - domain leak: no domain-specific vocabulary in a domain-agnostic harness.
+
+KEEL_LINT_ROOT points the linter at a different tree. It exists so tests/run.sh
+can golden-test the linter itself against mutated copies of this repo — a linter
+with no failing-case test is an unverified gate. CI never sets it.
 """
 
 from __future__ import annotations
@@ -19,7 +24,9 @@ import os
 import re
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.environ.get("KEEL_LINT_ROOT") or os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__))
+)
 offenders: list[str] = []
 
 
@@ -27,7 +34,7 @@ def bad(msg: str) -> None:
     offenders.append(msg)
 
 
-ALLOWED_MODELS = {"opus", "sonnet", "haiku", "inherit"}
+ALLOWED_MODELS = {"opus", "sonnet", "haiku", "fable", "inherit"}
 READ_ONLY_AGENTS = {
     "orchestrator",
     "planner",
@@ -226,6 +233,27 @@ for md in sorted(set(md_files)):
                 if not os.path.isfile(os.path.join(ROOT, t)):
                     bad(f"{md}:{n}: backtick-referenced {t} does not exist")
 
+# --- slash references: every `/name` the harness advertises must be invocable ---
+# Descriptions and rules route the agent by naming commands. A `/name` that no
+# longer exists is a routing dead end the agent cannot detect at runtime, so it
+# silently does nothing. Skills are invocable as `/name` too, so both count.
+SLASH = re.compile(r"`(/[a-z][a-z0-9-]*)`")
+invocable = {
+    os.path.basename(p)[:-3] for p in glob.glob(f"{ROOT}/.claude/commands/*.md")
+}
+invocable |= {
+    os.path.basename(os.path.dirname(p))
+    for p in glob.glob(f"{ROOT}/.claude/skills/*/SKILL.md")
+}
+for md in sorted(glob.glob(f"{ROOT}/.claude/**/*.md", recursive=True)):
+    with open(md, encoding="utf-8") as fh:
+        for n, line in enumerate(fh, 1):
+            for ref in SLASH.findall(line):
+                if ref[1:] not in invocable:
+                    bad(
+                        f"{os.path.relpath(md, ROOT)}:{n}: `{ref}` is not a command or skill"
+                    )
+
 # --- domain leak: a domain-agnostic harness names no single domain ---
 DENY = re.compile(r"\b(trading|brokerage)\b", re.IGNORECASE)
 for md in glob.glob(f"{ROOT}/.claude/**/*.md", recursive=True):
@@ -239,8 +267,8 @@ for md in glob.glob(f"{ROOT}/.claude/**/*.md", recursive=True):
 # words (whitespace-split — deterministic, no tokenizer dependency); ~0.75
 # words/token puts the total near the README's ≈5k-token claim. Raising a
 # budget is an explicit, reviewable act — that is the point.
-# Calibrated 2026-07-09: CLAUDE.md 836, largest rule 658, total 4,231 by this
-# metric (str.split() counts slightly above `wc -w`) — ~6-8% headroom each.
+# Calibrated 2026-08-01: CLAUDE.md 836, largest rule 679 (dev-process.md), total
+# 4,252 by this metric (str.split() counts slightly above `wc -w`).
 MAX_CLAUDE_MD_WORDS = 900
 MAX_RULE_WORDS = 700
 MAX_ALWAYS_ON_WORDS = 4500

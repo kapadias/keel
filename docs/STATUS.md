@@ -35,6 +35,21 @@ and Keel ships as an installable plugin with language stack packs. Language- and
 
 ## Recently changed
 
+- **2026-08-01** — Harness optimization, stage 0 (the linter becomes a tested gate):
+  - **`harness_lint.py` had no failing-case test.** It was the one gate the harness never proved:
+    if a check silently stopped firing it would still print `OK`. `KEEL_LINT_ROOT` now retargets the
+    linter at a copied tree so `tests/run.sh` can break exactly one thing and assert it is caught.
+    CI never sets the variable.
+  - Golden tests added for the linter itself: a faithful copy passes; an unknown model tier is
+    rejected and named; the always-on word budget bites; unwiring `check-review.sh` from `/ship` is
+    blocked and cites ADR-0005.
+  - **New check — slash references resolve.** Every `` `/name` `` the harness advertises must be a
+    real command or skill. A routing pointer to a command that no longer exists is a dead end the
+    agent cannot detect at runtime. It passes today; this pins it.
+  - `fable` added to `ALLOWED_MODELS` — Fable 5 is a current Claude Code model tier and the linter
+    rejected it, blocking adopters from using it in an agent.
+  - Stale calibration comment corrected (claimed largest rule 658 / total 4,231; actual 679 / 4,252).
+
 - **2026-07-09** — Karpathy-alignment + gate-integrity pass (audit of the harness against Andrej
   Karpathy's published AI-coding principles):
   - `check-review.sh` now **fails closed on out-of-schema input**: unknown or missing verdict →

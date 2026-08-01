@@ -259,5 +259,59 @@ printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push --all origin"
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin HEAD:refs/heads/main"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "guard-branch: blocks qualified refs/heads/main push" 2 "$?"
 rm -rf "$TMP"
 
+echo "== harness_lint.py (the linter is itself a gate) =="
+# A linter with no failing-case test is an unverified gate: it would still print
+# "OK" if a check silently stopped firing. Each case copies the real tree, breaks
+# exactly one thing, and asserts the linter catches it (KEEL_LINT_ROOT retargets).
+LINT="$ROOT/tests/harness_lint.py"
+lint_fixture() { # -> echoes a fresh copy of the harness
+  local d; d="$(mktemp -d)"
+  cp -R "$ROOT/.claude" "$ROOT/docs" "$ROOT/tests" "$ROOT/stacks" "$ROOT/.github" \
+        "$ROOT/.claude-plugin" "$d/" 2>/dev/null
+  cp "$ROOT"/*.md "$ROOT"/LICENSE "$d/" 2>/dev/null
+  printf '%s' "$d"
+}
+FX="$(lint_fixture)"
+KEEL_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: an unmodified copy passes (fixture is faithful)" 0 "$?"
+rm -rf "$FX"
+
+# model tier: fable is a real Claude Code model and must be accepted; junk must not.
+FX="$(lint_fixture)"
+sed -i 's/^model: haiku$/model: fable/' "$FX/.claude/agents/explorer.md"
+KEEL_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: accepts model 'fable'" 0 "$?"
+sed -i 's/^model: fable$/model: gpt-4/' "$FX/.claude/agents/explorer.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: rejects an unknown model tier" 1 "$?"
+contains "lint: names the offending model" "gpt-4" "$out"
+rm -rf "$FX"
+
+# slash references: a routing pointer to a command that does not exist is a dead end.
+FX="$(lint_fixture)"
+printf '\nSee `/nonexistent-command` for details.\n' >> "$FX/.claude/rules/dev-process.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a slash ref that is not a command or skill" 1 "$?"
+contains "lint: names the unresolved slash reference" "/nonexistent-command" "$out"
+rm -rf "$FX"
+
+# skills are invocable as /name, so a skill reference must NOT be reported dead.
+FX="$(lint_fixture)"
+printf '\nSee `/security-review` and `/tdd-workflow` for details.\n' >> "$FX/.claude/rules/testing.md"
+KEEL_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: a skill name IS a valid slash reference" 0 "$?"
+rm -rf "$FX"
+
+# the token budget must actually bite (it is the mechanism locking the compression in).
+FX="$(lint_fixture)"
+python3 -c "
+import sys; p=sys.argv[1]
+open(p,'a').write('\n' + ('filler ' * 5000) + '\n')" "$FX/.claude/rules/sync.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: always-on word budget blocks bloat" 1 "$?"
+contains "lint: names the rule budget" "word budget" "$out"
+rm -rf "$FX"
+
+# review-gate wiring (ADR-0005) must stay pinned: unwiring it is the defect it guards.
+FX="$(lint_fixture)"
+sed -i 's/check-review\.sh/checkreview.sh/g' "$FX/.claude/commands/ship.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks /ship that no longer wires check-review.sh" 1 "$?"
+contains "lint: cites ADR-0005 on unwiring" "ADR-0005" "$out"
+rm -rf "$FX"
+
 printf '\n%s passed, %s failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
