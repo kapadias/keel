@@ -337,9 +337,46 @@ for jf in (plugin_manifest, marketplace, plugin_hooks):
     except json.JSONDecodeError as exc:
         bad(f"plugin packaging: invalid JSON in {os.path.relpath(jf, ROOT)}: {exc}")
 
+
+# --- hook wiring equivalence: two files declare the same gates, with no shared source ---
+# settings.json (standalone, $CLAUDE_PROJECT_DIR/.claude/...) and hooks.json
+# (plugin, ${CLAUDE_PLUGIN_ROOT}/...) register the SAME gates against the same
+# events. Nothing links them, so a gate added to one and forgotten in the other
+# is live in one install mode and absent in the other — the exact asymmetry
+# ADR-0007 was written about. Generating one from the other would need a build
+# step ADR-0006 rejected, so assert equivalence instead.
+def hook_shape(cfg: dict) -> dict:
+    """Event -> matcher -> ordered script names, with the path prefix normalized away."""
+    shape: dict[str, dict[str, list[str]]] = {}
+    for event, entries in (cfg.get("hooks") or {}).items():
+        by_matcher: dict[str, list[str]] = {}
+        for entry in entries:
+            scripts = []
+            for hook in entry.get("hooks", []):
+                cmd = hook.get("command", "")
+                cmd = re.sub(r"^\$\{?CLAUDE_PLUGIN_ROOT\}?/", "", cmd)
+                cmd = re.sub(r"^\$\{?CLAUDE_PROJECT_DIR\}?/\.claude/", "", cmd)
+                scripts.append(cmd)
+            by_matcher.setdefault(entry.get("matcher", "*"), []).extend(scripts)
+        shape[event] = by_matcher
+    return shape
+
+
 if os.path.isfile(plugin_hooks):
     with open(plugin_hooks, encoding="utf-8") as fh:
         ph = json.load(fh)
+    a, b = hook_shape(settings), hook_shape(ph)
+    for event in sorted(set(a) | set(b)):
+        if event not in a:
+            bad(f"hook wiring: '{event}' is in hooks.json but not settings.json")
+        elif event not in b:
+            bad(f"hook wiring: '{event}' is in settings.json but not hooks.json")
+        elif a[event] != b[event]:
+            bad(
+                f"hook wiring: '{event}' differs between settings.json and hooks.json "
+                f"(settings={a[event]}, plugin={b[event]}) — a gate wired in one "
+                f"install mode and not the other"
+            )
     for _event, entries in (ph.get("hooks") or {}).items():
         for entry in entries:
             for hook in entry.get("hooks", []):

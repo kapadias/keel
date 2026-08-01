@@ -345,6 +345,30 @@ printf '\nDo not use `git reset --hard` here.\n' >> "$FX/.claude/commands/rollba
 KEEL_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: a negated git mention is not an under-grant" 0 "$?"
 rm -rf "$FX"
 
+# Hook wiring equivalence: settings.json and hooks.json register the same gates
+# with no shared source. A gate added to one and forgotten in the other is live
+# standalone and absent under a plugin install — the asymmetry ADR-0007 is about.
+FX="$(lint_fixture)"
+python3 - "$FX/.claude/hooks/hooks.json" <<'PY'
+import json, sys
+p = sys.argv[1]; cfg = json.load(open(p))
+cfg["hooks"]["PreToolUse"][0]["hooks"].pop()          # drop secret-scan from the plugin wiring only
+json.dump(cfg, open(p, "w"), indent=2)
+PY
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a gate wired in settings.json but not hooks.json" 1 "$?"
+contains "lint: names the desynced event" "PreToolUse" "$out"
+rm -rf "$FX"
+FX="$(lint_fixture)"
+python3 - "$FX/.claude/hooks/hooks.json" <<'PY'
+import json, sys
+p = sys.argv[1]; cfg = json.load(open(p))
+cfg["hooks"]["SessionEnd"] = [{"hooks": [{"type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/x.sh"}]}]
+json.dump(cfg, open(p, "w"), indent=2)
+PY
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks an event present in only one wiring" 1 "$?"
+contains "lint: names the one-sided event" "SessionEnd" "$out"
+rm -rf "$FX"
+
 # review-gate wiring (ADR-0005) must stay pinned: unwiring it is the defect it guards.
 FX="$(lint_fixture)"
 sed -i 's/check-review\.sh/checkreview.sh/g' "$FX/.claude/commands/ship.md"

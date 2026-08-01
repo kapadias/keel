@@ -35,6 +35,16 @@ and Keel ships as an installable plugin with language stack packs. Language- and
 
 ## Recently changed
 
+- **2026-08-01** — Harness optimization, stage 2 (hook wiring can no longer drift):
+  - `settings.json` and `.claude/hooks/hooks.json` register the **same** gates against the same
+    events with nothing linking them. A gate added to one and forgotten in the other is live in one
+    install mode and absent in the other — the asymmetry ADR-0007 is about. Generating one from the
+    other needs the build step ADR-0006 rejected, so the linter **asserts equivalence** instead:
+    both files are parsed, the `${CLAUDE_PLUGIN_ROOT}` / `$CLAUDE_PROJECT_DIR/.claude` prefixes are
+    normalized away, and the event → matcher → script shapes must match exactly.
+  - Two golden tests: a gate dropped from one wiring is blocked and the event named; an event
+    present in only one wiring is blocked and named.
+
 - **2026-08-01** — Harness optimization, stage 1 (the plugin install path was not the harness):
   - **The Definition-of-Done gate was silently absent under a plugin install.** `session-start.sh`
     guarded the pre-push install on `[ -f .claude/hooks/… ]` — a path that does not exist when Keel
