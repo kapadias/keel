@@ -50,6 +50,23 @@ release; v1.0.0 is the first tagged artifact.
 
 ## Recently changed
 
+- **2026-08-01** — Release automation; expiring facts removed from the banner:
+  - **Pushing a `v*` tag now publishes the GitHub Release**, notes read from `CHANGELOG.md`.
+    v1.0.0 had to be assembled by hand, and that is precisely what argued for automating it:
+    `git tag -F` defaults to `--cleanup=strip`, which deletes every `#`-prefixed line, so the tag
+    annotation lost all its headings and a breaking change read like a feature. The tag is the
+    trigger; the changelog is the source of truth.
+  - The workflow **fails closed twice**: no `## [<version>]` section (or an empty one) refuses to
+    publish, and a tag that disagrees with `plugin.json` / `marketplace.json` refuses too. An empty
+    release body is undetectable downstream, so it must be caught here.
+  - Extraction lives in `.github/scripts/release-notes.sh`, not inline YAML, so it is golden-tested
+    like every other gate — 9 tests, including that dots in a version are escaped rather than
+    matching as regex wildcards (`1.0.0` must not select a `1x0x0` section).
+  - **`assets/keel-banner.svg` hardcoded `v0.1.0` and `MIT`.** The version was two releases stale
+    and nobody noticed — the argument against putting expiring facts in a hand-edited image. Both
+    chips removed, along with the `License` and `release` badges in the README header. Version lives
+    in `CHANGELOG.md` and the manifests; the licence lives in `LICENSE`.
+
 - **2026-08-01** — v1.0.0 release prep (documentation caught up with the code):
   - Both manifests bumped `0.2.0` → **`1.0.0`**; `plugin.json` gained `license` and `keywords`.
   - **`README.md`'s token-economy table was wrong, and had been for a while.** It claimed "≈5k
