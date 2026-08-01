@@ -1,4 +1,5 @@
 ---
+name: fix
 description: The bounded fast lane for trivial, reversible fixes — check-trivial.sh decides eligibility (≤15 lines, ≤3 files, no new deps, off the critical surface); regression test, gate, and single machine-checked review are never skipped. Anything bigger routes to the full loop.
 argument-hint: "[what to fix]"
 model: sonnet
@@ -22,14 +23,15 @@ full loop.
    skips this.
 3. **Implement the minimal fix** (GREEN). No drive-by improvements — surgical changes only.
 4. **Eligibility — the script decides.** Run
-   `bash .claude/skills/fast-lane/scripts/check-trivial.sh`. Non-zero means this is **not**
-   a trivial change: stop and route through the full loop (`/plan` → `/tdd` → `/review` →
-   `/ship`). Do not argue with the classifier.
+   `bash $KEEL/skills/fast-lane/scripts/check-trivial.sh` (`$KEEL` = the harness root announced at
+   SessionStart; `.claude` in a standalone checkout). Non-zero means this is **not** a trivial
+   change: stop and route through the full loop (`/plan` → `/tdd` → `/review` → `/ship`). Do not
+   argue with the classifier.
 5. **Full local gate** (`/test`): lint + type-check + tests + coverage. Never skipped, never
    reported green unless observed green.
 6. **Single review — machine-checked.** Dispatch `code-reviewer`; write its fenced JSON verdict
    verbatim to `.claude/reviews/<sha>-code.json` (`git rev-parse --short HEAD`) and run
-   `bash .claude/skills/code-review/scripts/check-review.sh` on it. Non-zero blocks the ship.
+   `bash $KEEL/skills/code-review/scripts/check-review.sh` on it. Non-zero blocks the ship.
 7. **Ship.** One-line `docs/STATUS.md` entry, conventional commit, `git push -u origin <branch>`,
    PR to `develop` linked to the tracked issue.
 

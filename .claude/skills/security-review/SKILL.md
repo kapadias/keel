@@ -1,6 +1,6 @@
 ---
 name: security-review
-description: Apply when a change touches authentication, authorization, secrets, money, user data, deserialization, file/URL/network handling, or anything outward-facing. Use when `/security-review` runs or the security-reviewer agent engages — a standalone threat-model pass beyond the correctness review.
+description: A change touching authentication, authorization, secrets, money, user data, deserialization, file/URL/network handling, or anything outward-facing. Threat-model pass beyond correctness review.
 ---
 
 # Security Review

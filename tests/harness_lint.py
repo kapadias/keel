@@ -4,11 +4,16 @@
 Every check below fails the build (boundaries.md: deterministic gates decide):
   - agents: valid frontmatter (name/description/model/tools); model in the
     allowed set; read-only agents grant no mutating tools.
-  - commands: description present; model (if set) valid.
-  - skills: each SKILL.md declares a description (its trigger).
+  - skills (commands are skills too): description present; model/effort valid;
+    side-effecting workflows set disable-model-invocation.
   - settings.json: every wired hook script exists on disk.
   - cross-links: every intra-repo markdown link resolves to a real file.
+  - slash refs: every `/name` named in the harness resolves to a command or skill.
   - domain leak: no domain-specific vocabulary in a domain-agnostic harness.
+
+KEEL_LINT_ROOT points the linter at a different tree. It exists so tests/run.sh
+can golden-test the linter itself against mutated copies of this repo — a linter
+with no failing-case test is an unverified gate. CI never sets it.
 """
 
 from __future__ import annotations
@@ -19,7 +24,9 @@ import os
 import re
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.environ.get("KEEL_LINT_ROOT") or os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__))
+)
 offenders: list[str] = []
 
 
@@ -27,7 +34,8 @@ def bad(msg: str) -> None:
     offenders.append(msg)
 
 
-ALLOWED_MODELS = {"opus", "sonnet", "haiku", "inherit"}
+ALLOWED_MODELS = {"opus", "sonnet", "haiku", "fable", "inherit"}
+ALLOWED_EFFORT = {"low", "medium", "high", "xhigh", "max"}
 READ_ONLY_AGENTS = {
     "orchestrator",
     "planner",
@@ -75,9 +83,25 @@ for path in sorted(glob.glob(f"{ROOT}/.claude/agents/*.md")):
     leaked = granted & MUTATING_TOOLS
     if name in READ_ONLY_AGENTS and leaked:
         bad(f"{path}: read-only agent grants mutating tools {sorted(leaked)}")
+    # `skills:` preloads FULL skill content at startup, turning a probabilistic
+    # description-trigger into a deterministic one. That guarantee is why depth
+    # may live in the skill instead of an always-on rule — so a name that does
+    # not resolve silently removes the depth it was trusted to carry.
+    for skill in (s.strip() for s in (fm_value(block, "skills") or "").split(",")):
+        if skill and not os.path.isfile(f"{ROOT}/.claude/skills/{skill}/SKILL.md"):
+            bad(f"{path}: preloads skill '{skill}' which has no SKILL.md")
+    effort = fm_value(block, "effort")
+    if effort and effort not in ALLOWED_EFFORT:
+        bad(f"{path}: effort '{effort}' not in {sorted(ALLOWED_EFFORT)}")
 
-# --- commands ---
-for path in sorted(glob.glob(f"{ROOT}/.claude/commands/*.md")):
+# --- skills (commands are skills too: Claude Code merged the two) ---
+# A side-effecting workflow must be user-invocable ONLY. safety.md requires a
+# human to approve first promotion to production; disable-model-invocation is
+# what makes that a mechanism instead of a request, and it also drops the
+# description from every turn's context.
+USER_ONLY_SKILLS = {"ship", "release", "rollback", "adr", "sync", "intake"}
+for path in sorted(glob.glob(f"{ROOT}/.claude/skills/*/SKILL.md")):
+    name = os.path.basename(os.path.dirname(path))
     block = frontmatter(path)
     if block is None:
         bad(f"{path}: missing/unterminated frontmatter")
@@ -87,22 +111,25 @@ for path in sorted(glob.glob(f"{ROOT}/.claude/commands/*.md")):
     model = fm_value(block, "model")
     if model and model not in ALLOWED_MODELS:
         bad(f"{path}: model '{model}' not in {sorted(ALLOWED_MODELS)}")
-
-# --- skills ---
-for path in sorted(glob.glob(f"{ROOT}/.claude/skills/*/SKILL.md")):
-    block = frontmatter(path)
-    if block is None:
-        bad(f"{path}: missing/unterminated frontmatter")
-        continue
-    if fm_value(block, "description") is None:
-        bad(f"{path}: frontmatter missing 'description:'")
+    effort = fm_value(block, "effort")
+    if effort and effort not in ALLOWED_EFFORT:
+        bad(f"{path}: effort '{effort}' not in {sorted(ALLOWED_EFFORT)}")
+    if (
+        name in USER_ONLY_SKILLS
+        and fm_value(block, "disable-model-invocation") != "true"
+    ):
+        bad(
+            f"{path}: '{name}' has side effects and must set "
+            f"disable-model-invocation: true — a human approves outward-facing "
+            f"actions (rules/safety.md), and the model must not self-invoke it"
+        )
 
 # --- review gate wiring: the machine-checkable verdict must be reachable ---
 # ADR-0005's parser is only a gate if the live pipeline invokes it. /review and
 # /ship must reference check-review.sh; a harness where the script exists but
 # nothing calls it re-creates the unwired-gate defect this pins against.
 for cmd in ("review", "ship"):
-    cmd_path = f"{ROOT}/.claude/commands/{cmd}.md"
+    cmd_path = f"{ROOT}/.claude/skills/{cmd}/SKILL.md"
     try:
         with open(cmd_path, encoding="utf-8") as fh:
             if "check-review.sh" not in fh.read():
@@ -226,6 +253,54 @@ for md in sorted(set(md_files)):
                 if not os.path.isfile(os.path.join(ROOT, t)):
                     bad(f"{md}:{n}: backtick-referenced {t} does not exist")
 
+# --- allowed-tools completeness: a command must be able to run its own steps ---
+# `allowed-tools` is a PRE-APPROVAL grant, not a restriction: a missing entry
+# falls through to the permission system, so the command halts for approval
+# interactively and is denied outright in dontAsk / non-interactive runs — it
+# degrades exactly where unattended operation matters. /release shipped with
+# `git tag` but no `git push` while its own step 4 said "Push the tag".
+# Only the mechanically provable case is checked: a backticked `git <verb>` in
+# the body of a command that declares allowed-tools but does not grant that verb.
+FRONT = re.compile(r"^---\n(.*?)\n---\n", re.S)
+GIT_IN_SPAN = re.compile(r"`[^`]*\bgit\s+([a-z-]+)")
+NEGATED = re.compile(r"\b(do not|don't|never|instead of)\b", re.I)
+for path in sorted(glob.glob(f"{ROOT}/.claude/skills/*/SKILL.md")):
+    raw = open(path, encoding="utf-8").read()
+    m = FRONT.match(raw)
+    if not m:
+        continue
+    at = re.search(r"^allowed-tools:\s*(.+)$", m.group(1), re.M)
+    if not at:
+        continue  # unrestricted by design — nothing can be under-granted
+    granted = set(re.findall(r"Bash\(git\s+([a-z-]+)", at.group(1)))
+    used: set[str] = set()
+    for line in raw[m.end() :].splitlines():
+        if not NEGATED.search(line):
+            used |= set(GIT_IN_SPAN.findall(line))
+    for verb in sorted(used - granted):
+        bad(
+            f"{os.path.relpath(path, ROOT)}: body runs `git {verb}` but "
+            f"allowed-tools does not grant Bash(git {verb}:*)"
+        )
+
+# --- slash references: every `/name` the harness advertises must be invocable ---
+# Descriptions and rules route the agent by naming commands. A `/name` that no
+# longer exists is a routing dead end the agent cannot detect at runtime, so it
+# silently does nothing. Skills are invocable as `/name` too, so both count.
+SLASH = re.compile(r"`(/[a-z][a-z0-9-]*)`")
+invocable = {
+    os.path.basename(os.path.dirname(p))
+    for p in glob.glob(f"{ROOT}/.claude/skills/*/SKILL.md")
+}
+for md in sorted(glob.glob(f"{ROOT}/.claude/**/*.md", recursive=True)):
+    with open(md, encoding="utf-8") as fh:
+        for n, line in enumerate(fh, 1):
+            for ref in SLASH.findall(line):
+                if ref[1:] not in invocable:
+                    bad(
+                        f"{os.path.relpath(md, ROOT)}:{n}: `{ref}` is not a command or skill"
+                    )
+
 # --- domain leak: a domain-agnostic harness names no single domain ---
 DENY = re.compile(r"\b(trading|brokerage)\b", re.IGNORECASE)
 for md in glob.glob(f"{ROOT}/.claude/**/*.md", recursive=True):
@@ -239,11 +314,16 @@ for md in glob.glob(f"{ROOT}/.claude/**/*.md", recursive=True):
 # words (whitespace-split — deterministic, no tokenizer dependency); ~0.75
 # words/token puts the total near the README's ≈5k-token claim. Raising a
 # budget is an explicit, reviewable act — that is the point.
-# Calibrated 2026-07-09: CLAUDE.md 836, largest rule 658, total 4,231 by this
-# metric (str.split() counts slightly above `wc -w`) — ~6-8% headroom each.
-MAX_CLAUDE_MD_WORDS = 900
-MAX_RULE_WORDS = 700
-MAX_ALWAYS_ON_WORDS = 4500
+# Calibrated 2026-08-01: CLAUDE.md 836, largest rule 679 (dev-process.md), total
+# 4,252 by this metric (str.split() counts slightly above `wc -w`).
+MAX_CLAUDE_MD_WORDS = 300
+MAX_RULE_WORDS = 520
+MAX_ALWAYS_ON_WORDS = 3700
+# 00-core.md is also what a plugin install receives through SessionStart
+# additionalContext (ADR-0007), which Claude Code caps at 10,000 characters.
+# Overrun does not error — it truncates, silently dropping the tail of the
+# constitution for exactly the install mode that has nothing else. Budget under.
+MAX_CORE_CHARS = 9000
 
 
 def word_count(path: str) -> int:
@@ -264,6 +344,37 @@ if always_on > MAX_ALWAYS_ON_WORDS:
         f"always-on surface (CLAUDE.md + rules/) is {always_on} words — "
         f"exceeds the {MAX_ALWAYS_ON_WORDS}-word budget (token-economy.md)"
     )
+# Descriptions are always-on too: Claude Code injects every skill, agent and
+# command description into every turn so it can decide what to load. That made
+# them the one part of the surface with no budget at all, and they had grown to
+# ~7,000 chars. A description exists to support a load/route DECISION; prose
+# past that decision is paid every turn and buys nothing.
+MAX_DESCRIPTION_CHARS = 5600
+desc_chars = 0
+for patt in ("skills/*/SKILL.md", "agents/*.md"):
+    for p in glob.glob(f"{ROOT}/.claude/{patt}"):
+        m = re.search(r"^description:\s*(.+)$", open(p, encoding="utf-8").read(), re.M)
+        if m:
+            desc_chars += len(m.group(1))
+if desc_chars > MAX_DESCRIPTION_CHARS:
+    bad(
+        f"skill+agent+command descriptions total {desc_chars} chars — exceeds the "
+        f"{MAX_DESCRIPTION_CHARS}-char budget; these load on every turn"
+    )
+
+core = f"{ROOT}/.claude/rules/00-core.md"
+if not os.path.isfile(core):
+    bad(
+        "missing .claude/rules/00-core.md — the constitution and the plugin carrier (ADR-0007)"
+    )
+else:
+    core_chars = len(open(core, encoding="utf-8").read())
+    if core_chars > MAX_CORE_CHARS:
+        bad(
+            f"00-core.md is {core_chars} chars — exceeds the {MAX_CORE_CHARS}-char budget; "
+            f"SessionStart additionalContext truncates at 10,000 and a plugin install "
+            f"would silently lose the tail (ADR-0007)"
+        )
 
 # --- plugin packaging: manifests are valid JSON and wired scripts exist ---
 plugin_manifest = f"{ROOT}/.claude/.claude-plugin/plugin.json"
@@ -279,9 +390,46 @@ for jf in (plugin_manifest, marketplace, plugin_hooks):
     except json.JSONDecodeError as exc:
         bad(f"plugin packaging: invalid JSON in {os.path.relpath(jf, ROOT)}: {exc}")
 
+
+# --- hook wiring equivalence: two files declare the same gates, with no shared source ---
+# settings.json (standalone, $CLAUDE_PROJECT_DIR/.claude/...) and hooks.json
+# (plugin, ${CLAUDE_PLUGIN_ROOT}/...) register the SAME gates against the same
+# events. Nothing links them, so a gate added to one and forgotten in the other
+# is live in one install mode and absent in the other — the exact asymmetry
+# ADR-0007 was written about. Generating one from the other would need a build
+# step ADR-0006 rejected, so assert equivalence instead.
+def hook_shape(cfg: dict) -> dict:
+    """Event -> matcher -> ordered script names, with the path prefix normalized away."""
+    shape: dict[str, dict[str, list[str]]] = {}
+    for event, entries in (cfg.get("hooks") or {}).items():
+        by_matcher: dict[str, list[str]] = {}
+        for entry in entries:
+            scripts = []
+            for hook in entry.get("hooks", []):
+                cmd = hook.get("command", "")
+                cmd = re.sub(r"^\$\{?CLAUDE_PLUGIN_ROOT\}?/", "", cmd)
+                cmd = re.sub(r"^\$\{?CLAUDE_PROJECT_DIR\}?/\.claude/", "", cmd)
+                scripts.append(cmd)
+            by_matcher.setdefault(entry.get("matcher", "*"), []).extend(scripts)
+        shape[event] = by_matcher
+    return shape
+
+
 if os.path.isfile(plugin_hooks):
     with open(plugin_hooks, encoding="utf-8") as fh:
         ph = json.load(fh)
+    a, b = hook_shape(settings), hook_shape(ph)
+    for event in sorted(set(a) | set(b)):
+        if event not in a:
+            bad(f"hook wiring: '{event}' is in hooks.json but not settings.json")
+        elif event not in b:
+            bad(f"hook wiring: '{event}' is in settings.json but not hooks.json")
+        elif a[event] != b[event]:
+            bad(
+                f"hook wiring: '{event}' differs between settings.json and hooks.json "
+                f"(settings={a[event]}, plugin={b[event]}) — a gate wired in one "
+                f"install mode and not the other"
+            )
     for _event, entries in (ph.get("hooks") or {}).items():
         for entry in entries:
             for hook in entry.get("hooks", []):

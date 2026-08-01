@@ -1,6 +1,6 @@
 ---
 name: tdd-workflow
-description: Apply when writing or changing code under test-driven development — starting a RED→GREEN→REFACTOR cycle, choosing between golden and property tests, making untestable code testable, or deciding where to spend coverage. Use when the loop reaches the TDD stage or `/tdd` is invoked.
+description: Writing code test-first: RED->GREEN->REFACTOR, golden vs property tests, making untestable code testable, where to spend coverage. Used by /tdd and test-engineer.
 ---
 
 # TDD Workflow

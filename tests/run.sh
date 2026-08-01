@@ -194,6 +194,49 @@ out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"; check "exits 0 wit
 contains "warns that DoD is not enforced" "not Keel's DoD hook" "$out"
 grep -q 'exit 0' "$TMP/.git/hooks/pre-push"; check "does not overwrite the foreign hook" 0 "$?"
 rm -rf "$TMP"
+# Plugin install: the repo has no .claude/ at all — the harness lives at
+# CLAUDE_PLUGIN_ROOT. Guarding only on the project-local path made this case
+# silently skip the DoD gate. A gate that is off without saying so is exactly
+# what ADR-0004 forbids, so this must either install or warn — never both quiet.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"; check "plugin install: exits 0" 0 "$?"
+if [ -e "$TMP/.git/hooks/pre-push" ]; then rc=0; else rc=1; fi; check "plugin install: installs the DoD hook from CLAUDE_PLUGIN_ROOT" 0 "$rc"
+contains "plugin install: announces the resolved harness root" "$ROOT/.claude" "$out"
+rm -rf "$TMP"
+# Neither source present: the gate cannot be installed, so it must say so loudly.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"; check "unlocatable harness: still exits 0" 0 "$?"
+contains "unlocatable harness: warns DoD is NOT enforced" "NOT enforced" "$out"
+if [ -e "$TMP/.git/hooks/pre-push" ]; then rc=0; else rc=1; fi; check "unlocatable harness: installs no dangling hook" 1 "$rc"
+rm -rf "$TMP"
+# Plugin install: rules/ never loads (no `rules` plugin component, ADR-0007), so the
+# constitution must ride additionalContext or the user gets agents with no policy.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
+contains "plugin install: carries the constitution in additionalContext" "The three principles" "$out"
+contains "plugin install: says the rules are not loaded" "NOT loaded" "$out"
+contains "plugin install: carries the never-list" "Mark work done" "$out"
+rm -rf "$TMP"
+# Standalone checkout: rules/ loads natively — carrying it again would double-pay.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+mkdir -p "$TMP/.claude/hooks" "$TMP/.claude/rules"
+cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"
+cp "$ROOT/.claude/rules/00-core.md" "$TMP/.claude/rules/"
+out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"
+printf '%s' "$out" | grep -q "The three principles"; check "standalone: does NOT double-pay for the constitution" 1 "$?"
+rm -rf "$TMP"
+# Standalone checkout: the announced root must be the project's own .claude/.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+mkdir -p "$TMP/.claude/hooks"; cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"
+out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"
+contains "standalone: announces the project harness root" "$TMP/.claude" "$out"
+# One assertion, always executed: a branch that only sometimes runs makes the
+# derived suite count (harness_lint's ACTUAL_GATES) disagree with what the run
+# reports, and a test count that is off by one is a test count nobody trusts.
+link="$(readlink "$TMP/.git/hooks/pre-push" 2>/dev/null || printf 'copied-not-symlink')"
+case "$link" in /*) target="absolute" ;; *) target="relative-or-copied" ;; esac
+check "standalone: pre-push target is not absolute (survives a repo move)" "relative-or-copied" "$target"
+rm -rf "$TMP"
 
 echo "== check-review.sh (review verdict gate) =="
 CR="$SKILLS/code-review/scripts/check-review.sh"
@@ -258,6 +301,205 @@ printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git -C . status"}}' | 
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push --all origin"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "guard-branch: blocks 'git push --all'" 2 "$?"
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin HEAD:refs/heads/main"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "guard-branch: blocks qualified refs/heads/main push" 2 "$?"
 rm -rf "$TMP"
+
+echo "== stop-dod.sh (Stop: no turn ends with STATUS stale) =="
+SD="$HOOKS/stop-dod.sh"
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+mkdir -p "$TMP/docs"; printf 'x\n' > "$TMP/src.py"; printf 'S\n' > "$TMP/docs/STATUS.md"
+"${GIT[@]}" -C "$TMP" add -A >/dev/null; "${GIT[@]}" -C "$TMP" commit -qm init
+printf 'clean tree\n' > /dev/null
+out="$(printf '{}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"; check "clean tree: turn ends freely" 0 "$?"
+contains "clean tree: emits no block" "" "$out"
+printf 'y\n' >> "$TMP/src.py"
+out="$(printf '{}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+contains "code changed + STATUS stale: blocks" '"decision":"block"' "$out"
+contains "block names the Definition of Done" "Definition of Done" "$out"
+printf 'more\n' >> "$TMP/docs/STATUS.md"
+out="$(printf '{}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+printf '%s' "$out" | grep -q '"decision"'; check "STATUS updated alongside: does NOT block" 1 "$?"
+"${GIT[@]}" -C "$TMP" checkout -q -- . 2>/dev/null
+# Doc-only work and untracked scratch files are not "a completed unit of code".
+printf 'note\n' >> "$TMP/docs/OTHER.md" 2>/dev/null || true
+printf 'scratch\n' > "$TMP/untracked.tmp"
+out="$(printf '{}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+printf '%s' "$out" | grep -q '"decision"'; check "docs-only + untracked scratch: does NOT block" 1 "$?"
+# Fails OPEN outside a git repo -- a Stop hook that errors would wedge the session.
+NOGIT="$(mktemp -d)"
+printf '{}' | CLAUDE_PROJECT_DIR="$NOGIT" "$SD" >/dev/null; check "non-repo: fails open, never wedges the turn" 0 "$?"
+rm -rf "$TMP" "$NOGIT"
+
+echo "== post-compact.sh (PostCompact: restate loop state) =="
+PC="$HOOKS/post-compact.sh"
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+mkdir -p "$TMP/docs"; printf 'x\n' > "$TMP/a.py"
+"${GIT[@]}" -C "$TMP" add -A >/dev/null; "${GIT[@]}" -C "$TMP" commit -qm init
+"${GIT[@]}" -C "$TMP" checkout -q -b feature/PROJ-1-x
+out="$(printf '{}' | CLAUDE_PROJECT_DIR="$TMP" "$PC")"; check "exits 0" 0 "$?"
+contains "reports the branch" "feature/PROJ-1-x" "$out"
+contains "reports STATUS state" "docs/STATUS.md" "$out"
+contains "reports missing review verdicts" "/review has not run" "$out"
+contains "emits PostCompact additionalContext" "additionalContext" "$out"
+printf '{}' | CLAUDE_PROJECT_DIR="$(mktemp -d)" "$PC" >/dev/null; check "non-repo: exits 0" 0 "$?"
+rm -rf "$TMP"
+
+echo "== subagent-verdict.sh (SubagentStop: ADR-0005 at the boundary) =="
+SV="$HOOKS/subagent-verdict.sh"
+TR="$(mktemp -d)/t.jsonl"
+mk_transcript() { # <assistant text>
+  python3 -c "
+import json,sys
+open(sys.argv[1],'w').write(json.dumps({'type':'assistant','message':{'content':[{'type':'text','text':sys.argv[2]}]}})+chr(10))" "$TR" "$1"
+}
+mk_transcript 'Looks good to me, ship it.'
+out="$(printf '{"transcript_path":"%s"}' "$TR" | CLAUDE_PROJECT_DIR="$ROOT" "$SV")"
+contains "prose instead of a verdict: blocks" '"decision":"block"' "$out"
+contains "block cites ADR-0005" "ADR-0005" "$out"
+mk_transcript 'Review done.
+
+```json
+{"verdict":"approve","summary":"ok","findings":[]}
+```'
+out="$(printf '{"transcript_path":"%s"}' "$TR" | CLAUDE_PROJECT_DIR="$ROOT" "$SV")"
+printf '%s' "$out" | grep -q '"decision"'; check "a valid approve verdict passes" 1 "$?"
+mk_transcript 'Review done.
+
+```json
+{"verdict":"approve","summary":"ok","findings":[{"severity":"CRITICAL","path":"a.py","line":1,"category":"correctness","issue":"i","fix":"f"}]}
+```'
+out="$(printf '{"transcript_path":"%s"}' "$TR" | CLAUDE_PROJECT_DIR="$ROOT" "$SV")"
+contains "approve carrying a CRITICAL finding: blocks" '"decision":"block"' "$out"
+# Fails OPEN when it cannot read anything -- /review still runs the real gate.
+printf '{"transcript_path":"/nonexistent/x.jsonl"}' | CLAUDE_PROJECT_DIR="$ROOT" "$SV" >/dev/null; check "unreadable transcript: fails open" 0 "$?"
+printf '{}' | CLAUDE_PROJECT_DIR="$ROOT" "$SV" >/dev/null; check "no transcript path: fails open" 0 "$?"
+rm -rf "$(dirname "$TR")"
+
+echo "== harness_lint.py (the linter is itself a gate) =="
+# A linter with no failing-case test is an unverified gate: it would still print
+# "OK" if a check silently stopped firing. Each case copies the real tree, breaks
+# exactly one thing, and asserts the linter catches it (KEEL_LINT_ROOT retargets).
+LINT="$ROOT/tests/harness_lint.py"
+lint_fixture() { # -> echoes a fresh copy of the harness
+  local d; d="$(mktemp -d)"
+  cp -R "$ROOT/.claude" "$ROOT/docs" "$ROOT/tests" "$ROOT/stacks" "$ROOT/.github" \
+        "$ROOT/.claude-plugin" "$d/" 2>/dev/null
+  cp "$ROOT"/*.md "$ROOT"/LICENSE "$d/" 2>/dev/null
+  printf '%s' "$d"
+}
+FX="$(lint_fixture)"
+KEEL_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: an unmodified copy passes (fixture is faithful)" 0 "$?"
+rm -rf "$FX"
+
+# model tier: fable is a real Claude Code model and must be accepted; junk must not.
+FX="$(lint_fixture)"
+sed -i 's/^model: haiku$/model: fable/' "$FX/.claude/agents/explorer.md"
+KEEL_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: accepts model 'fable'" 0 "$?"
+sed -i 's/^model: fable$/model: gpt-4/' "$FX/.claude/agents/explorer.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: rejects an unknown model tier" 1 "$?"
+contains "lint: names the offending model" "gpt-4" "$out"
+rm -rf "$FX"
+
+# slash references: a routing pointer to a command that does not exist is a dead end.
+FX="$(lint_fixture)"
+printf '\nSee `/nonexistent-command` for details.\n' >> "$FX/.claude/rules/dev-process.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a slash ref that is not a command or skill" 1 "$?"
+contains "lint: names the unresolved slash reference" "/nonexistent-command" "$out"
+rm -rf "$FX"
+
+# skills are invocable as /name, so a skill reference must NOT be reported dead.
+FX="$(lint_fixture)"
+printf '\nSee `/security-review` and `/tdd-workflow` for details.\n' >> "$FX/.claude/rules/testing.md"
+KEEL_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: a skill name IS a valid slash reference" 0 "$?"
+rm -rf "$FX"
+
+# the token budget must actually bite (it is the mechanism locking the compression in).
+FX="$(lint_fixture)"
+python3 -c "
+import sys; p=sys.argv[1]
+open(p,'a').write('\n' + ('filler ' * 5000) + '\n')" "$FX/.claude/rules/sync.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: always-on word budget blocks bloat" 1 "$?"
+contains "lint: names the rule budget" "word budget" "$out"
+rm -rf "$FX"
+
+# allowed-tools completeness: /release shipped granting `git tag` but not `git push`
+# while its own step said "Push the tag" — a command that cannot run its own steps.
+FX="$(lint_fixture)"
+sed -i 's/, Bash(git push origin v:\*)//' "$FX/.claude/skills/release/SKILL.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a command that cannot run its own git step" 1 "$?"
+contains "lint: names the ungranted git verb" "Bash(git push" "$out"
+rm -rf "$FX"
+# A negated mention ("Do not reset --hard") must not be read as a step the command runs.
+FX="$(lint_fixture)"
+printf '\nDo not use `git reset --hard` here.\n' >> "$FX/.claude/skills/rollback/SKILL.md"
+KEEL_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: a negated git mention is not an under-grant" 0 "$?"
+rm -rf "$FX"
+
+# Hook wiring equivalence: settings.json and hooks.json register the same gates
+# with no shared source. A gate added to one and forgotten in the other is live
+# standalone and absent under a plugin install — the asymmetry ADR-0007 is about.
+FX="$(lint_fixture)"
+python3 - "$FX/.claude/hooks/hooks.json" <<'PY'
+import json, sys
+p = sys.argv[1]; cfg = json.load(open(p))
+cfg["hooks"]["PreToolUse"][0]["hooks"].pop()          # drop secret-scan from the plugin wiring only
+json.dump(cfg, open(p, "w"), indent=2)
+PY
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a gate wired in settings.json but not hooks.json" 1 "$?"
+contains "lint: names the desynced event" "PreToolUse" "$out"
+rm -rf "$FX"
+FX="$(lint_fixture)"
+python3 - "$FX/.claude/hooks/hooks.json" <<'PY'
+import json, sys
+p = sys.argv[1]; cfg = json.load(open(p))
+cfg["hooks"]["SessionEnd"] = [{"hooks": [{"type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/x.sh"}]}]
+json.dump(cfg, open(p, "w"), indent=2)
+PY
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks an event present in only one wiring" 1 "$?"
+contains "lint: names the one-sided event" "SessionEnd" "$out"
+rm -rf "$FX"
+
+# Descriptions load on every turn and had no budget until now; prove it bites.
+FX="$(lint_fixture)"
+python3 -c "
+import sys,re; p=sys.argv[1]; t=open(p).read()
+open(p,'w').write(re.sub(r'^description: .*\$', 'description: ' + 'x'*4000, t, count=1, flags=re.M))" "$FX/.claude/skills/refactoring/SKILL.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: description budget blocks metadata creep" 1 "$?"
+contains "lint: says descriptions load every turn" "every turn" "$out"
+rm -rf "$FX"
+# skills: preload is what makes depth outside an always-on rule deterministic --
+# a name that does not resolve silently removes the depth it was trusted to carry.
+FX="$(lint_fixture)"
+sed -i 's/^skills: tdd-workflow$/skills: no-such-skill/' "$FX/.claude/agents/test-engineer.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks an agent preloading a nonexistent skill" 1 "$?"
+contains "lint: names the unresolved skill" "no-such-skill" "$out"
+rm -rf "$FX"
+FX="$(lint_fixture)"
+sed -i 's/^effort: low$/effort: turbo/' "$FX/.claude/agents/explorer.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks an invalid effort level" 1 "$?"
+rm -rf "$FX"
+# 00-core.md rides SessionStart additionalContext, which TRUNCATES at 10k rather
+# than erroring -- an overrun would silently drop the tail for plugin installs.
+FX="$(lint_fixture)"
+python3 -c "
+import sys; open(sys.argv[1],'a').write('\n' + ('padding ' * 1500))" "$FX/.claude/rules/00-core.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a 00-core.md too big for the SessionStart channel" 1 "$?"
+contains "lint: cites the truncation risk" "truncates" "$out"
+rm -rf "$FX"
+
+# disable-model-invocation on a side-effecting workflow is a SAFETY assertion, not
+# a token one: without it the model can decide on its own to promote to production,
+# which rules/safety.md reserves for a human.
+FX="$(lint_fixture)"
+sed -i '/^disable-model-invocation: true$/d' "$FX/.claude/skills/release/SKILL.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks /release the model could self-invoke" 1 "$?"
+contains "lint: ties it to the human-approval rule" "safety.md" "$out"
+rm -rf "$FX"
+
+# review-gate wiring (ADR-0005) must stay pinned: unwiring it is the defect it guards.
+FX="$(lint_fixture)"
+sed -i 's/check-review\.sh/checkreview.sh/g' "$FX/.claude/skills/ship/SKILL.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks /ship that no longer wires check-review.sh" 1 "$?"
+contains "lint: cites ADR-0005 on unwiring" "ADR-0005" "$out"
+rm -rf "$FX"
 
 printf '\n%s passed, %s failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

@@ -1,6 +1,6 @@
 ---
 name: fast-lane
-description: Apply when a change might qualify for the bounded fast lane — a trivial, reversible fix (roughly ≤15 changed lines, ≤3 files, no new dependencies, off the critical surface). Use when /fix runs, when deciding whether a small change needs the full loop, or when tuning fast-lane budgets for a repo.
+description: Deciding whether a change qualifies for the bounded fast lane (~<=15 lines, <=3 files, no new deps, off the critical surface). Used by /fix.
 ---
 
 # Fast lane — proportionality with a deterministic fence

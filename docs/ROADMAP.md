@@ -1,4 +1,8 @@
-# ROADMAP — Keel v0.2 "Gates as Code"
+# ROADMAP — Keel
+
+> **v0.2 "Gates as Code" and v1.0.0 "The Model Cannot Ship Itself" have shipped.**
+> The workstreams below are kept as the record of what was planned; status notes mark what is
+> actually done. Open items are collected at the bottom.
 
 The plan to take Keel from a beautifully-_described_ harness to a beautifully-_enforced_ one. The
 guiding finding: **Keel preaches deterministic gates but enforces most of them with prose.** v0.2
@@ -30,6 +34,13 @@ Turn prose gates into wired, deterministic ones.
   integrity (orphan + dead-link detection), domain-leak check.
 - CI adds markdownlint, link-check, and the hook test suite.
 
+_Status (v1.0.0): **mostly shipped.** 136 golden tests run in CI alongside `harness_lint.py`, which
+now validates model tiers, effort levels, `skills:` resolution, dead links, backticked `docs/` refs,
+slash-reference resolution, `allowed-tools` completeness, hook-wiring equivalence between
+`settings.json` and `hooks.json`, five token budgets, and the invocation-control safety assertion.
+The linter itself is now golden-tested via `KEEL_LINT_ROOT`. **Still open:** orphan detection and a
+markdownlint job._
+
 ### WS3 · Modernize to the current Claude Code surface
 
 - Skills bundle executables/templates/references (true progressive disclosure), add `allowed-tools`.
@@ -37,6 +48,15 @@ Turn prose gates into wired, deterministic ones.
   injected deterministically.
 - Exploit the full hook lifecycle: `SessionStart`, `Stop`/`SubagentStop`, `PreCompact`.
 - Settings: `allow`/`ask` lists, persistent memory, statusline.
+
+_Status (v1.0.0): **mostly shipped.** Six hook events are wired — `PreToolUse`, `PostToolUse`,
+`SessionStart`, plus `Stop` (no turn ends with the Definition of Done stale), `SubagentStop` (the
+reviewer's verdict is checked where it is produced), and `PostCompact` (loop state restated after a
+summary). Commands became skills and gained invocation control; the six with side effects are
+human-only. Agents gained `skills:` preloading, `effort:` and `maxTurns:`. **Still open:** the
+statusline. **Deliberately rejected:** persistent agent `memory:` — it is LLM-authored state that
+steers future sessions with no gate in front of it, which `boundaries.md` forbids; adopting it needs
+an ADR and a validation gate first._
 
 ### WS4 · Complete the loop & fill coverage
 
