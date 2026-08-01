@@ -301,6 +301,77 @@ printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push --all origin"
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin HEAD:refs/heads/main"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "guard-branch: blocks qualified refs/heads/main push" 2 "$?"
 rm -rf "$TMP"
 
+echo "== stop-dod.sh (Stop: no turn ends with STATUS stale) =="
+SD="$HOOKS/stop-dod.sh"
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+mkdir -p "$TMP/docs"; printf 'x\n' > "$TMP/src.py"; printf 'S\n' > "$TMP/docs/STATUS.md"
+"${GIT[@]}" -C "$TMP" add -A >/dev/null; "${GIT[@]}" -C "$TMP" commit -qm init
+printf 'clean tree\n' > /dev/null
+out="$(printf '{}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"; check "clean tree: turn ends freely" 0 "$?"
+contains "clean tree: emits no block" "" "$out"
+printf 'y\n' >> "$TMP/src.py"
+out="$(printf '{}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+contains "code changed + STATUS stale: blocks" '"decision":"block"' "$out"
+contains "block names the Definition of Done" "Definition of Done" "$out"
+printf 'more\n' >> "$TMP/docs/STATUS.md"
+out="$(printf '{}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+printf '%s' "$out" | grep -q '"decision"'; check "STATUS updated alongside: does NOT block" 1 "$?"
+"${GIT[@]}" -C "$TMP" checkout -q -- . 2>/dev/null
+# Doc-only work and untracked scratch files are not "a completed unit of code".
+printf 'note\n' >> "$TMP/docs/OTHER.md" 2>/dev/null || true
+printf 'scratch\n' > "$TMP/untracked.tmp"
+out="$(printf '{}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+printf '%s' "$out" | grep -q '"decision"'; check "docs-only + untracked scratch: does NOT block" 1 "$?"
+# Fails OPEN outside a git repo -- a Stop hook that errors would wedge the session.
+NOGIT="$(mktemp -d)"
+printf '{}' | CLAUDE_PROJECT_DIR="$NOGIT" "$SD" >/dev/null; check "non-repo: fails open, never wedges the turn" 0 "$?"
+rm -rf "$TMP" "$NOGIT"
+
+echo "== post-compact.sh (PostCompact: restate loop state) =="
+PC="$HOOKS/post-compact.sh"
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+mkdir -p "$TMP/docs"; printf 'x\n' > "$TMP/a.py"
+"${GIT[@]}" -C "$TMP" add -A >/dev/null; "${GIT[@]}" -C "$TMP" commit -qm init
+"${GIT[@]}" -C "$TMP" checkout -q -b feature/PROJ-1-x
+out="$(printf '{}' | CLAUDE_PROJECT_DIR="$TMP" "$PC")"; check "exits 0" 0 "$?"
+contains "reports the branch" "feature/PROJ-1-x" "$out"
+contains "reports STATUS state" "docs/STATUS.md" "$out"
+contains "reports missing review verdicts" "/review has not run" "$out"
+contains "emits PostCompact additionalContext" "additionalContext" "$out"
+printf '{}' | CLAUDE_PROJECT_DIR="$(mktemp -d)" "$PC" >/dev/null; check "non-repo: exits 0" 0 "$?"
+rm -rf "$TMP"
+
+echo "== subagent-verdict.sh (SubagentStop: ADR-0005 at the boundary) =="
+SV="$HOOKS/subagent-verdict.sh"
+TR="$(mktemp -d)/t.jsonl"
+mk_transcript() { # <assistant text>
+  python3 -c "
+import json,sys
+open(sys.argv[1],'w').write(json.dumps({'type':'assistant','message':{'content':[{'type':'text','text':sys.argv[2]}]}})+chr(10))" "$TR" "$1"
+}
+mk_transcript 'Looks good to me, ship it.'
+out="$(printf '{"transcript_path":"%s"}' "$TR" | CLAUDE_PROJECT_DIR="$ROOT" "$SV")"
+contains "prose instead of a verdict: blocks" '"decision":"block"' "$out"
+contains "block cites ADR-0005" "ADR-0005" "$out"
+mk_transcript 'Review done.
+
+```json
+{"verdict":"approve","summary":"ok","findings":[]}
+```'
+out="$(printf '{"transcript_path":"%s"}' "$TR" | CLAUDE_PROJECT_DIR="$ROOT" "$SV")"
+printf '%s' "$out" | grep -q '"decision"'; check "a valid approve verdict passes" 1 "$?"
+mk_transcript 'Review done.
+
+```json
+{"verdict":"approve","summary":"ok","findings":[{"severity":"CRITICAL","path":"a.py","line":1,"category":"correctness","issue":"i","fix":"f"}]}
+```'
+out="$(printf '{"transcript_path":"%s"}' "$TR" | CLAUDE_PROJECT_DIR="$ROOT" "$SV")"
+contains "approve carrying a CRITICAL finding: blocks" '"decision":"block"' "$out"
+# Fails OPEN when it cannot read anything -- /review still runs the real gate.
+printf '{"transcript_path":"/nonexistent/x.jsonl"}' | CLAUDE_PROJECT_DIR="$ROOT" "$SV" >/dev/null; check "unreadable transcript: fails open" 0 "$?"
+printf '{}' | CLAUDE_PROJECT_DIR="$ROOT" "$SV" >/dev/null; check "no transcript path: fails open" 0 "$?"
+rm -rf "$(dirname "$TR")"
+
 echo "== harness_lint.py (the linter is itself a gate) =="
 # A linter with no failing-case test is an unverified gate: it would still print
 # "OK" if a check silently stopped firing. Each case copies the real tree, breaks

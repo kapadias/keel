@@ -22,10 +22,13 @@ and Keel ships as an installable plugin with language stack packs. Language- and
 - **Commands ×14** — `/plan`, `/tdd`, `/implement`, `/review`, `/test`, `/coverage`, `/debug`, `/fix`,
   `/ship`, `/release`, `/rollback`, `/sync`, `/adr`, `/intake`. Model-tiered; several use `!`/`@`
   injection.
-- **Hooks** — `guard-branch` (blocks protected-branch commits/pushes + `--all`/`--mirror`/`+refspec`
+- **Hooks ×8** — `guard-branch` (blocks protected-branch commits/pushes + `--all`/`--mirror`/`+refspec`
   force pushes), `secret-scan` (blocks secret writes + Bash reads of secret files), `format`,
   `require-status-sync` (pre-push DoD + strict secret scan, auto-installed at SessionStart — warns on
-  a foreign hook), `session-start`; shared `lib/` + plugin `hooks.json`.
+  a foreign hook), `session-start` (also carries `00-core.md` into plugin installs), `stop-dod`
+  (Stop — no turn ends with STATUS stale), `subagent-verdict` (SubagentStop — ADR-0005 enforced where
+  the verdict is produced), `post-compact` (PostCompact — restates loop state). Six events wired;
+  shared `lib/` + plugin `hooks.json`, asserted equivalent to `settings.json` by the linter.
 - **Settings** — denies reading secrets and force-push; wires all hooks.
 - **Tests** — `tests/run.sh` (gate golden tests; the count is derived and drift-linted, never
   hardcoded) + `tests/harness_lint.py` (self-validation).
@@ -35,6 +38,30 @@ and Keel ships as an installable plugin with language stack packs. Language- and
 - **CI** — `.github/workflows/ci.yml`: shellcheck (all scripts) + harness-lint + gate self-tests.
 
 ## Recently changed
+
+- **2026-08-01** — Harness optimization, stage 5 (three new gates, all at zero always-on cost):
+  - **`SubagentStop` → `subagent-verdict.sh`.** ADR-0005 makes the JSON verdict the thing that
+    decides merges — but it only bound if `/review` _remembered_ to write the file and run the
+    checker. A reviewer returning prose sailed past. The hook now runs the **same**
+    `check-review.sh` against the reviewer's own last message, at the moment it finishes. No new
+    parser, no second copy of the schema. Fails **open** when it cannot read the transcript or find
+    the checker (defence-in-depth, not the gate); fails **closed** on output it can judge.
+  - **`Stop` → `stop-dod.sh`.** The pre-push DoD gate fired too late: by push time the agent had
+    usually declared "done" several turns earlier. This blocks a turn ending when tracked, non-doc
+    files changed and `docs/STATUS.md` is untouched. Deliberately narrow — reading, planning,
+    doc-only edits and untracked scratch all end freely — and it fails **open** outside a git repo,
+    because a Stop hook that errors would wedge every turn. Claude Code overrides after 8
+    consecutive blocks, so it can annoy but cannot deadlock.
+  - **`PostCompact` → `post-compact.sh`.** Compaction keeps the narrative and drops the bookkeeping,
+    so the agent re-reviews code it already reviewed or believes it shipped what it did not. Restates
+    branch, HEAD, uncommitted count, STATUS state and whether review verdicts exist for _this_ SHA.
+    Reads only git facts; costs nothing until a compaction happens.
+  - `UserPromptExpansion` was considered and **skipped** — `guard-branch.sh` already covers the
+    dangerous case, and it becomes fully redundant once `/release` carries `disable-model-invocation`.
+  - All three wired into **both** `settings.json` and `hooks.json`; stage 2's equivalence lint is
+    what makes that safe. 19 golden tests: each gate blocks, allows, and fails in the documented
+    direction. One found a real bug — `stop-dod.sh` stripped the porcelain status column before
+    filtering untracked files, so every scratch file read as a tracked change.
 
 - **2026-08-01** — Harness optimization, stage 4 (description metadata was the ungoverned surface):
   - **Descriptions are always-on and had no budget.** Claude Code injects every skill, agent and

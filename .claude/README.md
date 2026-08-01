@@ -34,8 +34,13 @@ discipline is **enforced by code, not prose**. Start with [`../CLAUDE.md`](../CL
   Read deny list), `format.sh` (post-edit auto-format), `require-status-sync.sh` (pre-push
   Definition-of-Done + strict secret scan — no fixture exemption at push time; use
   placeholder-classed values), `session-start.sh` (installs the pre-push hook — warns instead of
-  overwriting a foreign one — detects the stack, injects context). Shared logic in `lib/`
-  (`json.sh`, `secret-patterns.sh`); plugin wiring in `hooks.json`.
+  overwriting a foreign one — detects the stack, carries `rules/00-core.md` into plugin installs),
+  `stop-dod.sh` (**Stop** — blocks a turn ending with tracked code changed and `docs/STATUS.md`
+  stale), `subagent-verdict.sh` (**SubagentStop** — runs `check-review.sh` on the reviewer's own
+  output, so ADR-0005 binds where the verdict is produced), `post-compact.sh` (**PostCompact** —
+  restates branch, STATUS state, and review verdicts after a summary). Shared logic in `lib/`
+  (`json.sh`, `secret-patterns.sh`); plugin wiring in `hooks.json`, asserted equivalent to
+  `settings.json` by the linter.
 - **`settings.json`** — denies reading secrets (`.env`/`*.pem`/`*.key`/`.ssh`/`.aws`/…) and
   `git push --force`; wires the hooks (PreToolUse, PostToolUse, SessionStart).
 - **`.claude-plugin/`** — `plugin.json`, so Keel installs as a Claude Code plugin.
@@ -53,7 +58,7 @@ CLAUDE.md + rules/   →  always-on    (tiny, dense, paid every turn; lint-budge
 skills/              →  on-demand    (load when the trigger matches; depth in bundled files)
 commands/            →  workflows    (invoke an encoded pipeline)
 agents/              →  delegation   (spend a subagent's context, keep the conclusion)
-hooks/               →  enforcement  (deterministic gates that BLOCK around edits and pushes)
+hooks/               →  enforcement  (deterministic gates that BLOCK around edits, turns, and pushes)
 ```
 
 This is the token economy in one picture: keep the always-on surface small, push depth into surfaces
