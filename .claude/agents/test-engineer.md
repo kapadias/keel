@@ -1,6 +1,6 @@
 ---
 name: test-engineer
-description: Writes the failing tests that pin desired behavior before implementation, and hardens the suite with golden and property tests. Use to open the TDD cycle or to close coverage gaps.
+description: Writes the failing tests that pin behavior before implementation, and hardens the suite with golden and property tests. Opens the TDD cycle; closes coverage gaps.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
 skills: tdd-workflow

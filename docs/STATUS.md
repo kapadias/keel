@@ -36,6 +36,24 @@ and Keel ships as an installable plugin with language stack packs. Language- and
 
 ## Recently changed
 
+- **2026-08-01** — Harness optimization, stage 4 (description metadata was the ungoverned surface):
+  - **Descriptions are always-on and had no budget.** Claude Code injects every skill, agent and
+    command `description` into every turn so it can decide what to load — ~6,950 chars (≈1,740
+    tokens) of the surface nothing was measuring. Trimmed to the triggering nouns: **6,952 → 5,281
+    chars (≈1,740 → ≈1,320 tokens/turn)**, and capped at 5,600 by a new lint check.
+  - `orchestrator` carried its routing map **twice** inside its own 74 lines (bullets, then a
+    stage→owner→gate table) and told itself to run the reviewers concurrently in two places. The
+    bullets are gone; the table stays — it is an output-format spec, not a restatement.
+  - **Two proposed cuts were rejected after reading the files.** The per-agent "Principles" blocks
+    are _not_ restatements of the rules — each specializes the three principles to that agent's job
+    ("the reproduction decides", "tests decide", "a step with no gate is not planned"). And the JSON
+    verdict schema duplicated across both reviewers is deliberate defense-in-depth on the one
+    contract that decides merges (ADR-0005); the two blocks also differ in their read-only
+    guardrails. Cutting either would have traded quality for tokens.
+  - Four new golden tests: the description budget bites, an agent preloading a nonexistent skill is
+    blocked, an invalid `effort:` is blocked, and a `00-core.md` too large for the SessionStart
+    channel is blocked citing the truncation risk.
+
 - **2026-08-01** — Harness optimization, stage 3 (the always-on surface, and the plugin carrier):
   - **Always-on prose 4,252 → 3,602 words (−15%)**, entirely by deleting content that was stated
     two or three times _within the always-on surface itself_ — deleting one copy of something the

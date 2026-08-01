@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: Apply when reviewing a diff or PR — triaging findings by severity, deciding what to flag versus let go, writing actionable findings, or rendering a merge verdict. Use when `/review` runs or the code-reviewer / security-reviewer agents engage.
+description: Reviewing a diff or PR: severity triage, what to flag vs let go, actionable findings, merge verdict. Used by /review and the code-reviewer agent.
 ---
 
 # Code Review

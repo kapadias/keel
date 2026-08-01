@@ -1,6 +1,6 @@
 ---
 name: observability
-description: Apply when adding or changing logging, metrics, tracing, or alerting — or instrumenting a service to debug a production issue. Use when defining SLIs/SLOs, structuring logs, choosing metric labels (cardinality), propagating trace/correlation IDs, or writing an alert that should page.
+description: Adding or changing logging, metrics, tracing, or alerting; instrumenting a service. SLIs/SLOs, structured logs, metric cardinality, trace IDs, alerts that page.
 ---
 
 # Observability

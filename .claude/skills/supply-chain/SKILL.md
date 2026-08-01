@@ -1,6 +1,6 @@
 ---
 name: supply-chain
-description: Apply when adding or upgrading a dependency, or reviewing a lockfile change. Use when vetting a new package (the ≥80%-of-the-need rule), pinning versions, checking provenance/integrity, scanning for known vulns, spotting typosquats, or scoping CI tokens. Bundles scripts/dep-audit.sh.
+description: Adding or upgrading a dependency, or reviewing a lockfile change. Vetting, pinning, provenance, known vulns, typosquats, CI token scope.
 ---
 
 # Supply Chain Security

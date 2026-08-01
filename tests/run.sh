@@ -385,6 +385,34 @@ out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks an event
 contains "lint: names the one-sided event" "SessionEnd" "$out"
 rm -rf "$FX"
 
+# Descriptions load on every turn and had no budget until now; prove it bites.
+FX="$(lint_fixture)"
+python3 -c "
+import sys,re; p=sys.argv[1]; t=open(p).read()
+open(p,'w').write(re.sub(r'^description: .*\$', 'description: ' + 'x'*4000, t, count=1, flags=re.M))" "$FX/.claude/skills/refactoring/SKILL.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: description budget blocks metadata creep" 1 "$?"
+contains "lint: says descriptions load every turn" "every turn" "$out"
+rm -rf "$FX"
+# skills: preload is what makes depth outside an always-on rule deterministic --
+# a name that does not resolve silently removes the depth it was trusted to carry.
+FX="$(lint_fixture)"
+sed -i 's/^skills: tdd-workflow$/skills: no-such-skill/' "$FX/.claude/agents/test-engineer.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks an agent preloading a nonexistent skill" 1 "$?"
+contains "lint: names the unresolved skill" "no-such-skill" "$out"
+rm -rf "$FX"
+FX="$(lint_fixture)"
+sed -i 's/^effort: low$/effort: turbo/' "$FX/.claude/agents/explorer.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks an invalid effort level" 1 "$?"
+rm -rf "$FX"
+# 00-core.md rides SessionStart additionalContext, which TRUNCATES at 10k rather
+# than erroring -- an overrun would silently drop the tail for plugin installs.
+FX="$(lint_fixture)"
+python3 -c "
+import sys; open(sys.argv[1],'a').write('\n' + ('padding ' * 1500))" "$FX/.claude/rules/00-core.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a 00-core.md too big for the SessionStart channel" 1 "$?"
+contains "lint: cites the truncation risk" "truncates" "$out"
+rm -rf "$FX"
+
 # review-gate wiring (ADR-0005) must stay pinned: unwiring it is the defect it guards.
 FX="$(lint_fixture)"
 sed -i 's/check-review\.sh/checkreview.sh/g' "$FX/.claude/commands/ship.md"

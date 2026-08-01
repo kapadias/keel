@@ -1,6 +1,6 @@
 ---
 name: security-reviewer
-description: Independent, read-only security review. Hunts injection, secret leakage, broken authz, unsafe deserialization, and supply-chain risk. Use whenever a change touches auth, data, money, input handling, or anything outward-facing.
+description: Independent, read-only security review: injection, secret leakage, broken authz, unsafe deserialization, supply-chain risk. Use when a change touches auth, data, money, or input.
 tools: Read, Grep, Glob, Bash
 model: opus
 skills: security-review, code-review

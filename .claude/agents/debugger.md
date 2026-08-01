@@ -1,6 +1,6 @@
 ---
 name: debugger
-description: Root-cause analysis for failing tests, crashes, and incorrect behavior. Reproduces, isolates, and fixes the actual cause — not the symptom. Use when something is broken and the cause is not obvious.
+description: Root-cause analysis for failing tests, crashes, and wrong behavior. Reproduces, isolates, and fixes the cause — not the symptom. Use when the cause is not obvious.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: opus
 skills: debugging

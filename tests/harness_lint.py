@@ -338,6 +338,24 @@ if always_on > MAX_ALWAYS_ON_WORDS:
         f"always-on surface (CLAUDE.md + rules/) is {always_on} words — "
         f"exceeds the {MAX_ALWAYS_ON_WORDS}-word budget (token-economy.md)"
     )
+# Descriptions are always-on too: Claude Code injects every skill, agent and
+# command description into every turn so it can decide what to load. That made
+# them the one part of the surface with no budget at all, and they had grown to
+# ~7,000 chars. A description exists to support a load/route DECISION; prose
+# past that decision is paid every turn and buys nothing.
+MAX_DESCRIPTION_CHARS = 5600
+desc_chars = 0
+for patt in ("skills/*/SKILL.md", "agents/*.md", "commands/*.md"):
+    for p in glob.glob(f"{ROOT}/.claude/{patt}"):
+        m = re.search(r"^description:\s*(.+)$", open(p, encoding="utf-8").read(), re.M)
+        if m:
+            desc_chars += len(m.group(1))
+if desc_chars > MAX_DESCRIPTION_CHARS:
+    bad(
+        f"skill+agent+command descriptions total {desc_chars} chars — exceeds the "
+        f"{MAX_DESCRIPTION_CHARS}-char budget; these load on every turn"
+    )
+
 core = f"{ROOT}/.claude/rules/00-core.md"
 if not os.path.isfile(core):
     bad(

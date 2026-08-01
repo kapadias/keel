@@ -1,6 +1,6 @@
 ---
 name: explorer
-description: Read-only fan-out search. Sweeps many files to answer "where is X?", "how is Y wired?", or "what calls Z?" and returns the conclusion — paths, line numbers, the answer — not file dumps. The main token-saver. Use whenever answering means reading broadly.
+description: Read-only fan-out search. Sweeps many files to answer "where is X?" or "how is Y wired?" and returns the conclusion, not file dumps. Use whenever answering means reading broadly.
 tools: Read, Grep, Glob
 model: haiku
 effort: low
