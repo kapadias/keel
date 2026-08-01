@@ -89,8 +89,8 @@ Research & Reuse → Plan → TDD (RED → GREEN → REFACTOR) → Implement →
 .claude/
 ├── rules/        always-on operating discipline — dense, short, paid every turn
 ├── agents/       specialists you delegate to (orchestrator, planner, reviewers, explorer, …)
-├── skills/       deep playbooks that load only when their trigger matches (+ bundled scripts)
-├── commands/     the pipeline: /plan /tdd /review /ship /release /rollback …
+├── skills/       deep playbooks (load on trigger) + the pipeline: /plan /tdd /review /ship …
+│              side-effecting ones are human-invoke-only and cost zero context
 ├── hooks/        deterministic guards that BLOCK protected-branch commits, secrets, and unsynced pushes
 └── settings.json denies reading secrets and force-push; wires the hooks
 CLAUDE.md         the always-on root — the agent reads this first
@@ -102,8 +102,7 @@ docs/             STATUS.md (the live mirror) + ROADMAP + Architecture Decision 
 | Layer                  | Loaded          | Purpose                                                                               |
 | ---------------------- | --------------- | ------------------------------------------------------------------------------------- |
 | `CLAUDE.md` + `rules/` | **Always**      | The dense, short policy the agent obeys every turn.                                   |
-| `skills/`              | **On demand**   | Long playbooks (with runnable scripts) that cost nothing until their trigger matches. |
-| `commands/`            | **On invoke**   | Repeatable workflows encoded once, so you never re-explain them.                      |
+| `skills/`              | **On demand**   | Playbooks that cost nothing until triggered, plus the `/name` pipeline workflows.     |
 | `agents/`              | **On delegate** | Specialists that spend _their own_ context and return conclusions.                    |
 | `hooks/`               | **On event**    | Deterministic enforcement on edit and on push.                                        |
 
@@ -257,8 +256,8 @@ golden tests proving each one blocks vs. allows, and CI fails if any gate regres
 Keel is language-agnostic. A few edits adapt it to any stack:
 
 1. **Your test gate** → copy a ready-made pack from [`stacks/`](stacks/) (python · typescript · go ·
-   rust), or edit [`.claude/commands/test.md`](.claude/commands/test.md) and
-   [`/ship`](.claude/commands/ship.md) with your real lint/type/test commands.
+   rust), or edit [`.claude/skills/test/SKILL.md`](.claude/skills/test/SKILL.md) and
+   [`/ship`](.claude/skills/ship/SKILL.md) with your real lint/type/test commands.
 2. **Your tracker** → set your issue-id prefix and branch convention in
    [`.claude/rules/git-workflow.md`](.claude/rules/git-workflow.md).
 3. **Your formatter** → point [`.claude/hooks/format.sh`](.claude/hooks/format.sh) at your tool (it
@@ -281,11 +280,10 @@ keel/
 │   ├── README.md              # harness index
 │   ├── settings.json          # secret-deny + hook wiring
 │   ├── .claude-plugin/        # plugin manifest (plugin.json)
-│   ├── rules/                 # 8 always-on rules
+│   ├── rules/                 # 9 always-on rules (00-core is the constitution)
 │   ├── agents/                # 8 specialists
-│   ├── skills/                # 11 on-demand playbooks (most with bundled scripts/templates)
-│   ├── commands/              # 14 pipeline commands
-│   └── hooks/                 # enforcing hooks + lib/ + hooks.json
+│   ├── skills/                # 11 playbooks + 14 pipeline workflows (6 human-only)
+│   └── hooks/                 # 8 enforcing hooks over 6 events + lib/ + hooks.json
 ├── tests/                     # gate golden tests + harness self-validation
 ├── stacks/                    # python · typescript · go · rust gate packs
 ├── docs/

@@ -1,4 +1,6 @@
 ---
+name: release
+disable-model-invocation: true
 description: Promote develop→main — human-gated production release. Creates the PR, requires explicit human approval before merge, then tags and publishes release notes.
 argument-hint: "<version> [release notes summary]"
 model: opus
@@ -13,7 +15,7 @@ Release: **$ARGUMENTS**
 
 ## Why this is gated
 
-Merging `develop → main` is a **risk-increasing, outward-facing, production action** — it widens blast radius to real users. Per [`.claude/rules/safety.md`](../rules/safety.md), this requires a human to approve before the merge executes. Do not merge on behalf of the user; open the PR and stop.
+Merging `develop → main` is a **risk-increasing, outward-facing, production action** — it widens blast radius to real users. Per [`.claude/rules/safety.md`](../../rules/safety.md), this requires a human to approve before the merge executes. Do not merge on behalf of the user; open the PR and stop.
 
 ## Steps
 

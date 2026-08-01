@@ -1,4 +1,5 @@
 ---
+name: fix
 description: The bounded fast lane for trivial, reversible fixes — check-trivial.sh decides eligibility (≤15 lines, ≤3 files, no new deps, off the critical surface); regression test, gate, and single machine-checked review are never skipped. Anything bigger routes to the full loop.
 argument-hint: "[what to fix]"
 model: sonnet

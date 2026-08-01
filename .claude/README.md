@@ -21,13 +21,18 @@ discipline is **enforced by code, not prose**. Start with [`../CLAUDE.md`](../CL
   `security-reviewer` (read-only; same verdict contract), `explorer` (read-only fan-out, token-saver),
   `debugger`. Each pins a model tier; the four that own a playbook **preload it** via `skills:`, so
   the depth arrives deterministically instead of by description-trigger.
-- **`skills/`** — 11 on-demand playbooks, most bundling runnable scripts/templates/references that load
-  only when opened: `tdd-workflow`, `code-review`, `debugging`, `refactoring`, `api-design`,
-  `security-review`, `migration-safety`, `observability`, `concurrency-performance`, `supply-chain`,
-  `fast-lane` (bundles `check-trivial.sh` — the deterministic fast-lane eligibility gate).
-- **`commands/`** — the pipeline (14): `/plan`, `/tdd`, `/implement`, `/review`, `/test`, `/coverage`,
-  `/debug`, `/fix`, `/ship`, `/release`, `/rollback`, `/sync`, `/adr`, `/intake`. Each declares its
-  model tier; several use `!` bash injection / `@` refs to act on real repo state.
+- **`skills/`** — 25 entries, since Claude Code merged commands into skills. Two kinds:
+  - **11 playbooks** — knowledge Claude loads when the trigger matches, most bundling runnable
+    scripts/templates/references that load only when opened: `tdd-workflow`, `code-review`,
+    `debugging`, `refactoring`, `api-design`, `security-review`, `migration-safety`, `observability`,
+    `concurrency-performance`, `supply-chain`, `fast-lane` (bundles `check-trivial.sh`).
+  - **14 pipeline workflows** — `/plan`, `/tdd`, `/implement`, `/review`, `/test`, `/coverage`,
+    `/debug`, `/fix`, `/ship`, `/release`, `/rollback`, `/sync`, `/adr`, `/intake`. Each declares its
+    model tier; several use `!` bash injection / `@` refs to act on real repo state. The six with
+    side effects — `/ship`, `/release`, `/rollback`, `/adr`, `/sync`, `/intake` — set
+    **`disable-model-invocation: true`**: only a human can trigger them, and their descriptions stay
+    out of context entirely. That is what makes "a human approves promotion to production"
+    ([`rules/safety.md`](rules/safety.md)) a mechanism rather than a request; the linter asserts it.
 - **`hooks/`** — the gates, now **blocking**: `guard-branch.sh` (blocks commits/pushes to
   `main`/`master`/`develop`, `--all`/`--mirror`, and `+refspec` force pushes), `secret-scan.sh`
   (blocks writes that introduce a secret, and Bash reads/copies of secret files — parity with the
@@ -42,7 +47,8 @@ discipline is **enforced by code, not prose**. Start with [`../CLAUDE.md`](../CL
   (`json.sh`, `secret-patterns.sh`); plugin wiring in `hooks.json`, asserted equivalent to
   `settings.json` by the linter.
 - **`settings.json`** — denies reading secrets (`.env`/`*.pem`/`*.key`/`.ssh`/`.aws`/…) and
-  `git push --force`; wires the hooks (PreToolUse, PostToolUse, SessionStart).
+  `git push --force`; wires the hooks (PreToolUse, PostToolUse, SessionStart, Stop, SubagentStop,
+  PostCompact).
 - **`.claude-plugin/`** — `plugin.json`, so Keel installs as a Claude Code plugin.
 
 Companion top-level surfaces: [`../tests/`](../tests/) (the harness's own gate golden tests +
@@ -55,8 +61,7 @@ distribution).
 ```
 rules/00-core.md     →  constitution (also the plugin carrier — ADR-0007)
 CLAUDE.md + rules/   →  always-on    (tiny, dense, paid every turn; lint-budgeted)
-skills/              →  on-demand    (load when the trigger matches; depth in bundled files)
-commands/            →  workflows    (invoke an encoded pipeline)
+skills/              →  on-demand    (playbooks load on trigger; workflows on /name)
 agents/              →  delegation   (spend a subagent's context, keep the conclusion)
 hooks/               →  enforcement  (deterministic gates that BLOCK around edits, turns, and pushes)
 ```
@@ -88,6 +93,6 @@ linter, `git`) and reduce permission prompts. The [`../stacks/`](../stacks/) pac
 ## Adapting Keel to your project
 
 Keel is language-agnostic. To make it yours: copy a [`../stacks/`](../stacks/) pack (or set your
-test/lint commands in [`commands/test.md`](commands/test.md) and [`commands/ship.md`](commands/ship.md)),
+test/lint commands in [`skills/test/SKILL.md`](skills/test/SKILL.md) and [`skills/ship/SKILL.md`](skills/ship/SKILL.md)),
 set your tracker's issue prefix in [`rules/git-workflow.md`](rules/git-workflow.md), and point your
 formatter in [`hooks/format.sh`](hooks/format.sh). Everything else is principle, not tooling.

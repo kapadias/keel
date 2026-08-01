@@ -19,9 +19,11 @@ and Keel ships as an installable plugin with language stack packs. Language- and
 - **Skills ×11** — `tdd-workflow`, `code-review`, `debugging`, `refactoring`, `api-design`,
   `security-review`, `migration-safety`, `observability`, `concurrency-performance`, `supply-chain`,
   `fast-lane` — most bundling runnable scripts/templates/references.
-- **Commands ×14** — `/plan`, `/tdd`, `/implement`, `/review`, `/test`, `/coverage`, `/debug`, `/fix`,
-  `/ship`, `/release`, `/rollback`, `/sync`, `/adr`, `/intake`. Model-tiered; several use `!`/`@`
-  injection.
+- **Pipeline workflows ×14** — also under `skills/`, since Claude Code merged commands into skills:
+  `/plan`, `/tdd`, `/implement`, `/review`, `/test`, `/coverage`, `/debug`, `/fix`, `/ship`,
+  `/release`, `/rollback`, `/sync`, `/adr`, `/intake`. Model-tiered; several use `!`/`@` injection.
+  The six with side effects set `disable-model-invocation: true` — human-triggered only, and out of
+  context entirely.
 - **Hooks ×8** — `guard-branch` (blocks protected-branch commits/pushes + `--all`/`--mirror`/`+refspec`
   force pushes), `secret-scan` (blocks secret writes + Bash reads of secret files), `format`,
   `require-status-sync` (pre-push DoD + strict secret scan, auto-installed at SessionStart — warns on
@@ -38,6 +40,25 @@ and Keel ships as an installable plugin with language stack packs. Language- and
 - **CI** — `.github/workflows/ci.yml`: shellcheck (all scripts) + harness-lint + gate self-tests.
 
 ## Recently changed
+
+- **2026-08-01** — Harness optimization, stage 6 (commands became skills; `/release` became a gate):
+  - Claude Code merged custom commands into skills, and only skills support **invocation control**.
+    All 14 moved from `.claude/commands/<n>.md` to `.claude/skills/<n>/SKILL.md` (via `git mv`, so
+    history follows).
+  - **The point is a safety gate, not tokens.** `rules/safety.md` says a human approves first
+    promotion to production — but the model could invoke `/release` on its own.
+    `disable-model-invocation: true` on `/ship`, `/release`, `/rollback`, `/adr`, `/sync` and
+    `/intake` makes that a mechanism: Claude cannot trigger them, and the linter now **asserts** the
+    field is present, tying the failure message back to `safety.md`. Verified empirically — those
+    six dropped out of the skill listing offered to the model the moment the field landed.
+  - Their descriptions leave context entirely as a side effect: **another ~1,020 chars (~255
+    tokens/turn)** on top of stage 4's trim.
+  - `/adr`'s 27-line ADR template moved to `skills/adr/templates/adr.md` — the file loads only when
+    an ADR is actually being written. That bundling is precisely what a skill directory buys and a
+    flat command file could not.
+  - The linter followed the files rather than silently linting an empty glob: the ADR-0005 review-gate
+    wiring check, the `allowed-tools` completeness check, and the slash-reference check all repoint at
+    `skills/`, and model/effort validation now applies to workflows too.
 
 - **2026-08-01** — Harness optimization, stage 5 (three new gates, all at zero always-on cost):
   - **`SubagentStop` → `subagent-verdict.sh`.** ADR-0005 makes the JSON verdict the thing that

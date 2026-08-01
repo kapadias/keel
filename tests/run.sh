@@ -422,13 +422,13 @@ rm -rf "$FX"
 # allowed-tools completeness: /release shipped granting `git tag` but not `git push`
 # while its own step said "Push the tag" — a command that cannot run its own steps.
 FX="$(lint_fixture)"
-sed -i 's/, Bash(git push origin v:\*)//' "$FX/.claude/commands/release.md"
+sed -i 's/, Bash(git push origin v:\*)//' "$FX/.claude/skills/release/SKILL.md"
 out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a command that cannot run its own git step" 1 "$?"
 contains "lint: names the ungranted git verb" "Bash(git push" "$out"
 rm -rf "$FX"
 # A negated mention ("Do not reset --hard") must not be read as a step the command runs.
 FX="$(lint_fixture)"
-printf '\nDo not use `git reset --hard` here.\n' >> "$FX/.claude/commands/rollback.md"
+printf '\nDo not use `git reset --hard` here.\n' >> "$FX/.claude/skills/rollback/SKILL.md"
 KEEL_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: a negated git mention is not an under-grant" 0 "$?"
 rm -rf "$FX"
 
@@ -484,9 +484,18 @@ out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a 00-cor
 contains "lint: cites the truncation risk" "truncates" "$out"
 rm -rf "$FX"
 
+# disable-model-invocation on a side-effecting workflow is a SAFETY assertion, not
+# a token one: without it the model can decide on its own to promote to production,
+# which rules/safety.md reserves for a human.
+FX="$(lint_fixture)"
+sed -i '/^disable-model-invocation: true$/d' "$FX/.claude/skills/release/SKILL.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks /release the model could self-invoke" 1 "$?"
+contains "lint: ties it to the human-approval rule" "safety.md" "$out"
+rm -rf "$FX"
+
 # review-gate wiring (ADR-0005) must stay pinned: unwiring it is the defect it guards.
 FX="$(lint_fixture)"
-sed -i 's/check-review\.sh/checkreview.sh/g' "$FX/.claude/commands/ship.md"
+sed -i 's/check-review\.sh/checkreview.sh/g' "$FX/.claude/skills/ship/SKILL.md"
 out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks /ship that no longer wires check-review.sh" 1 "$?"
 contains "lint: cites ADR-0005 on unwiring" "ADR-0005" "$out"
 rm -rf "$FX"

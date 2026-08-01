@@ -1,4 +1,6 @@
 ---
+name: intake
+disable-model-invocation: true
 description: Turn a raw idea or bug into a well-formed, de-duplicated tracked issue with a clear title, acceptance criteria, and scope — ready to pick up.
 argument-hint: "[the idea, bug, or request]"
 model: sonnet

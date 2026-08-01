@@ -4,8 +4,8 @@
 Every check below fails the build (boundaries.md: deterministic gates decide):
   - agents: valid frontmatter (name/description/model/tools); model in the
     allowed set; read-only agents grant no mutating tools.
-  - commands: description present; model (if set) valid.
-  - skills: each SKILL.md declares a description (its trigger).
+  - skills (commands are skills too): description present; model/effort valid;
+    side-effecting workflows set disable-model-invocation.
   - settings.json: every wired hook script exists on disk.
   - cross-links: every intra-repo markdown link resolves to a real file.
   - slash refs: every `/name` named in the harness resolves to a command or skill.
@@ -94,8 +94,14 @@ for path in sorted(glob.glob(f"{ROOT}/.claude/agents/*.md")):
     if effort and effort not in ALLOWED_EFFORT:
         bad(f"{path}: effort '{effort}' not in {sorted(ALLOWED_EFFORT)}")
 
-# --- commands ---
-for path in sorted(glob.glob(f"{ROOT}/.claude/commands/*.md")):
+# --- skills (commands are skills too: Claude Code merged the two) ---
+# A side-effecting workflow must be user-invocable ONLY. safety.md requires a
+# human to approve first promotion to production; disable-model-invocation is
+# what makes that a mechanism instead of a request, and it also drops the
+# description from every turn's context.
+USER_ONLY_SKILLS = {"ship", "release", "rollback", "adr", "sync", "intake"}
+for path in sorted(glob.glob(f"{ROOT}/.claude/skills/*/SKILL.md")):
+    name = os.path.basename(os.path.dirname(path))
     block = frontmatter(path)
     if block is None:
         bad(f"{path}: missing/unterminated frontmatter")
@@ -105,22 +111,25 @@ for path in sorted(glob.glob(f"{ROOT}/.claude/commands/*.md")):
     model = fm_value(block, "model")
     if model and model not in ALLOWED_MODELS:
         bad(f"{path}: model '{model}' not in {sorted(ALLOWED_MODELS)}")
-
-# --- skills ---
-for path in sorted(glob.glob(f"{ROOT}/.claude/skills/*/SKILL.md")):
-    block = frontmatter(path)
-    if block is None:
-        bad(f"{path}: missing/unterminated frontmatter")
-        continue
-    if fm_value(block, "description") is None:
-        bad(f"{path}: frontmatter missing 'description:'")
+    effort = fm_value(block, "effort")
+    if effort and effort not in ALLOWED_EFFORT:
+        bad(f"{path}: effort '{effort}' not in {sorted(ALLOWED_EFFORT)}")
+    if (
+        name in USER_ONLY_SKILLS
+        and fm_value(block, "disable-model-invocation") != "true"
+    ):
+        bad(
+            f"{path}: '{name}' has side effects and must set "
+            f"disable-model-invocation: true — a human approves outward-facing "
+            f"actions (rules/safety.md), and the model must not self-invoke it"
+        )
 
 # --- review gate wiring: the machine-checkable verdict must be reachable ---
 # ADR-0005's parser is only a gate if the live pipeline invokes it. /review and
 # /ship must reference check-review.sh; a harness where the script exists but
 # nothing calls it re-creates the unwired-gate defect this pins against.
 for cmd in ("review", "ship"):
-    cmd_path = f"{ROOT}/.claude/commands/{cmd}.md"
+    cmd_path = f"{ROOT}/.claude/skills/{cmd}/SKILL.md"
     try:
         with open(cmd_path, encoding="utf-8") as fh:
             if "check-review.sh" not in fh.read():
@@ -255,7 +264,7 @@ for md in sorted(set(md_files)):
 FRONT = re.compile(r"^---\n(.*?)\n---\n", re.S)
 GIT_IN_SPAN = re.compile(r"`[^`]*\bgit\s+([a-z-]+)")
 NEGATED = re.compile(r"\b(do not|don't|never|instead of)\b", re.I)
-for path in sorted(glob.glob(f"{ROOT}/.claude/commands/*.md")):
+for path in sorted(glob.glob(f"{ROOT}/.claude/skills/*/SKILL.md")):
     raw = open(path, encoding="utf-8").read()
     m = FRONT.match(raw)
     if not m:
@@ -280,9 +289,6 @@ for path in sorted(glob.glob(f"{ROOT}/.claude/commands/*.md")):
 # silently does nothing. Skills are invocable as `/name` too, so both count.
 SLASH = re.compile(r"`(/[a-z][a-z0-9-]*)`")
 invocable = {
-    os.path.basename(p)[:-3] for p in glob.glob(f"{ROOT}/.claude/commands/*.md")
-}
-invocable |= {
     os.path.basename(os.path.dirname(p))
     for p in glob.glob(f"{ROOT}/.claude/skills/*/SKILL.md")
 }
@@ -345,7 +351,7 @@ if always_on > MAX_ALWAYS_ON_WORDS:
 # past that decision is paid every turn and buys nothing.
 MAX_DESCRIPTION_CHARS = 5600
 desc_chars = 0
-for patt in ("skills/*/SKILL.md", "agents/*.md", "commands/*.md"):
+for patt in ("skills/*/SKILL.md", "agents/*.md"):
     for p in glob.glob(f"{ROOT}/.claude/{patt}"):
         m = re.search(r"^description:\s*(.+)$", open(p, encoding="utf-8").read(), re.M)
         if m:

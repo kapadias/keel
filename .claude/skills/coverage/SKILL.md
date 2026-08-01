@@ -1,4 +1,5 @@
 ---
+name: coverage
 description: Report line and branch coverage; spotlight survival-critical surface gaps; fail if below the project floor. Extracted from /test for focused coverage work.
 argument-hint: "[optional: path or module to focus on; defaults to whole project]"
 model: sonnet
@@ -18,7 +19,7 @@ Coverage report for: **$ARGUMENTS** (if empty, the whole project).
    - Rust: `cargo tarpaulin --out Stdout` (or `cargo llvm-cov`)
    - Or `make coverage` / the repo's documented command.
 2. **Report the numbers.** Line coverage % and branch coverage % for the scope requested. Compare against the project's declared floor (check `pyproject.toml`, `jest.config.*`, `.nycrc`, `Makefile`, or CI config). **Fail loudly if below the floor** — do not soften the number.
-3. **Spotlight the survival-critical surface.** Scan for any code touching **money, auth, data integrity, persistence, or irreversible/outward-facing actions** (see [`.claude/rules/testing.md`](../rules/testing.md)). For each such file or module, report:
+3. **Spotlight the survival-critical surface.** Scan for any code touching **money, auth, data integrity, persistence, or irreversible/outward-facing actions** (see [`.claude/rules/testing.md`](../../rules/testing.md)). For each such file or module, report:
    - Current line % and branch %
    - Whether a **golden test** (exact oracle) exists
    - Whether a **property test** (invariant over generated inputs) exists

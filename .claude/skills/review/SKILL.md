@@ -1,4 +1,5 @@
 ---
+name: review
 description: Path-aware parallel review before merge — always a correctness review; adds a security review when the change touches auth, data, money, input handling, or anything outward-facing.
 argument-hint: "[scope — paths/files; defaults to the current branch diff vs develop]"
 model: opus
