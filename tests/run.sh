@@ -358,7 +358,7 @@ sv_payload() { # <last_assistant_message|""> [extra JSON object merged in]
     '{hook_event_name:"SubagentStop",agent_type:"code-reviewer",stop_hook_active:false,transcript_path:$parent}
      + (if $last=="" then {} else {last_assistant_message:$last} end) + $extra'
 }
-sv_run() { CLAUDE_PLUGIN_ROOT= CLAUDE_PROJECT_DIR="$ROOT" "$SV"; }
+sv_run() { CLAUDE_PLUGIN_ROOT='' CLAUDE_PROJECT_DIR="$ROOT" "$SV"; }
 sv_blocks() { # <desc> <stdout> -- a block is top-level decision=block with a reason
   local d; d="$(printf '%s' "$2" | jq -r 'select(.decision=="block" and (.reason|length)>0) | "block"' 2>/dev/null)"
   if [ "$d" = "block" ]; then PASS=$((PASS + 1)); printf '  ok   %s\n' "$1"
@@ -421,7 +421,7 @@ sv_allows "never grades the parent transcript" "$out"
 out="$(sv_payload "" '{"agent_transcript_path":"/nonexistent/x.jsonl"}' | sv_run)"; check "unreadable agent transcript: exit 0" 0 "$?"
 sv_allows "unreadable agent transcript: fails open" "$out"
 printf '{}' | sv_run >/dev/null; check "empty object: fails open" 0 "$?"
-out="$(sv_payload "$SV_PROSE" | CLAUDE_PLUGIN_ROOT= CLAUDE_PROJECT_DIR="$SVT" "$SV")"; check "checker not locatable: exit 0" 0 "$?"
+out="$(sv_payload "$SV_PROSE" | CLAUDE_PLUGIN_ROOT='' CLAUDE_PROJECT_DIR="$SVT" "$SV")"; check "checker not locatable: exit 0" 0 "$?"
 sv_allows "checker not locatable: fails open" "$out"
 # Sent back once already this turn: do not loop forever.
 out="$(sv_payload "$SV_PROSE" '{"stop_hook_active":true}' | sv_run)"; check "stop_hook_active with malformed output: exit 0" 0 "$?"
