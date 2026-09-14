@@ -28,6 +28,24 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
   README header for the same reason. The live version lives in `CHANGELOG.md` and the manifests; the
   licence lives in `LICENSE`.
 
+### Fixed
+
+- **`subagent-verdict.sh` graded the wrong transcript and blocked the wrong verdicts** (#7). The
+  SubagentStop gate read `transcript_path`, which for that event is the _parent_ session's
+  transcript — so `check-review.sh` ran against the orchestrator's prose and rejected every
+  reviewer verdict as "not valid JSON". It now reads `last_assistant_message` (the subagent's final
+  text; the hooks reference names it as the source because the transcript file may lag), falls
+  back to the last assistant text in `agent_transcript_path`, and never touches the parent
+  transcript — if neither field is present it fails open with a stderr note, since grading the
+  parent can only produce a false verdict. It also blocked on _any_ non-zero checker exit; only
+  exit 2 (no verdict, unparseable, ambiguous) is a breach of the contract, while exit 1 is a
+  well-formed `request_changes` or a blocking finding — the reviewer doing its job, which `/review`
+  and `/ship` turn into a red gate. **Behaviour change:** an approve carrying a CRITICAL finding no
+  longer bounces the reviewer; it stops, and the downstream checker on the same text still exits 1.
+  And it honours `stop_hook_active`, so a reviewer that cannot produce the contract is sent back
+  once, not forever. The `tests/run.sh` section is rewritten (24 checks, 8 red against the old
+  hook); the old section had pinned the bug by feeding `transcript_path`.
+
 ## [1.0.0] — 2026-08-01 — "The Model Cannot Ship Itself"
 
 The first published release. Keel has existed since 2026-06-22 and reached v0.2.0 internally, but no

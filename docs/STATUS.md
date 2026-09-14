@@ -50,6 +50,29 @@ release; v1.0.0 is the first tagged artifact.
 
 ## Recently changed
 
+- **2026-09-13** — The SubagentStop verdict gate graded the wrong transcript (#7):
+  - Found by two independent reviewers in a downstream install, where the hook is byte-identical.
+    `subagent-verdict.sh` read `transcript_path` — for SubagentStop, the **parent** session's
+    transcript (the hooks reference is explicit: `agent_transcript_path` is the subagent's,
+    `last_assistant_message` its final text and the recommended source, since the file may lag).
+    It ran `check-review.sh` on the orchestrator's prose and rejected every verdict as "not valid
+    JSON". It also blocked on any non-zero exit, when exit 1 is a well-formed `request_changes` —
+    the reviewer doing its job — and only exit 2 breaks the contract.
+  - Fixed: `last_assistant_message` → last assistant text in `agent_transcript_path` → fail open
+    with a stderr note; the parent transcript is never a source. Block only on exit 2. Honour
+    `stop_hook_active`, so once the hook blocks for real a reviewer that cannot emit the contract is
+    sent back once, then `/review`'s gate decides. Output shape unchanged — top-level
+    `decision`/`reason` was already the documented one.
+  - **The old test section had pinned the bug**: it fed `transcript_path` and asserted that an
+    approve carrying a CRITICAL finding blocks. Rewritten — 24 checks, watched fail (8 red) against
+    the old hook: approve and request_changes pass through; a CRITICAL finding and an off-schema
+    severity pass the hook while the downstream checker still exits 1; prose and two fenced blocks
+    are sent back citing ADR-0005; the agent-transcript fallback is used, the parent never; missing
+    checker/transcript/payload fail open; `stop_hook_active` stops the loop. Hermetic:
+    `CLAUDE_PLUGIN_ROOT` cleared, payloads built with `jq --arg`.
+  - Verified live: the fixed hook ran on four reviewer subagents' real payloads downstream and let
+    their well-formed verdicts through.
+
 - **2026-08-01** — Release automation; expiring facts removed from the banner:
   - **Pushing a `v*` tag now publishes the GitHub Release**, notes read from `CHANGELOG.md`.
     v1.0.0 had to be assembled by hand, and that is precisely what argued for automating it:
