@@ -376,6 +376,43 @@ NOGIT="$(mktemp -d)"
 printf '{}' | CLAUDE_PROJECT_DIR="$NOGIT" "$SD" >/dev/null; check "non-repo: fails open, never wedges the turn" 0 "$?"
 rm -rf "$TMP" "$NOGIT"
 
+echo "== subagent-start.sh (SubagentStart: the constitution reaches subagents) =="
+# SessionStart additionalContext is parent-only, so under a plugin install every
+# Task-spawned agent ran with no policy. Plugin mode carries 00-core.md in; a
+# standalone checkout loads rules/ natively for subagents too and must not double-pay.
+SA="$HOOKS/subagent-start.sh"
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+out="$(printf '{"agent_type":"implementer"}' | CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$SA")"; check "subagent-start: plugin install exits 0" 0 "$?"
+contains "subagent-start: plugin install emits SubagentStart context" '"hookEventName":"SubagentStart"' "$out"
+contains "subagent-start: plugin install carries the constitution" "The three principles" "$out"
+contains "subagent-start: plugin install carries the ladder" "YAGNI" "$out"
+printf '%s' "$out" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; check "subagent-start: plugin output is valid JSON" 0 "$?"
+out="$(sleep 3 | CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" timeout 2 "$SA")"; check "subagent-start: never waits on stdin" 0 "$?"
+NOJQ="$(mktemp -d)"
+for b in bash sh env cat grep sed head tr dirname; do
+  p="$(command -v "$b" 2>/dev/null || true)"
+  if [ -n "$p" ]; then ln -s "$p" "$NOJQ/$b" 2>/dev/null || true; fi
+done
+out="$(printf '{}' | PATH="$NOJQ" CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$SA")"
+printf '%s' "$out" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; check "subagent-start: no-jq fallback is still valid JSON" 0 "$?"
+rm -rf "$NOJQ" "$TMP"
+TMP="$(mktemp -d)"; mkdir -p "$TMP/.claude/hooks" "$TMP/.claude/rules"
+cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"; cp "$ROOT/.claude/rules/00-core.md" "$TMP/.claude/rules/"
+out="$(printf '{}' | CLAUDE_PROJECT_DIR="$TMP" "$SA")"; check "subagent-start: standalone exits 0" 0 "$?"
+check "subagent-start: standalone emits nothing (rules load natively — no double-pay)" "" "$out"
+rm -rf "$TMP"
+NOH="$(mktemp -d)"; printf '{}' | CLAUDE_PROJECT_DIR="$NOH" "$SA" >/dev/null; check "subagent-start: unlocatable harness fails open" 0 "$?"; rm -rf "$NOH"
+# The shared emitter also fixed session-start's no-jq fallback, which embedded raw newlines.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+NOJQ="$(mktemp -d)"
+for b in bash sh env cat grep sed head tr dirname ln cp readlink pwd mkdir; do
+  p="$(command -v "$b" 2>/dev/null || true)"
+  if [ -n "$p" ]; then ln -s "$p" "$NOJQ/$b" 2>/dev/null || true; fi
+done
+out="$(PATH="$NOJQ" CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
+printf '%s' "$out" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; check "session-start: no-jq plugin-mode output is valid JSON" 0 "$?"
+rm -rf "$NOJQ" "$TMP"
+
 echo "== post-compact.sh (PostCompact: restate loop state) =="
 PC="$HOOKS/post-compact.sh"
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
