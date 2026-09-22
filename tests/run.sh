@@ -251,11 +251,16 @@ printf '* -diff\n' > "$TMP/.gitattributes"; printf 's = 8  # %s hidden by attrib
 "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -qm attrs
 out="$(cd "$TMP" && bash "$CD" --range main...HEAD 2>&1)"; contains "check-debt: --range sees through a -diff gitattribute" "src/attr.py:1: no-trigger" "$out"
 rm -f "$TMP/.gitattributes" "$TMP/src/attr.py"; "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -qm noattrs
-# A record the classifier cannot parse (a TAB in the file name) counts as a failure, not a skip.
+# A TAB in a file name is refused before grep runs — fail closed, never a guess.
 printf 't = 9  # %s ceiling, trigger\n' "$M" > "$TMP/src/tab	name.py"
-out="$(cd "$TMP" && bash "$CD" src 2>&1)"; check "check-debt: an unparsable record fails closed" 1 "$?"
-contains "check-debt: an unparsable record is reported" "unparsable" "$out"
+out="$(cd "$TMP" && bash "$CD" src 2>&1)"; check "check-debt: a tab in a file name fails closed" 2 "$?"
+contains "check-debt: a tab in a file name is explained" "tab or newline" "$out"
 rm -f "$TMP/src/tab	name.py"
+# A crafted directory name with a tab and record-shaped text must not forge a record
+# for the files beneath it: any tab or newline in a scanned path fails closed.
+mkdir -p "$TMP/src/d	5:# $M c, t"; printf 'h = 1  # %s hidden\n' "$M" > "$TMP/src/d	5:# $M c, t/x.py"
+( cd "$TMP" && bash "$CD" src 2>/dev/null ); check "check-debt: a crafted tab-bearing path fails closed" 2 "$?"
+rm -rf "$TMP/src/d	5:# $M c, t"
 # grep must read every file: a NUL byte or an invalid UTF-8 byte must not make a file
 # "binary" and skipped, and a single-file operand still carries its filename.
 printf 'v = 1  # %s nul byte\n\0\n' "$M" > "$TMP/src/nul.py"

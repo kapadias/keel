@@ -81,6 +81,11 @@ collect() {
       [ -e "$p" ] || { printf 'check-debt: no such path %s\n' "$p" >&2; return 2; }
       case "$p" in -*) paths[i]="./$p" ;; esac   # grep reads "-" as stdin even after --
     done
+    # A tab or newline in a path would let the path forge a record (the classifier splits
+    # on the tab grep -Z's NUL becomes). Refuse such trees outright: exit 2, never a guess.
+    if [ -n "$(find "${paths[@]}" \( -name "*"$'\t'"*" -o -name "*"$'\n'"*" \) -print -quit 2>/dev/null)" ]; then
+      printf 'check-debt: a path contains a tab or newline — rename it before scanning\n' >&2; return 2
+    fi
     for d in "${SKIP_DIRS[@]}"; do args+=("--exclude-dir=$d"); done
     # -a: a NUL byte must not make a file "binary" and skipped; -H: a single-file operand
     # still carries its name; LC_ALL=C: an invalid UTF-8 byte must not skip the file either.
