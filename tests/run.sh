@@ -171,6 +171,54 @@ NOREPO="$(mktemp -d)"
 ( cd "$NOREPO" && bash "$CT" ); check "not a git repo fails closed" 1 "$?"
 rm -rf "$TMP" "$NOREPO"
 
+echo "== check-debt.sh (debt-marker gate + ledger) =="
+# A deliberate corner is only tracked if its marker names the trigger to revisit it.
+# The script decides well-formedness; prose cannot. Fixtures build the marker from a
+# split literal so this file never carries the marker form itself.
+CD="$SKILLS/lean/scripts/check-debt.sh"
+M='debt:'
+TMP="$(mktemp -d)"; mkdir -p "$TMP/src" "$TMP/node_modules/x" "$TMP/docs"
+printf 'lock = Lock()  # %s global lock, per-account locks if throughput matters\n' "$M" > "$TMP/src/ok.py"
+( cd "$TMP" && bash "$CD" ); check "check-debt: marker with a trigger passes" 0 "$?"
+out="$(cd "$TMP" && bash "$CD" --ledger 2>/dev/null)"; contains "check-debt: ledger counts it" "1 markers, 0 with no trigger." "$out"
+contains "check-debt: ledger names the trigger" "upgrade: per-account locks" "$out"
+printf 'for a in xs:  # %s O(n^2) scan\n' "$M" > "$TMP/src/rot.py"
+( cd "$TMP" && bash "$CD" 2>/dev/null ); check "check-debt: marker with no trigger fails closed" 1 "$?"
+out="$(cd "$TMP" && bash "$CD" --ledger 2>&1)"
+contains "check-debt: ledger tags the rotting marker" "no-trigger" "$out"
+contains "check-debt: ledger summary counts both" "2 markers, 1 with no trigger." "$out"
+contains "check-debt: ledger groups by file" "src/rot.py" "$out"
+contains "check-debt: stderr names path:line of the offender" "src/rot.py:1" "$out"
+printf '// %s trailing comma,   \n' "$M" > "$TMP/src/empty.js"
+( cd "$TMP" && bash "$CD" 2>/dev/null ); check "check-debt: empty text after the comma is still no-trigger" 1 "$?"
+rm -f "$TMP/src/rot.py" "$TMP/src/empty.js"
+printf '# %s nothing\n' "$M" > "$TMP/node_modules/x/dep.py"
+( cd "$TMP" && bash "$CD" 2>/dev/null ); check "check-debt: node_modules is skipped" 0 "$?"
+printf 'example: `# %s global lock`\n' "$M" > "$TMP/docs/lean.md"
+( cd "$TMP" && bash "$CD" 2>/dev/null ); check "check-debt: markdown quoting the convention is not a marker" 0 "$?"
+printf 'x = 1  # technical %s later\n' "$M" > "$TMP/src/prose.py"
+( cd "$TMP" && bash "$CD" 2>/dev/null ); check "check-debt: the word without the comment prefix is not a marker" 0 "$?"
+EMPTY="$(mktemp -d)"; out="$(cd "$EMPTY" && bash "$CD" --ledger 2>/dev/null)"; check "check-debt: clean tree exits 0" 0 "$?"
+contains "check-debt: clean tree says so" "Clean ledger." "$out"
+( cd "$EMPTY" && bash "$CD" --range main...HEAD 2>/dev/null ); check "check-debt: --range outside a git repo fails closed" 2 "$?"
+( cd "$EMPTY" && bash "$CD" --bogus 2>/dev/null ); check "check-debt: unknown flag fails closed" 2 "$?"
+# --range gates only ADDED lines: debt someone else left does not block this PR.
+rm -rf "$TMP/node_modules"; "${GIT[@]}" -C "$TMP" init -q
+printf 'y = 2  # %s naive heuristic\n' "$M" > "$TMP/src/old.py"
+"${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -qm base; "${GIT[@]}" -C "$TMP" branch -M main
+"${GIT[@]}" -C "$TMP" checkout -q -b feature/debt
+printf 'z = 3  # %s single worker, pool when queue depth > 100\n' "$M" > "$TMP/src/new.py"
+"${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -qm new
+( cd "$TMP" && bash "$CD" --range main...HEAD 2>/dev/null ); check "check-debt: --range ignores a pre-existing no-trigger marker outside the diff" 0 "$?"
+( cd "$TMP" && bash "$CD" 2>/dev/null ); check "check-debt: default scan still sees the pre-existing debt" 1 "$?"
+printf 'w = 4  # %s cache never expires\n' "$M" >> "$TMP/src/new.py"
+"${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -qm rot
+out="$(cd "$TMP" && bash "$CD" --range main...HEAD 2>&1)"; check "check-debt: --range blocks a new no-trigger marker" 1 "$?"
+contains "check-debt: --range names path:line of the new offender" "src/new.py:2" "$out"
+( cd "$TMP" && bash "$CD" --range nosuchref...HEAD 2>/dev/null ); check "check-debt: unresolvable range fails closed" 2 "$?"
+( cd "$ROOT" && bash "$CD" 2>/dev/null ); check "check-debt: Keel's own tree carries no untriggered marker" 0 "$?"
+rm -rf "$TMP" "$EMPTY"
+
 echo "== format.sh (PostToolUse, best-effort) =="
 TF="$(mktemp).py"; echo 'x=1' > "$TF"
 printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$TF" | "$HOOKS/format.sh"; check "exits 0 even if no formatter present" 0 "$?"
