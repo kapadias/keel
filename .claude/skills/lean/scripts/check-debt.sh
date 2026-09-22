@@ -83,7 +83,11 @@ collect() {
     done
     # A tab or newline in a path would let the path forge a record (the classifier splits
     # on the tab grep -Z's NUL becomes). Refuse such trees outright: exit 2, never a guess.
-    if [ -n "$(find "${paths[@]}" \( -name "*"$'\t'"*" -o -name "*"$'\n'"*" \) -print -quit 2>/dev/null)" ]; then
+    local prune=() hit
+    for d in "${SKIP_DIRS[@]}"; do prune+=(-name "$d" -prune -o); done
+    hit="$(find "${paths[@]}" "${prune[@]}" \( -path "*"$'\t'"*" -o -path "*"$'\n'"*" \) -print -quit)" \
+      || { printf 'check-debt: find failed — refusing to scan\n' >&2; return 2; }
+    if [ -n "$hit" ]; then
       printf 'check-debt: a path contains a tab or newline — rename it before scanning\n' >&2; return 2
     fi
     for d in "${SKIP_DIRS[@]}"; do args+=("--exclude-dir=$d"); done

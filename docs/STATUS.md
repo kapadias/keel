@@ -109,6 +109,8 @@ release; v1.0.0 is the first tagged artifact.
     built character by character with plain string literals, because `gsub` replacement
     strings treat backslashes differently in mawk, BWK awk and gawk — observed under real mawk
     and gawk, after discovering the host's `mawk` had been swapped for a gawk wrapper mid-review.
+    The tab/newline guard checks whole paths, prunes the skipped dirs, and treats a failing
+    `find` as a stop.
   - **Rejected:** intensity modes (a flag file the model writes with no gate in front of it) and
     installing the source's own plugin alongside Keel (its test and report rules contradict
     `testing.md` and the four-line report). **Expected effect is an estimate, not a measurement:**

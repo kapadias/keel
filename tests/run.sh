@@ -261,6 +261,16 @@ rm -f "$TMP/src/tab	name.py"
 mkdir -p "$TMP/src/d	5:# $M c, t"; printf 'h = 1  # %s hidden\n' "$M" > "$TMP/src/d	5:# $M c, t/x.py"
 ( cd "$TMP" && bash "$CD" src 2>/dev/null ); check "check-debt: a crafted tab-bearing path fails closed" 2 "$?"
 rm -rf "$TMP/src/d	5:# $M c, t"
+# The guard checks the whole path, not just the last component, and a failing find is a stop.
+mkdir -p "$TMP/src/p	1:# $M a, b"; printf 'k = 1  # %s hidden\n' "$M" > "$TMP/src/p	1:# $M a, b/f.py"
+( cd "$TMP" && bash "$CD" "src/p	1:# $M a, b/f.py" 2>/dev/null ); check "check-debt: a tab in a parent of a path operand fails closed" 2 "$?"
+rm -rf "$TMP/src/p	1:# $M a, b"
+NOFIND="$(mktemp -d)"; printf '#!/bin/sh\nexit 1\n' > "$NOFIND/find"; chmod +x "$NOFIND/find"
+( cd "$TMP" && PATH="$NOFIND:$PATH" bash "$CD" src 2>/dev/null ); check "check-debt: a failing find is a stop, not a skipped guard" 2 "$?"
+rm -rf "$NOFIND"
+mkdir -p "$TMP/node_modules/t	ab"; printf 'n = 1\n' > "$TMP/node_modules/t	ab/x.js"
+( cd "$TMP" && bash "$CD" 2>/dev/null ); check "check-debt: a tab-named file inside a skipped dir is not a false stop (debt found, guard silent)" 1 "$?"
+rm -rf "$TMP/node_modules"
 # grep must read every file: a NUL byte or an invalid UTF-8 byte must not make a file
 # "binary" and skipped, and a single-file operand still carries its filename.
 printf 'v = 1  # %s nul byte\n\0\n' "$M" > "$TMP/src/nul.py"
