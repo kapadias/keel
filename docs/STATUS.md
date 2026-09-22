@@ -54,6 +54,14 @@ release; v1.0.0 is the first tagged artifact.
 
 ## Recently changed
 
+- **2026-09-22** — Second WS7 eval, the ladder on trap tasks with `/review` forced
+  (`docs/benchmarks/2026-09-22-ladder-v2.md`): six tasks, Sonnet, n = 12 per arm, hidden checks.
+  **`after` 12/12 correct vs 10/12, zero new dependency files vs one, cost −11%, wall −23%, median
+  source lines 22 → 16.5; mean flat** because one `after` run over-built the date picker by 80
+  lines while the other answered in one. The stdlib traps (id, config, snapshot) shrank; debounce
+  and retry did not. The design cannot separate the ladder from the review-inflation rule; the
+  next eval needs n = 4 per cell and an arm with one but not the other.
+
 - **2026-09-22** — The simplicity lens now binds in review (from the first eval's outlier):
   - **A review ask that adds code must name a failing input.** The rubric gains the calibration
     question "Does the fix add code?"; `code-review` treats speculative hardening (RFC-grade

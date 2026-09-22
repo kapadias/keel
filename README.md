@@ -58,15 +58,19 @@ release): four feature tasks on a scratch Python service, Claude Sonnet, headles
 sessions, scored on source lines added (tests excluded), tokens, cost and turns behind a hidden
 correctness test.
 
-| arm                         | correct | src LOC (median) | tokens |  cost | turns |
-| --------------------------- | ------: | ---------------: | -----: | ----: | ----: |
-| **before** (v1.0.0 harness) |     8/8 |              7.5 |   545k | $0.24 |  13.5 |
-| **after** (decision ladder) |     8/8 |              8.0 |   587k | $0.51 |  12.4 |
+| eval                                     | arm        | correct | new deps | src LOC (median) |  cost |  wall |
+| ---------------------------------------- | ---------- | ------: | -------: | ---------------: | ----: | ----: |
+| v1 — four plain tasks, review not forced | **before** |     8/8 |        0 |              7.5 | $0.24 |  52 s |
+|                                          | **after**  |     8/8 |        0 |              8.0 | $0.51 | 112 s |
+| v2 — six trap tasks, `/review` forced    | **before** |   10/12 |        1 |               22 | $3.18 | 556 s |
+|                                          | **after**  |   12/12 |        0 |             16.5 | $2.82 | 429 s |
 
-No measurable difference on these tasks: both arms were already lean and every run was correct. The
-one outlier (25 lines, $2.43) came from the review loop inflating a six-line check, not from the
-ladder — the finding that matters. Method, raw rows and what to run next:
-[`docs/benchmarks/2026-09-22-ladder.md`](docs/benchmarks/2026-09-22-ladder.md).
+On plain tasks the ladder changes nothing — Keel was already lean. On tasks with an over-build
+trap (a date picker, a retry, a config layer, an id, a deep copy) the `after` arm was correct on
+every run, never created a dependency file, and came in cheaper and faster with a 25% lower median
+line count; the mean is flat because one run over-built the date picker by 80 lines. Small n, high
+variance. Method and raw rows: [`v1`](docs/benchmarks/2026-09-22-ladder.md) ·
+[`v2`](docs/benchmarks/2026-09-22-ladder-v2.md).
 
 Small n; treat as a smoke signal, not a result. The always-on surface costs about 3% more per turn
 (3,599 → 3,679 words) to buy it.
