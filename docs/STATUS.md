@@ -54,6 +54,12 @@ release; v1.0.0 is the first tagged artifact.
 
 ## Recently changed
 
+- **2026-09-22** — README restructured on the outline of the project credited in its Credits
+  section: a centred header with the CI-proven claims, Before / after, Numbers (a small before/after
+  benchmark of the decision ladder, filled in from measured runs), How it works with the ladder,
+  Install, Commands, Safety & enforcement, Development, FAQ. Content, links and counts unchanged;
+  the header nav anchors now point at the renamed sections.
+
 - **2026-09-22** — The decision ladder: solution size becomes a rule and a gate (ADR-0008):
   - **Keel governed process, not size.** TDD, review and sync were enforced; how _much_ code to
     write was a 42-word Simplicity bullet. `00-core.md` now carries a seven-rung ladder — YAGNI,

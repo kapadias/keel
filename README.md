@@ -2,116 +2,71 @@
 
 <img src="assets/keel-banner.svg" alt="Keel — a production-grade, token-efficient harness for Claude Code" width="100%">
 
-<br/>
+<h1 align="center">Keel</h1>
 
-[![Built for Claude Code](https://img.shields.io/badge/Built%20for-Claude%20Code-D97757?style=for-the-badge)](https://claude.com/claude-code)
-[![Language agnostic](https://img.shields.io/badge/Language-agnostic-2f855a?style=for-the-badge)](#make-it-yours)
-[![PRs welcome](https://img.shields.io/badge/PRs-welcome-d97757?style=for-the-badge)](CONTRIBUTING.md)
+<p align="center">
+  <em>Keel is the harness that makes the model prove its work — tests, gates, review — before anything ships.</em>
+</p>
 
-**The backbone that keeps an AI coding agent upright.**
-A portable `.claude/` operating system that makes AI-assisted development
-**disciplined, test-driven, review-gated, and safe** — without burning your context window.
+<p align="center">
+  <a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/Built%20for-Claude%20Code-D97757?style=for-the-badge" alt="Built for Claude Code"></a>
+  <a href="#make-it-yours"><img src="https://img.shields.io/badge/Language-agnostic-2f855a?style=for-the-badge" alt="Language agnostic"></a>
+  <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-d97757?style=for-the-badge" alt="PRs welcome"></a>
+</p>
 
-[Quickstart](#quickstart) · [Philosophy](#the-three-principles) · [What's inside](#whats-inside) · [Token economy](#the-token-economy) · [Commands](#the-pipeline) · [Make it yours](#make-it-yours) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
+<p align="center">
+  <strong>216 golden tests &middot; 9 blocking gates over 7 hook events &middot; ~7.1k always-on tokens &middot; every review verdict machine-checked</strong><br>
+  <sub>These are not claims in prose — they are numbers CI proves. `tests/run.sh` counts the golden
+  tests, `tests/harness_lint.py` fails the build if a doc drifts from that count or the token
+  budget, and `check-review.sh` rejects any reviewer output that isn't a parseable verdict.</sub>
+</p>
+
+<p align="center">
+  <a href="#install">Install</a> &middot;
+  <a href="#how-it-works">How it works</a> &middot;
+  <a href="#commands">Commands</a> &middot;
+  <a href="CHANGELOG.md">Changelog</a> &middot;
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
 
 </div>
 
 ---
 
-## Why Keel?
+## Before / after
 
-An LLM coding agent is fast, tireless, and **confidently wrong** often enough to hurt you. Left
-unstructured it will skip the test, swallow the error, refactor and change behavior in the same
-breath, push to `main`, and quietly leak a secret into a log — and it will do all of it while sounding
-certain.
+Without Keel: the agent edits production code, says "done," and nothing checked it. Confidently
+wrong is still wrong.
 
-**Keel is the structural backbone that keeps the agent upright.** A keel is the part of a ship that
-resists capsizing under load; this harness is the part of your workflow that resists shipping
-untested, unreviewed, or irreversible change under the pressure to move fast. It is a small, opinionated
-set of **rules, agents, skills, workflows, and hooks** that drop into any repository's `.claude/`
-directory and encode _how the work gets done_.
-
-It is distilled from a harness built for a real-capital systematic-trading operation — where a wrong
-number moves money — and generalized for **any software project, in any language**.
-
-> Keel is not a framework you import. It is a set of operating instructions for Claude Code: copy it in,
-> adapt three things, and the agent starts working like a disciplined senior engineer.
-
-**The gates are _code_, not prose.** Keel doesn't just tell the agent to behave — it _enforces_ it.
-Commits to a protected branch are blocked, secrets are blocked before they hit disk, a turn cannot end
-with the Definition of Done stale, and a reviewer that returns prose instead of a machine-checkable
-verdict is caught at the boundary. The harness **tests its own gates** (`bash tests/run.sh` —
-golden tests) so the enforcement can't silently rot.
-
-**What v1.0 adds:** the model can no longer invoke the six workflows that have side effects, a plugin
-install finally carries the operating rules it was always missing, and every token budget is enforced
-by the linter rather than asserted in a README.
-
----
-
-## The three principles
-
-Everything in Keel descends from three lines.
-
-### 1. The LLM proposes; deterministic gates decide
-
-An LLM may read code, draft changes, generate hypotheses, and explain. **Tests, types, linters, and
-human review decide** whether any of it merges or acts. No unvalidated model output crosses a boundary
-that touches production, money, or user data. The sharp test for any design:
-
-> _"If this output is silently wrong, can it cause harm before a deterministic check catches it?"_
-> If yes — put a gate between the LLM and the consequence.
-
-### 2. Safety is lexicographically prior to speed
-
-Irreversible and outward-facing actions — deploy, delete, force-push, publish, migrate — are gated
-behind tests, review, and (when they widen blast radius) a human. Risk-_reducing_ actions may be
-automatic; risk-_increasing_ actions are gated. When "safe" and "fast" disagree, **safe wins, always.**
-
-### 3. Context is a budget — spend it deliberately
-
-The always-on surface stays tiny; depth loads on demand. Token thrift is a first-class design goal —
-and it is **never** paid for in quality. (See [The token economy](#the-token-economy).)
-
----
-
-## The loop
-
-Every change moves through these stages, in order. Speed comes from doing each well once — not from
-skipping the ones that catch mistakes.
+With Keel, the same request produces a failing test first, a diff, and a machine-checked review
+verdict before anything merges:
 
 ```
-Research & Reuse → Plan → TDD (RED → GREEN → REFACTOR) → Implement → Review → Verify → Commit & PR → Sync
+$ bash .claude/skills/code-review/scripts/check-review.sh < verdict.json
+✓ check-review: no blocking findings; verdict approves.
+
+Assumptions:    the caller wants OAuth device-flow login, not password grant
+Changed:        src/auth/device_flow.py, tests/test_device_flow.py
+Verified:       pytest -q (42 passed) + ruff + mypy — all green, observed
+Remaining risk: token refresh path has no property test yet (debt: tracked)
 ```
 
----
+## Numbers
 
-## What's inside
+Measured on a small before/after benchmark of the decision ladder (this branch vs. the previous
+release): four feature tasks on a scratch Python service, Claude Sonnet, headless Claude Code
+sessions, scored on source lines added (tests excluded), tokens, cost and turns behind a hidden
+correctness test.
 
-```
-.claude/
-├── rules/        always-on operating discipline — dense, short, paid every turn
-├── agents/       specialists you delegate to (orchestrator, planner, reviewers, explorer, …)
-├── skills/       deep playbooks (load on trigger) + the pipeline: /plan /tdd /review /ship …
-│              side-effecting ones are human-invoke-only and cost zero context
-├── hooks/        deterministic guards that BLOCK protected-branch commits, secrets, and unsynced pushes
-└── settings.json denies reading secrets and force-push; wires the hooks
-CLAUDE.md         the always-on root — the agent reads this first
-tests/            the harness's own gate tests + self-validation (bash tests/run.sh)
-stacks/           ready-made test-gate packs: python · typescript · go · rust
-docs/             STATUS.md (the live mirror) + ROADMAP + Architecture Decision Records
-```
+| arm                         | src LOC | tokens | cost | turns | correct |
+| --------------------------- | ------: | -----: | ---: | ----: | ------: |
+| **before** (v1.0.0 harness) |     TBD |    TBD |  TBD |   TBD |     TBD |
+| **after** (decision ladder) |     TBD |    TBD |  TBD |   TBD |     TBD |
 
-| Layer                  | Loaded          | Purpose                                                                           |
-| ---------------------- | --------------- | --------------------------------------------------------------------------------- |
-| `CLAUDE.md` + `rules/` | **Always**      | The dense, short policy the agent obeys every turn.                               |
-| `skills/`              | **On demand**   | Playbooks that cost nothing until triggered, plus the `/name` pipeline workflows. |
-| `agents/`              | **On delegate** | Specialists that spend _their own_ context and return conclusions.                |
-| `hooks/`               | **On event**    | Deterministic enforcement on edit and on push.                                    |
+Small n; treat as a smoke signal, not a result. The always-on surface costs about 3% more per turn
+(3,599 → 3,679 words) to buy it.
 
----
-
-## The token economy
+### The token economy
 
 Most "AI dev setups" fail the same way: they stuff every instruction into one always-on file. Every
 token in that file is re-read on **every** turn, the window fills, and the agent gets duller as the
@@ -127,32 +82,65 @@ The six side-effecting workflows (`/ship`, `/release`, `/rollback`, `/adr`, `/sy
 `disable-model-invocation: true`, so they cost **zero** always-on tokens — and Claude cannot invoke
 them at all. Only you can.
 
-So **most of Keel's guidance never touches your main context** until the moment it is relevant. The
-mechanisms:
+## How it works
 
-- **Tiny always-on core.** Rules state a principle in a sentence and _link_ to the detail — they never
-  inline it. The whole standing policy is under 3,700 words, and the linter fails the build above it.
-- **Skills load on a trigger.** A 2,000-token debugging playbook costs zero until you are debugging —
-  and bundles its scripts/templates so depth loads only when opened.
-- **Workflows encode a pipeline once.** `/ship` runs the whole gate-commit-PR-sync sequence; you don't
-  re-describe it each time.
-- **Subagents do the fan-out.** Need to search 40 files? The `explorer` agent (on a cheap model) burns
-  _its_ context and hands back three `path:line` references and an answer — not the file dumps. Your
-  main thread keeps the conclusion.
-- **Model-tier routing.** Haiku for mechanical fan-out, Sonnet for the build, Opus for review and hard
-  reasoning. Cost matched to depth.
+An LLM coding agent is fast, tireless, and **confidently wrong** often enough to hurt you. Keel is
+the structural backbone that keeps it upright — a small, opinionated set of **rules, agents,
+skills, workflows, and hooks** that drop into any repository's `.claude/` directory and encode _how
+the work gets done_. It is distilled from a harness built for a real-capital systematic-trading
+operation — where a wrong number moves money — and generalized for any software project, in any
+language.
 
-> **The one hard line:** token thrift never justifies skipping a test, a review, a validation step, or
-> a safety gate. Save tokens on _how you find and present information_ — never on the correctness and
-> safety of the work. See [`.claude/rules/token-economy.md`](.claude/rules/token-economy.md).
+**The LLM proposes; deterministic gates decide.** An LLM may read code, draft changes, generate
+hypotheses, and explain. Tests, types, linters, and human review decide what merges or acts. No
+unvalidated model output crosses a boundary that touches production, money, or user data. The sharp
+test for any design: _"If this output is silently wrong, can it cause harm before a deterministic
+check catches it?"_ If yes — put a gate between the LLM and the consequence.
 
----
+**Safety is lexicographically prior to speed.** Irreversible and outward-facing actions — deploy,
+delete, force-push, publish, migrate — are gated behind tests, review, and (when they widen blast
+radius) a human. Risk-_reducing_ actions may be automatic; risk-_increasing_ actions are gated. When
+"safe" and "fast" disagree, safe wins, always.
 
-## Quickstart
+**Context is a budget — spend it deliberately.** The always-on surface stays tiny; depth loads on
+demand. Token thrift is a first-class design goal, and it is never paid for in quality.
+
+Every change moves through the loop, in order — speed comes from doing each stage well once, not
+from skipping the ones that catch mistakes:
+
+```
+Research & Reuse → Plan → TDD (RED → GREEN → REFACTOR) → Implement → Review → Verify → Commit & PR → Sync
+```
+
+Before writing code, the agent stops at the first rung that holds:
+
+```
+1. Does this need to exist?   → no: skip it (YAGNI)
+2. Already in this codebase?  → reuse it, don't rewrite
+3. Stdlib does it?            → use it
+4. Native platform feature?   → use it
+5. Installed dependency?      → use it
+6. One line?                  → one line
+7. Only then: the minimum code that works
+```
+
+The ladder sizes the solution, never the loop — a test, a review verdict and a sync are never
+simplified away.
+
+### What's inside
+
+| Layer                  | Loaded          | Purpose                                                                           |
+| ---------------------- | --------------- | --------------------------------------------------------------------------------- |
+| `CLAUDE.md` + `rules/` | **Always**      | The dense, short policy the agent obeys every turn.                               |
+| `skills/`              | **On demand**   | Playbooks that cost nothing until triggered, plus the `/name` pipeline workflows. |
+| `agents/`              | **On delegate** | Specialists that spend _their own_ context and return conclusions.                |
+| `hooks/`               | **On event**    | Deterministic enforcement on edit and on push.                                    |
+
+## Install
 
 Keel is files, not a dependency. Adopt it in under a minute — as a copy-in, or as a plugin.
 
-### Option A — copy it in (standalone)
+### Option A — copy it in
 
 ```bash
 # From the root of your repository:
@@ -167,16 +155,18 @@ mkdir -p docs && cp /tmp/keel/docs/STATUS.md docs/STATUS.md
 chmod +x .claude/hooks/*.sh
 ```
 
-### Option B — install as a plugin (versioned, shareable)
+### Option B — plugin
 
 ```
 /plugin marketplace add kapadias/keel
 /plugin install keel@keel
 ```
 
-A plugin install brings the agents, skills, commands, and hooks. Plugins don't apply a `settings.json`
-permission posture, so copy Keel's secret read-deny list into your own settings — see
-[`.claude/settings.json`](.claude/settings.json).
+A plugin install brings the agents, skills, commands, and hooks — but it is **not** equivalent to a
+copy-in install: plugins don't apply a `settings.json` permission posture, so copy Keel's
+secret-read-deny list into your own settings (see [`.claude/settings.json`](.claude/settings.json)
+and [ADR 0007](docs/adr/0007-plugin-install-is-not-equivalent.md)). Full comparison:
+[`docs/INSTALL.md`](docs/INSTALL.md).
 
 Then open the repo in **[Claude Code](https://claude.com/claude-code)** and try:
 
@@ -188,11 +178,23 @@ Then open the repo in **[Claude Code](https://claude.com/claude-code)** and try:
 ```
 
 That's it — the agent now plans before coding, writes the failing test first, reviews before merge,
-and refuses to mark work done while a mirror is out of sync. Next, [make it yours](#make-it-yours).
+and refuses to mark work done while a mirror is out of sync.
 
----
+### Make it yours
 
-## The pipeline
+Keel is language-agnostic. A few edits adapt it to any stack:
+
+1. **Your test gate** → copy a ready-made pack from [`stacks/`](stacks/) (python · typescript · go ·
+   rust), or edit [`.claude/skills/test/SKILL.md`](.claude/skills/test/SKILL.md) and
+   [`/ship`](.claude/skills/ship/SKILL.md) with your real lint/type/test commands.
+2. **Your tracker** → set your issue-id prefix and branch convention in
+   [`.claude/rules/git-workflow.md`](.claude/rules/git-workflow.md).
+3. **Your formatter** → point [`.claude/hooks/format.sh`](.claude/hooks/format.sh) at your tool (it
+   already handles Python, JS/TS, Go, and Rust out of the box).
+
+Everything else is principle, not tooling — it transfers unchanged.
+
+## Commands
 
 Fifteen workflows cover the development loop. Invoke them with `/<name>` in Claude Code. They live
 under `.claude/skills/` — Claude Code merged custom commands into skills, and only skills support
@@ -218,9 +220,7 @@ trigger them, which is what makes "a human approves promotion to production"
 | `/adr` **(human-only)**      | Write a numbered Architecture Decision Record with real alternatives.                     |
 | `/intake` **(human-only)**   | Turn a raw idea or bug into a well-formed, de-duplicated tracked issue.                   |
 
----
-
-## The crew
+### The crew
 
 Eight specialist agents, each model-tiered so you never burn a frontier model on mechanical work.
 
@@ -239,8 +239,6 @@ Eight specialist agents, each model-tiered so you never burn a frontier model on
 references: `tdd-workflow`, `code-review`, `debugging`, `refactoring`, `api-design`, `security-review`,
 `migration-safety`, `observability`, `concurrency-performance`, `supply-chain`, `fast-lane`, `lean`
 (the decision ladder in depth, with `check-debt.sh`).
-
----
 
 ## Safety & enforcement
 
@@ -262,25 +260,22 @@ Hooks turn the rules into deterministic guards — gates, not suggestions:
 and denies `git push --force`. The harness even **tests its own gates**: `bash tests/run.sh` runs
 golden tests proving each one blocks vs. allows, and CI fails if any gate regresses.
 
----
+See [`SECURITY.md`](SECURITY.md) for how to report a vulnerability privately.
 
-## Make it yours
+## Development
 
-Keel is language-agnostic. A few edits adapt it to any stack:
+Keel tests itself the same way it asks your project to. Before any change lands:
 
-1. **Your test gate** → copy a ready-made pack from [`stacks/`](stacks/) (python · typescript · go ·
-   rust), or edit [`.claude/skills/test/SKILL.md`](.claude/skills/test/SKILL.md) and
-   [`/ship`](.claude/skills/ship/SKILL.md) with your real lint/type/test commands.
-2. **Your tracker** → set your issue-id prefix and branch convention in
-   [`.claude/rules/git-workflow.md`](.claude/rules/git-workflow.md).
-3. **Your formatter** → point [`.claude/hooks/format.sh`](.claude/hooks/format.sh) at your tool (it
-   already handles Python, JS/TS, Go, and Rust out of the box).
+```bash
+bash tests/run.sh              # gate golden tests — each hook proven to block vs. allow
+python3 tests/harness_lint.py  # token budgets, stale-count drift, verdict format, wiring
+```
 
-Everything else is principle, not tooling — it transfers unchanged.
+CI also runs shellcheck over every hook. Issues and PRs are welcome — see
+[`CONTRIBUTING.md`](CONTRIBUTING.md) for the style guide, the frontmatter shapes, and how to add a
+rule, skill, command, or agent (and why most additions should be on-demand, not always-on).
 
----
-
-## Repository structure
+### Repository structure
 
 ```
 keel/
@@ -308,8 +303,6 @@ keel/
 └── .github/                   # CI + PR template
 ```
 
----
-
 ## FAQ
 
 **Is this a library or a CLI?** Neither. It is a set of Markdown + shell files that configure
@@ -324,18 +317,7 @@ agent upright under the pressure to move fast.
 **Will this slow me down?** It front-loads the work that prevents rework: a plan, a failing test, a
 review. Net, it is faster — and far safer — than shipping and debugging in production.
 
----
-
-## Contributing
-
-Issues and PRs are welcome. Keel itself is built with Keel — see
-[`CONTRIBUTING.md`](CONTRIBUTING.md) for the style guide, the frontmatter shapes, and how to add a
-rule, skill, command, or agent (and why most additions should be on-demand, not always-on).
-
-## Security
-
-See [`SECURITY.md`](SECURITY.md). In short: no secrets in code, logs, or prompts; report
-vulnerabilities privately.
+**Is it just a prompt?** No: hooks block, tests decide, the linter budgets the prose.
 
 ## Credits
 
