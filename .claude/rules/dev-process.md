@@ -10,14 +10,11 @@ takes the full loop below; when in doubt, the full loop (see the `fast-lane` ski
 
 ## 0. Research & Reuse — before writing new code
 
-Do not hand-roll what a battle-tested library already does correctly. Reinventing a parser, a date
-library, an auth flow, or a crypto primitive is a correctness and security risk, not a flex.
-
-1. **Search the codebase first.** Find the existing pattern, helper, or abstraction and match it. A
-   change that looks like the code around it is easier to review and harder to get wrong.
-2. **Search the ecosystem second.** Prefer a maintained, widely-used library over net-new code when it
-   covers ≥80% of the need. Confirm exact API behavior against current docs, not memory.
-3. **Capture non-obvious findings** as an ADR (`/adr`) or a note in `docs/`.
+Climb the ladder ([00-core.md](./00-core.md)): this codebase, the stdlib, the platform, an
+installed dependency — then a maintained library when it covers ≥80% of the need. For **parsing,
+dates, crypto, auth** it is always the library: hand-rolling those is a security risk, not a flex.
+Confirm API behavior against current docs, not memory; capture non-obvious findings as an ADR
+(`/adr`) or a `docs/` note.
 
 ## 1. Plan
 
@@ -56,4 +53,4 @@ Branch, commit, PR, and the five mirrors: [00-core.md](./00-core.md),
 
 **Report every completed unit in four lines** (mirrored by the PR template): **Assumptions** (what
 you took as given), **Changed** (files/behavior), **Verified** (the gate you ran and its _observed_
-result — never inferred), **Remaining risk** (what is not covered).
+result — never inferred), **Remaining risk** (what is not covered, and what was deliberately skipped — with the trigger to add it).

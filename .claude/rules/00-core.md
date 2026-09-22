@@ -25,6 +25,20 @@ Research & Reuse → Plan → TDD (RED → GREEN → REFACTOR) → Implement →
 Do not skip stages. One exception: a trivial, reversible fix may take the `/fix` fast lane —
 `check-trivial.sh` decides eligibility, never prose. → [dev-process.md](./dev-process.md)
 
+## Before writing code
+
+Understand the problem first — trace the real flow — then stop at the first rung that holds:
+
+1. **YAGNI** — does it need to exist at all?
+2. Already in this **codebase**? Reuse it.
+3. The **stdlib** does it? Use it.
+4. A **native** platform feature covers it? Use it.
+5. An already-**installed** dependency solves it? Use it.
+6. Can it be **one line**? One line.
+7. Only then: the **minimum code** that works.
+
+The ladder sizes the solution, never the loop. → [engineering.md](./engineering.md)
+
 ## Never
 
 - Commit or push to `main`/`develop`, or force-push. (`guard-branch.sh` blocks it.)

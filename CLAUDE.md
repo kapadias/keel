@@ -5,7 +5,7 @@ review-gated, and safe by construction. Language- and domain-agnostic: drop it i
 and the same loop applies.
 
 **The operating rules are in [`.claude/rules/`](.claude/rules/), which loads on every turn.** Start
-with [`00-core.md`](.claude/rules/00-core.md) — the three principles, the loop, the never-list, and
+with [`00-core.md`](.claude/rules/00-core.md) — the three principles, the loop, the ladder, the never-list, and
 routing. This file holds only what lives nowhere else.
 
 ## Caliber bar
