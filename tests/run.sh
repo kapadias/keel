@@ -609,5 +609,36 @@ out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks /ship th
 contains "lint: cites ADR-0005 on unwiring" "ADR-0005" "$out"
 rm -rf "$FX"
 
+# The ladder lives twice by design — always-on rungs in 00-core.md, on-demand depth in
+# the lean skill — so the seven rung keywords are pinned in both copies (ADR-0008).
+FX="$(lint_fixture)"
+sed -i 's/\*\*stdlib\*\*/standard library/' "$FX/.claude/rules/00-core.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a rung dropped from the always-on ladder" 1 "$?"
+contains "lint: names the missing rung" "stdlib" "$out"
+rm -rf "$FX"
+FX="$(lint_fixture)"
+sed -i 's/YAGNI/you are not going to need it/g' "$FX/.claude/skills/lean/SKILL.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a rung dropped from the lean skill" 1 "$?"
+contains "lint: names the drifted copy" "skills/lean/SKILL.md" "$out"
+rm -rf "$FX"
+# The debt gate is only a gate if /review runs it — ADR-0005's wiring lesson, applied again.
+FX="$(lint_fixture)"
+sed -i 's/check-debt\.sh/checkdebt.sh/g' "$FX/.claude/skills/review/SKILL.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks /review that no longer wires check-debt.sh" 1 "$?"
+contains "lint: cites ADR-0008 on unwiring the debt gate" "ADR-0008" "$out"
+rm -rf "$FX"
+# Ideas borrowed from another project are credited in README.md and nowhere else; the
+# harness carries no external brand. The term is split so this file cannot trip the check.
+FX="$(lint_fixture)"
+printf '\nSee also pony%s.\n' 'tail' >> "$FX/.claude/skills/lean/SKILL.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks an external project name outside README.md" 1 "$?"
+contains "lint: names the file carrying the external name" "skills/lean/SKILL.md" "$out"
+contains "lint: says where credit belongs" "README.md" "$out"
+rm -rf "$FX"
+FX="$(lint_fixture)"
+printf '\nCredit: pony%s.\n' 'tail' >> "$FX/README.md"
+KEEL_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: README.md may credit the external project" 0 "$?"
+rm -rf "$FX"
+
 printf '\n%s passed, %s failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
