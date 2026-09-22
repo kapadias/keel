@@ -60,7 +60,7 @@ release; v1.0.0 is the first tagged artifact.
     validation, limits, i18n cases on a surface the task did not make critical) as a question, not
     a MEDIUM; `code-reviewer` climbs the ladder on its own fix before asking; `dev-process.md` §4
     now reads "fix MEDIUM when it names a failing case; one that only adds code without one gets a
-    `debt:` marker, not the code"; `implementer` answers such asks with the marker and a Remaining
+    `debt:` marker instead"; `implementer` answers such asks with the marker and a Remaining
     risk line. Two lint pins with failing-case tests keep the rule in place. Always-on prose
     3,679 → 3,690 words.
 

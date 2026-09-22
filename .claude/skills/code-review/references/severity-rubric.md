@@ -39,8 +39,9 @@ Severity is a function of **blast radius × reachability × reversibility**:
 - **Does it fail closed or open?** Fail-open is the multiplier that turns a MEDIUM into a CRITICAL.
 - **Is there a test that would have caught it?** Missing tests on critical logic is itself HIGH —
   untested survival-critical code is incomplete, not merely thin.
-- **Does the fix add code?** A finding whose fix _adds_ code (a bound, a branch, a type, a wrapper)
-  must name the concrete input or caller that reaches the bad path today. Hardening against inputs
+- **Does the fix add code?** Off the critical surface and outside the auto-CRITICAL list, a finding
+  whose fix _adds_ code (a bound, a branch, a type, a wrapper) must name the concrete input or
+  caller that reaches the bad path today. Hardening against inputs
   nobody sends is a `simplicity` question, not a MEDIUM — the ladder applies to the reviewer's ask
   as much as to the author's diff.
 

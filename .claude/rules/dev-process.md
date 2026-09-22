@@ -38,7 +38,8 @@ failures. Make the change look like it belongs in the file.
 ## 4. Review
 
 Run `/review` before merge. Address every **CRITICAL** and **HIGH** finding; fix **MEDIUM** when it
-names a failing case; one that only adds code without one gets a `debt:` marker instead. Changes that touch auth, data, money, or anything outward-facing also get a security pass.
+names a failing case; one that only adds code without one gets a `debt:` marker instead. Changes
+that touch auth, data, money, or anything outward-facing also get a security pass.
 
 ## 5. Verify
 

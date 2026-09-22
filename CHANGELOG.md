@@ -42,7 +42,7 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
 
 - **A review ask that adds code must name a failing input** (ADR-0008, amended). The severity
   rubric, `code-review`, `code-reviewer`, `implementer` and `dev-process.md` §4 ("fix MEDIUM when it
-  names a failing case; one that only adds code without one gets a `debt:` marker, not the code")
+  names a failing case; one that only adds code without one gets a `debt:` marker instead")
   all carry it, pinned by two lint checks. Found by the first WS7 eval, where the review loop turned
   a six-line check into 25 lines.
 - `engineering.md` Simplicity now names what is never simplified away and the `debt:` marker;
