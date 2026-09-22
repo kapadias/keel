@@ -57,7 +57,7 @@ collect() {
     # a PR-controlled .gitattributes (-diff, binary) must not turn added lines into
     # "Binary files differ".
     # core.quotePath=false: a non-ASCII path arrives as bytes, not as a quoted C string.
-    diff="$(git -c core.quotePath=false diff --no-color --no-ext-diff --text --no-textconv -U0 --no-prefix --no-renames --end-of-options "$range" -- . ':(exclude)*.md' 2>/dev/null)" || {
+    diff="$(git -c core.quotePath=false diff --no-color --no-ext-diff --text --no-textconv -U0 --inter-hunk-context=0 --no-prefix --no-renames --end-of-options "$range" -- . ':(exclude)*.md' 2>/dev/null)" || {
       printf 'check-debt: cannot resolve range %s\n' "$range" >&2; return 2; }
     # rem = added lines still owed by the current hunk (from the @@ header), so an added
     # line that itself begins "++ " is content, never mistaken for the next +++ header.
@@ -82,7 +82,9 @@ collect() {
       case "$p" in -*) paths[i]="./$p" ;; esac   # grep reads "-" as stdin even after --
     done
     for d in "${SKIP_DIRS[@]}"; do args+=("--exclude-dir=$d"); done
-    grep -rnIZE "${args[@]}" --exclude='*.md' -- "$PATTERN" "${paths[@]}" | tr '\0' '\t' | sed 's#^\./##'
+    # -a: a NUL byte must not make a file "binary" and skipped; -H: a single-file operand
+    # still carries its name; LC_ALL=C: an invalid UTF-8 byte must not skip the file either.
+    LC_ALL=C grep -rnHaZE "${args[@]}" --exclude='*.md' -- "$PATTERN" "${paths[@]}" | tr '\0' '\t' | sed 's#^\./##'
     rc=${PIPESTATUS[0]}
     [ "$rc" -le 1 ] || { printf 'check-debt: grep failed (%s)\n' "$rc" >&2; return 2; }
   fi

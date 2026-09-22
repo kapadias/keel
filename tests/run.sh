@@ -256,6 +256,16 @@ printf 't = 9  # %s ceiling, trigger\n' "$M" > "$TMP/src/tab	name.py"
 out="$(cd "$TMP" && bash "$CD" src 2>&1)"; check "check-debt: an unparsable record fails closed" 1 "$?"
 contains "check-debt: an unparsable record is reported" "unparsable" "$out"
 rm -f "$TMP/src/tab	name.py"
+# grep must read every file: a NUL byte or an invalid UTF-8 byte must not make a file
+# "binary" and skipped, and a single-file operand still carries its filename.
+printf 'v = 1  # %s nul byte\n\0\n' "$M" > "$TMP/src/nul.py"
+out="$(cd "$TMP" && bash "$CD" src 2>&1)"; contains "check-debt: a NUL byte does not hide a marker" "src/nul.py:1: no-trigger" "$out"
+printf 'w = 1  # %s bad byte \xff\n' "$M" > "$TMP/src/utf.py"
+out="$(cd "$TMP" && LC_ALL=C.UTF-8 bash "$CD" src 2>&1)"; contains "check-debt: an invalid UTF-8 byte does not hide a marker" "src/utf.py:1: no-trigger" "$out"
+rm -f "$TMP/src/nul.py" "$TMP/src/utf.py"
+printf 'x = 1  # %s single file\n' "$M" > "$TMP/src/single.py"
+out="$(cd "$TMP" && bash "$CD" src/single.py 2>&1)"; contains "check-debt: a single-file operand keeps its filename" "src/single.py:1: no-trigger" "$out"
+rm -f "$TMP/src/single.py"
 # A path argument of exactly '-' is a file, never stdin.
 printf 'u = 1  # %s dash file\n' "$M" > "$TMP/-"
 ( cd "$TMP" && bash "$CD" -- - 2>/dev/null ); check "check-debt: a path named '-' is scanned as a file" 1 "$?"
