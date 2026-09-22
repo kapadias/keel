@@ -58,10 +58,15 @@ release): four feature tasks on a scratch Python service, Claude Sonnet, headles
 sessions, scored on source lines added (tests excluded), tokens, cost and turns behind a hidden
 correctness test.
 
-| arm                         | src LOC | tokens | cost | turns | correct |
-| --------------------------- | ------: | -----: | ---: | ----: | ------: |
-| **before** (v1.0.0 harness) |     TBD |    TBD |  TBD |   TBD |     TBD |
-| **after** (decision ladder) |     TBD |    TBD |  TBD |   TBD |     TBD |
+| arm                         | correct | src LOC (median) | tokens |  cost | turns |
+| --------------------------- | ------: | ---------------: | -----: | ----: | ----: |
+| **before** (v1.0.0 harness) |     8/8 |              7.5 |   545k | $0.24 |  13.5 |
+| **after** (decision ladder) |     8/8 |              8.0 |   587k | $0.51 |  12.4 |
+
+No measurable difference on these tasks: both arms were already lean and every run was correct. The
+one outlier (25 lines, $2.43) came from the review loop inflating a six-line check, not from the
+ladder — the finding that matters. Method, raw rows and what to run next:
+[`docs/benchmarks/2026-09-22-ladder.md`](docs/benchmarks/2026-09-22-ladder.md).
 
 Small n; treat as a smoke signal, not a result. The always-on surface costs about 3% more per turn
 (3,599 → 3,679 words) to buy it.

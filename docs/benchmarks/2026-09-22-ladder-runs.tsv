@@ -1,0 +1,17 @@
+id	rc	hidden	smoke	src_loc	src_files	deps	turns	in_tok	out_tok	cost_usd	wall_s
+t2-after-0	0	pass	ok	6	1	0	14	601144	3510	0.2545	44
+t2-before-0	0	pass	ok	7	1	0	12	491188	3279	0.2234	51
+t1-before-0	0	pass	ok	6	1	0	17	655570	4871	0.2860	74
+t3-before-0	0	pass	ok	8	1	0	11	482264	3137	0.2152	38
+t3-after-0	0	pass	ok	8	1	0	12	535883	4171	0.1731	49
+t4-before-0	0	pass	ok	13	1	0	12	483838	2849	0.2125	41
+t4-after-0	0	pass	ok	13	1	0	12	507388	3173	0.2294	45
+t1-before-1	0	pass	ok	6	1	0	16	649946	4162	0.2754	51
+t1-after-1	0	pass	ok	7	1	0	14	588364	4674	0.2620	56
+t2-before-1	0	pass	ok	6	1	0	17	634339	4312	0.2688	49
+t2-after-1	0	pass	ok	7	1	0	12	547534	4381	0.2518	49
+t3-before-1	0	pass	ok	8	1	0	11	438492	2617	0.1999	39
+t3-after-1	0	pass	ok	8	1	0	11	487464	3088	0.2185	37
+t4-after-1	0	pass	ok	13	1	0	12	534892	3475	0.2325	49
+t4-before-1	0	pass	ok	13	1	0	12	497459	5447	0.2512	70
+t1-after-0	0	pass	ok	25	1	0	12	856431	10688	2.4253	570

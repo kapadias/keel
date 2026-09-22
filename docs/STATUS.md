@@ -59,6 +59,12 @@ release; v1.0.0 is the first tagged artifact.
   benchmark of the decision ladder, filled in from measured runs), How it works with the ladder,
   Install, Commands, Safety & enforcement, Development, FAQ. Content, links and counts unchanged;
   the header nav anchors now point at the renamed sections.
+- **2026-09-22** — First WS7 behavioural eval, the ladder before vs. after
+  (`docs/benchmarks/2026-09-22-ladder.md`): four tasks, Sonnet, n = 8 per arm, hidden tests.
+  **No measurable difference** — 8/8 correct in both arms, median 7.5 vs 8.0 source lines; the
+  v1.0.0 baseline was already lean and no task had an over-build trap. The one outlier was the
+  review loop inflating a six-line email check into a 25-line validator: the simplicity lens must
+  outrank a reviewer's "add a bound" reflex on trivial surfaces, which is the next thing to fix.
 
 - **2026-09-22** — The decision ladder: solution size becomes a rule and a gate (ADR-0008):
   - **Keel governed process, not size.** TDD, review and sync were enforced; how _much_ code to
