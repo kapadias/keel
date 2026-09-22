@@ -246,6 +246,20 @@ printf 'r = 7  # %s ceiling,\r\n' "$M" > "$TMP/src/crlf.py"
 out="$(cd "$TMP" && bash "$CD" src 2>&1)"; contains "check-debt: CRLF cannot turn a bare comma into a trigger" "src/crlf.py:1: no-trigger" "$out"
 rm -f "$TMP/src/crlf.py"
 ( cd "$TMP" && bash "$CD" nosuchdir 2>/dev/null ); check "check-debt: a missing PATH fails closed" 2 "$?"
+# A PR-controlled .gitattributes ('* -diff' / binary) must not hide added lines from --range.
+printf '* -diff\n' > "$TMP/.gitattributes"; printf 's = 8  # %s hidden by attributes\n' "$M" > "$TMP/src/attr.py"
+"${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -qm attrs
+out="$(cd "$TMP" && bash "$CD" --range main...HEAD 2>&1)"; contains "check-debt: --range sees through a -diff gitattribute" "src/attr.py:1: no-trigger" "$out"
+rm -f "$TMP/.gitattributes" "$TMP/src/attr.py"; "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -qm noattrs
+# A record the classifier cannot parse (a TAB in the file name) counts as a failure, not a skip.
+printf 't = 9  # %s ceiling, trigger\n' "$M" > "$TMP/src/tab	name.py"
+out="$(cd "$TMP" && bash "$CD" src 2>&1)"; check "check-debt: an unparsable record fails closed" 1 "$?"
+contains "check-debt: an unparsable record is reported" "unparsable" "$out"
+rm -f "$TMP/src/tab	name.py"
+# A path argument of exactly '-' is a file, never stdin.
+printf 'u = 1  # %s dash file\n' "$M" > "$TMP/-"
+( cd "$TMP" && bash "$CD" -- - 2>/dev/null ); check "check-debt: a path named '-' is scanned as a file" 1 "$?"
+rm -f "$TMP/-"
 ( cd "$ROOT" && bash "$CD" 2>/dev/null ); check "check-debt: Keel's own tree carries no untriggered marker" 0 "$?"
 rm -rf "$TMP" "$EMPTY"
 
@@ -431,9 +445,17 @@ contains "subagent-start: no-jq fallback still carries the constitution" "The th
 rm -f "$NOJQ/awk"
 out="$(printf '{}' | PATH="$NOJQ" CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$SA" 2>/dev/null)"; check "subagent-start: no-jq, no-awk exits 0" 0 "$?"
 check "subagent-start: no-jq, no-awk emits nothing instead of an empty carrier" "" "$out"
+# Backslashes and quotes in the carrier must survive the awk escaper on any awk.
+ln -sf "$(command -v awk)" "$NOJQ/awk"
+BQ="$(mktemp -d)"; mkdir -p "$BQ/hooks" "$BQ/rules"; cp "$HOOKS/require-status-sync.sh" "$BQ/hooks/"
+printf '# Core\nsay "hi" and C:\\path\\ end\\\n' > "$BQ/rules/00-core.md"
+out="$(printf '{}' | PATH="$NOJQ" CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$BQ" "$SA")"
+dec="$(printf '%s' "$out" | python3 -c 'import json,sys; print(json.load(sys.stdin)["hookSpecificOutput"]["additionalContext"])' 2>/dev/null)"; check "subagent-start: no-jq fallback with backslashes and quotes is valid JSON" 0 "$?"
+contains "subagent-start: no-jq fallback round-trips a backslash and a quote" 'say "hi" and C:\path\ end\' "$dec"
+rm -rf "$BQ"
 # A control character in the carrier must not break the JSON.
 CTL="$(mktemp -d)"; mkdir -p "$CTL/hooks" "$CTL/rules"; cp "$HOOKS/require-status-sync.sh" "$CTL/hooks/"
-printf '# Core\x01 with\x1b control\n' > "$CTL/rules/00-core.md"; ln -s "$(command -v awk)" "$NOJQ/awk"
+printf '# Core\x01 with\x1b control\n' > "$CTL/rules/00-core.md"; ln -sf "$(command -v awk)" "$NOJQ/awk"
 out="$(printf '{}' | PATH="$NOJQ" CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$CTL" "$SA")"
 printf '%s' "$out" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; check "subagent-start: no-jq fallback survives control characters" 0 "$?"
 rm -rf "$CTL"

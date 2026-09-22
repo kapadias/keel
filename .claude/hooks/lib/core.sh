@@ -55,7 +55,7 @@ keel_emit_context() {
   # from non-empty input — emit nothing and say so, never an empty, silent carrier.
   esc="$(printf '%s' "$text" \
     | tr -d '\000-\010\013\014\016-\037' \
-    | awk '{ gsub(/\\/, "\\\\"); gsub(/"/, "\\\""); gsub(/\t/, "\\t"); gsub(/\r/, "\\r")
+    | awk '{ gsub(/\\/, "\\\\\\\\"); gsub(/"/, "\\\""); gsub(/\t/, "\\t"); gsub(/\r/, "\\r")
             if (NR > 1) printf "\\n"; printf "%s", $0 }' 2>/dev/null)"
   if [ -n "$text" ] && [ -z "$esc" ]; then
     printf 'keel: cannot emit %s context without jq or awk\n' "$event" >&2

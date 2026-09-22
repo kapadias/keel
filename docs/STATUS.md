@@ -99,7 +99,10 @@ release; v1.0.0 is the first tagged artifact.
     records, `\r` trimmed); a missing PATH exited 0 (now 2); and the no-jq emitter dropped the
     whole carrier without `awk` while the golden tests, missing `awk` too, passed on the empty
     string — the escaper is now awk-only with C0 bytes stripped, emits nothing rather than an
-    empty carrier, and the fixtures link `awk` and assert the content.
+    empty carrier, and the fixtures link `awk` and assert the content. A second round found a
+    PR-controlled `.gitattributes` (`* -diff`) hiding added lines from the range gate
+    (`--text --no-textconv`), unparsable records being skipped instead of failed, a path named
+    `-` read as stdin, and the awk escaper collapsing `\\` to one backslash — each now pinned.
   - **Rejected:** intensity modes (a flag file the model writes with no gate in front of it) and
     installing the source's own plugin alongside Keel (its test and report rules contradict
     `testing.md` and the four-line report). **Expected effect is an estimate, not a measurement:**

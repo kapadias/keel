@@ -53,9 +53,11 @@ collect() {
     local diff
     # --end-of-options: the range is data, never a git option (--output=<path> would write
     # the diff over any file from a pre-approved gate call). --no-color/--no-ext-diff: user
-    # config must not hide the +++ headers or replace the diff we parse.
+    # config must not hide the +++ headers or replace the diff we parse. --text/--no-textconv:
+    # a PR-controlled .gitattributes (-diff, binary) must not turn added lines into
+    # "Binary files differ".
     # core.quotePath=false: a non-ASCII path arrives as bytes, not as a quoted C string.
-    diff="$(git -c core.quotePath=false diff --no-color --no-ext-diff -U0 --no-prefix --no-renames --end-of-options "$range" -- . ':(exclude)*.md' 2>/dev/null)" || {
+    diff="$(git -c core.quotePath=false diff --no-color --no-ext-diff --text --no-textconv -U0 --no-prefix --no-renames --end-of-options "$range" -- . ':(exclude)*.md' 2>/dev/null)" || {
       printf 'check-debt: cannot resolve range %s\n' "$range" >&2; return 2; }
     # rem = added lines still owed by the current hunk (from the @@ header), so an added
     # line that itself begins "++ " is content, never mistaken for the next +++ header.
@@ -73,8 +75,11 @@ collect() {
       /^\+\+\+ / { file = substr($0, 5); sub(/\t$/, "", file); rem = 0; next }'
   else
     local args=() d p rc
-    for p in "${paths[@]}"; do
+    local i
+    for i in "${!paths[@]}"; do
+      p="${paths[$i]}"
       [ -e "$p" ] || { printf 'check-debt: no such path %s\n' "$p" >&2; return 2; }
+      case "$p" in -*) paths[i]="./$p" ;; esac   # grep reads "-" as stdin even after --
     done
     for d in "${SKIP_DIRS[@]}"; do args+=("--exclude-dir=$d"); done
     grep -rnIZE "${args[@]}" --exclude='*.md' -- "$PATTERN" "${paths[@]}" | tr '\0' '\t' | sed 's#^\./##'
@@ -89,12 +94,13 @@ hits="$(collect)"; rc=$?
 
 # Classify: split the marker text at the first comma; both halves must be non-empty.
 rows="$(printf '%s\n' "$hits" | awk -v pat="$PATTERN" '
+  /^$/ { next }
   {
-    t = index($0, "\t"); if (t == 0) next
-    file = substr($0, 1, t - 1); rest = substr($0, t + 1)
-    c = index(rest, ":"); if (c == 0) next
-    ln = substr(rest, 1, c - 1); rest = substr(rest, c + 1)
-    if (ln !~ /^[0-9]+$/) next
+    # A record that does not parse (a tab in the file name) is a failure, never a skip:
+    # a gate that drops what it cannot read fails open.
+    t = index($0, "\t"); file = (t ? substr($0, 1, t - 1) : $0); rest = (t ? substr($0, t + 1) : "")
+    c = index(rest, ":"); ln = (c ? substr(rest, 1, c - 1) : ""); rest = (c ? substr(rest, c + 1) : "")
+    if (t == 0 || c == 0 || ln !~ /^[0-9]+$/) { printf "%s\t0\t0\tunparsable record\t\n", file; next }
     if (!match(rest, pat)) next
     text = substr(rest, RSTART + RLENGTH); sub(/\r$/, "", text)
     i = index(text, ",")
