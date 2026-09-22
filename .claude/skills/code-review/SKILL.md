@@ -52,12 +52,15 @@ One finding = **`path:line` + the problem in one sentence + a concrete fix.** Ma
 original_charge` at the handler edge and reject otherwise.
 
 Bad finding: "error handling could be improved here." No location, no defect, no fix — noise.
+A finding whose `fix` **adds** code states the failing input in `issue`; without one it is a
+question, not a MEDIUM.
 
 ## What NOT to flag
 
 Signal dies in a flood of nits. Skip subjective style a formatter/linter already owns, restyling that
-fights the local idiom — and never ask for speculative "what if we later need…" generality; when the
-diff _adds_ it, that is a Complexity finding.
+fights the local idiom, speculative hardening (RFC-grade validation, limits, i18n cases) on a
+surface the task did not make critical — and never ask for speculative "what if we later need…"
+generality; when the diff _adds_ it, that is a Complexity finding.
 Prefer **fewer, high-confidence findings**. If unsure it's a real defect, mark it as a _question_, not
 a blocker — ten weak findings bury the one that matters.
 

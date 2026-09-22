@@ -72,7 +72,8 @@ references that do not exist, domain-specific vocabulary in a domain-agnostic
 harness, malformed plugin manifests, five token budgets (CLAUDE.md, per-rule,
 total always-on, `00-core.md`'s SessionStart-channel size, and the combined
 skill/agent description metadata), a ladder rung missing from either of its two
-copies, `/review` or `/sync` no longer wiring `check-debt.sh`, and an adapted
+copies, `/review` or `/sync` no longer wiring `check-debt.sh`, the review-inflation
+rule dropping out of `dev-process.md` or the severity rubric, and an adapted
 project's name anywhere but `README.md`.
 
 ### The linter is itself a gate

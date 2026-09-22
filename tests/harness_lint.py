@@ -15,6 +15,8 @@ Every check below fails the build (boundaries.md: deterministic gates decide):
   - the ladder: the seven rung keywords appear in both 00-core.md (always-on)
     and skills/lean/SKILL.md (depth), so the two copies cannot drift (ADR-0008).
   - debt gate wiring: /review and /sync invoke check-debt.sh (ADR-0008).
+  - review inflation: dev-process §4 and the severity rubric keep the rule that a
+    review ask which adds code must name a failing input (ADR-0008).
 
 KEEL_LINT_ROOT points the linter at a different tree. It exists so tests/run.sh
 can golden-test the linter itself against mutated copies of this repo — a linter
@@ -313,6 +315,21 @@ for md in glob.glob(f"{ROOT}/.claude/**/*.md", recursive=True):
         for n, line in enumerate(fh, 1):
             if DENY.search(line):
                 bad(f"{md}:{n}: domain-specific term in a domain-agnostic harness")
+
+# --- review inflation: the review loop must not un-size what the ladder sized ---
+# The first WS7 eval's outlier: a six-line check became 25 lines because every MEDIUM
+# was built. dev-process §4 and the rubric carry the rule; pin the load-bearing phrases.
+for rel, phrase in (
+    (".claude/rules/dev-process.md", "names a failing case"),
+    (".claude/skills/code-review/references/severity-rubric.md", "Does the fix add code?"),
+):
+    path = os.path.join(ROOT, rel)
+    try:
+        with open(path, encoding="utf-8") as fh:
+            if phrase not in fh.read():
+                bad(f"{rel}: missing '{phrase}' — a review ask that adds code must name a failing input (ADR-0008)")
+    except FileNotFoundError:
+        bad(f"review-inflation rule: missing {rel}")
 
 # --- external names: credit lives in README.md and nowhere else ---
 # Keel adapts ideas from other projects; the credit line in the root README is the

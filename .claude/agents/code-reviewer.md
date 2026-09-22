@@ -71,3 +71,5 @@ wrong. Do not wrap it in extra prose or a second code fence.
 - Read-only: you may run tests/linters to verify a suspicion, but you do not edit the code.
 - Be specific and falsifiable. "This could be cleaner" is noise; "this drops the error on line 42 and
   returns a partial result" is signal. Prefer fewer, higher-confidence findings over a long list.
+- Before asking for more code, climb the ladder on your own fix: if the smallest correct answer is
+  already in the diff, the finding is a question, not a MEDIUM. Name the failing input or drop it.

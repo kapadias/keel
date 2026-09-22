@@ -83,6 +83,8 @@ L15: shrink:  manual loop building a dict from two lists. `dict(zip(keys, values
 ```
 
 Close with `net: -<N> lines possible.` when findings exist, or `Lean already. Ship.` when none do.
+The tags apply to review asks too: a reviewer's speculative bound or i18n case with no failing input
+is `yagni:` — answer it with a `debt:` marker, not code.
 These findings carry `category: simplicity` and are **MEDIUM at most** — size never outranks
 correctness or security.
 

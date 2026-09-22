@@ -728,5 +728,18 @@ printf '\nCredit: pony%s.\n' 'tail' >> "$FX/README.md"
 KEEL_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: README.md may credit the external project" 0 "$?"
 rm -rf "$FX"
 
+# The review loop must not un-size what the ladder sized: a MEDIUM that only adds code is
+# answered with a debt marker, and a finding whose fix adds code names a failing input.
+FX="$(lint_fixture)"
+sed -i 's/names a failing case/is convenient/' "$FX/.claude/rules/dev-process.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks dev-process losing the MEDIUM-names-a-failing-case rule" 1 "$?"
+contains "lint: names dev-process for the review-inflation rule" "dev-process.md" "$out"
+rm -rf "$FX"
+FX="$(lint_fixture)"
+sed -i 's/Does the fix add code?/Is it nice?/' "$FX/.claude/skills/code-review/references/severity-rubric.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks the rubric losing the adds-code calibration" 1 "$?"
+contains "lint: names the rubric for the review-inflation rule" "severity-rubric.md" "$out"
+rm -rf "$FX"
+
 printf '\n%s passed, %s failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

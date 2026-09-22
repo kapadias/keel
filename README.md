@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <strong>216 golden tests &middot; 9 blocking gates over 7 hook events &middot; ~7.1k always-on tokens &middot; every review verdict machine-checked</strong><br>
+  <strong>220 golden tests &middot; 9 blocking gates over 7 hook events &middot; ~7.1k always-on tokens &middot; every review verdict machine-checked</strong><br>
   <sub>These are not claims in prose — they are numbers CI proves. `tests/run.sh` counts the golden
   tests, `tests/harness_lint.py` fails the build if a doc drifts from that count or the token
   budget, and `check-review.sh` rejects any reviewer output that isn't a parseable verdict.</sub>

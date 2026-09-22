@@ -39,3 +39,5 @@ test into correct, reviewable code.
 - If the spec or test is ambiguous or looks wrong, stop and say so — do not implement a guess.
 - Never silently swallow an error in code that touches money, data, or state.
 - Never weaken or delete a test to make a build pass. If a test is wrong, fix it deliberately and say so.
+- A review ask that adds code with no failing input named gets a `debt:` marker with its trigger, and a
+  line under Remaining risk — not the code. The ladder sizes the fix as much as the first draft.

@@ -54,6 +54,16 @@ release; v1.0.0 is the first tagged artifact.
 
 ## Recently changed
 
+- **2026-09-22** — The simplicity lens now binds in review (from the first eval's outlier):
+  - **A review ask that adds code must name a failing input.** The rubric gains the calibration
+    question "Does the fix add code?"; `code-review` treats speculative hardening (RFC-grade
+    validation, limits, i18n cases on a surface the task did not make critical) as a question, not
+    a MEDIUM; `code-reviewer` climbs the ladder on its own fix before asking; `dev-process.md` §4
+    now reads "fix MEDIUM when it names a failing case; one that only adds code without one gets a
+    `debt:` marker, not the code"; `implementer` answers such asks with the marker and a Remaining
+    risk line. Two lint pins with failing-case tests keep the rule in place. Always-on prose
+    3,679 → 3,695 words.
+
 - **2026-09-22** — README restructured on the outline of the project credited in its Credits
   section: a centred header with the CI-proven claims, Before / after, Numbers (a small before/after
   benchmark of the decision ladder, filled in from measured runs), How it works with the ladder,

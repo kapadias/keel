@@ -87,3 +87,13 @@ subagents, so the hook emits nothing there and never pays twice.
   tickets, scoring source LOC, tokens, cost, and turns, behind a correctness and safety gate.
 
 The source of these ideas is credited in `README.md`.
+
+## Amendment (2026-09-22) — the lens must bind in review
+
+The first WS7 eval (`../benchmarks/2026-09-22-ladder.md`) found no difference between arms on plain
+tasks and one outlier where the review loop, not the first draft, inflated a six-line check into
+25 lines: every MEDIUM was built because §4 said "fix MEDIUM when feasible". The ladder now applies
+to the reviewer's ask: a finding whose fix adds code must name the input that reaches the bad path
+today, and a MEDIUM without one is answered with a `debt:` marker rather than code. Two lint pins
+hold the rule. A deterministic inflation gate (diff size before vs. after review) is the upgrade
+path if the second eval shows prose is not enough.
