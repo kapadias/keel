@@ -12,7 +12,7 @@ takes the full loop below; when in doubt, the full loop (see the `fast-lane` ski
 
 Climb the ladder ([00-core.md](./00-core.md)): this codebase, the stdlib, the platform, an
 installed dependency — then a maintained library when it covers ≥80% of the need. For **parsing,
-dates, crypto, auth** it is always the library: hand-rolling those is a security risk, not a flex.
+dates, crypto, auth** it is always the library: hand-rolling those is a security risk.
 Confirm API behavior against current docs, not memory; capture non-obvious findings as an ADR
 (`/adr`) or a `docs/` note.
 
@@ -23,8 +23,7 @@ steps. **State the assumptions you are coding under.** If the request admits mor
 interpretation, present them and ask — never pick silently; push back when the requested approach
 looks wrong, and **stop when confused**: "this seems off" beats plausible-looking wrong code. For
 anything spanning multiple modules, write the plan down before coding (`/plan`). Name what could
-break and how you will know. A plan that fits in your head is fine; a plan that doesn't must be on
-disk.
+break and how you will know. A plan that fits in your head is fine; one that doesn't goes on disk.
 
 ## 2. TDD — RED → GREEN → REFACTOR
 
@@ -39,7 +38,7 @@ failures. Make the change look like it belongs in the file.
 ## 4. Review
 
 Run `/review` before merge. Address every **CRITICAL** and **HIGH** finding; fix **MEDIUM** when it
-names a failing case; one that only adds code without one gets a `debt:` marker, not the code. Changes that touch auth, data, money, or anything outward-facing also get a security pass.
+names a failing case; one that only adds code without one gets a `debt:` marker instead. Changes that touch auth, data, money, or anything outward-facing also get a security pass.
 
 ## 5. Verify
 

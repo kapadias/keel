@@ -62,7 +62,7 @@ release; v1.0.0 is the first tagged artifact.
     now reads "fix MEDIUM when it names a failing case; one that only adds code without one gets a
     `debt:` marker, not the code"; `implementer` answers such asks with the marker and a Remaining
     risk line. Two lint pins with failing-case tests keep the rule in place. Always-on prose
-    3,679 → 3,695 words.
+    3,679 → 3,690 words.
 
 - **2026-09-22** — README restructured on the outline of the project credited in its Credits
   section: a centred header with the CI-proven claims, Before / after, Numbers (a small before/after
