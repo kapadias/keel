@@ -49,14 +49,19 @@ keel_emit_context() {
       '{hookSpecificOutput: {hookEventName: $e, additionalContext: $c}}'
     return 0
   fi
-  # Order matters: backslashes first, then quotes; tab/CR become escapes; every other
-  # C0 control byte is dropped (JSON forbids them raw, and none carries meaning here);
-  # newlines are joined last. If the pipeline cannot run (no awk) it yields nothing
+  # Character by character with plain string literals: gsub replacement strings treat
+  # backslashes differently in mawk and gawk, and a JSON escaper cannot afford that.
+  # Tab/CR become escapes; every other C0 control byte is dropped (JSON forbids them raw,
+  # and none carries meaning here); newlines are joined last. If the pipeline cannot run (no awk) it yields nothing
   # from non-empty input — emit nothing and say so, never an empty, silent carrier.
   esc="$(printf '%s' "$text" \
     | tr -d '\000-\010\013\014\016-\037' \
-    | awk '{ gsub(/\\/, "\\\\\\\\"); gsub(/"/, "\\\""); gsub(/\t/, "\\t"); gsub(/\r/, "\\r")
-            if (NR > 1) printf "\\n"; printf "%s", $0 }' 2>/dev/null)"
+    | awk '{ out = ""
+             for (i = 1; i <= length($0); i++) { c = substr($0, i, 1)
+               if (c == "\\") c = "\\\\"; else if (c == "\"") c = "\\\""
+               else if (c == "\t") c = "\\t"; else if (c == "\r") c = "\\r"
+               out = out c }
+             if (NR > 1) printf "\\n"; printf "%s", out }' 2>/dev/null)"
   if [ -n "$text" ] && [ -z "$esc" ]; then
     printf 'keel: cannot emit %s context without jq or awk\n' "$event" >&2
     return 0

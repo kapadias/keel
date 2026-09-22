@@ -105,7 +105,10 @@ release; v1.0.0 is the first tagged artifact.
     `-` read as stdin, and the awk escaper collapsing `\\` to one backslash — each now pinned.
     The tree scan now reads every file (`grep -a` under `LC_ALL=C`, `-H`): a NUL byte, an
     invalid UTF-8 byte or a single-file operand no longer hides a marker, and a path containing a
-    tab or newline (which could forge a record) is refused outright.
+    tab or newline (which could forge a record) is refused outright. The no-jq escaper is
+    built character by character with plain string literals, because `gsub` replacement
+    strings treat backslashes differently in mawk, BWK awk and gawk — observed under real mawk
+    and gawk, after discovering the host's `mawk` had been swapped for a gawk wrapper mid-review.
   - **Rejected:** intensity modes (a flag file the model writes with no gate in front of it) and
     installing the source's own plugin alongside Keel (its test and report rules contradict
     `testing.md` and the four-line report). **Expected effect is an estimate, not a measurement:**
