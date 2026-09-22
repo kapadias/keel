@@ -216,6 +216,36 @@ printf 'w = 4  # %s cache never expires\n' "$M" >> "$TMP/src/new.py"
 out="$(cd "$TMP" && bash "$CD" --range main...HEAD 2>&1)"; check "check-debt: --range blocks a new no-trigger marker" 1 "$?"
 contains "check-debt: --range names path:line of the new offender" "src/new.py:2" "$out"
 ( cd "$TMP" && bash "$CD" --range nosuchref...HEAD 2>/dev/null ); check "check-debt: unresolvable range fails closed" 2 "$?"
+# An option-shaped range must never reach git: --output=<path> would write the diff over any
+# file, exec bit intact, from a pre-approved gate call (security review, 2026-09-22).
+printf 'keep\n' > "$TMP/victim.sh"
+( cd "$TMP" && bash "$CD" --range=--output=victim.sh 2>/dev/null ); check "check-debt: option-shaped --range= fails closed" 2 "$?"
+check "check-debt: option-shaped range wrote nothing" "keep" "$(cat "$TMP/victim.sh")"
+( cd "$TMP" && bash "$CD" --range --stat 2>/dev/null ); check "check-debt: option-shaped --range fails closed" 2 "$?"
+( cd "$TMP" && bash "$CD" --range '' 2>/dev/null ); check "check-debt: empty range fails closed" 2 "$?"
+# User git config must not turn the gate off: colour hides the +++ headers, an external diff
+# replaces the output entirely.
+( cd "$TMP" && git config --local color.diff always && git config --local diff.external /bin/true && bash "$CD" --range main...HEAD 2>/dev/null ); check "check-debt: --range ignores colour and external-diff config" 1 "$?"
+( cd "$TMP" && git config --local --unset color.diff && git config --local --unset diff.external )
+# A colon in the path must not let a trigger-less marker pass as well-formed.
+mkdir -p "$TMP/src/a:1:x, y"; printf 'v = 5  # %s no trigger here\n' "$M" > "$TMP/src/a:1:x, y/z.py"
+( cd "$TMP" && bash "$CD" src 2>/dev/null ); check "check-debt: a colon in the path cannot forge a trigger" 1 "$?"
+rm -rf "$TMP/src/a:1:x, y"
+# A space in the path makes git append a TAB to the +++ header; the columns must not shift.
+printf 'q = 6  # %s no trigger\n' "$M" > "$TMP/src/my file.py"
+"${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -qm spaced
+out="$(cd "$TMP" && bash "$CD" --range main...HEAD 2>&1)"; contains "check-debt: --range names a marker in a path with a space" "src/my file.py:1: no-trigger" "$out"
+rm -f "$TMP/src/my file.py"; "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -qm unspaced
+# An added line that begins '++ ' shows as '+++ ' in the diff and is content, not a header.
+printf '++ x  # %s no trigger\ny = 1\n' "$M" > "$TMP/src/plus.txt"
+"${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -qm plus
+out="$(cd "$TMP" && bash "$CD" --range main...HEAD 2>&1)"; contains "check-debt: --range does not mistake a '++ ' content line for a header" "src/plus.txt:1: no-trigger" "$out"
+rm -f "$TMP/src/plus.txt"; "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -qm noplus
+# CRLF: a trailing comma followed by \r is still no trigger.
+printf 'r = 7  # %s ceiling,\r\n' "$M" > "$TMP/src/crlf.py"
+out="$(cd "$TMP" && bash "$CD" src 2>&1)"; contains "check-debt: CRLF cannot turn a bare comma into a trigger" "src/crlf.py:1: no-trigger" "$out"
+rm -f "$TMP/src/crlf.py"
+( cd "$TMP" && bash "$CD" nosuchdir 2>/dev/null ); check "check-debt: a missing PATH fails closed" 2 "$?"
 ( cd "$ROOT" && bash "$CD" 2>/dev/null ); check "check-debt: Keel's own tree carries no untriggered marker" 0 "$?"
 rm -rf "$TMP" "$EMPTY"
 
@@ -390,12 +420,23 @@ contains "subagent-start: plugin install carries the ladder" "YAGNI" "$out"
 printf '%s' "$out" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; check "subagent-start: plugin output is valid JSON" 0 "$?"
 out="$(sleep 3 | CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" timeout 2 "$SA")"; check "subagent-start: never waits on stdin" 0 "$?"
 NOJQ="$(mktemp -d)"
-for b in bash sh env cat grep sed head tr dirname; do
+for b in bash sh env cat grep sed head tr dirname awk; do
   p="$(command -v "$b" 2>/dev/null || true)"
   if [ -n "$p" ]; then ln -s "$p" "$NOJQ/$b" 2>/dev/null || true; fi
 done
 out="$(printf '{}' | PATH="$NOJQ" CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$SA")"
 printf '%s' "$out" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; check "subagent-start: no-jq fallback is still valid JSON" 0 "$?"
+contains "subagent-start: no-jq fallback still carries the constitution" "The three principles" "$out"
+# Without awk the escaper cannot run: emit nothing rather than an empty (valid, silent) carrier.
+rm -f "$NOJQ/awk"
+out="$(printf '{}' | PATH="$NOJQ" CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$SA" 2>/dev/null)"; check "subagent-start: no-jq, no-awk exits 0" 0 "$?"
+check "subagent-start: no-jq, no-awk emits nothing instead of an empty carrier" "" "$out"
+# A control character in the carrier must not break the JSON.
+CTL="$(mktemp -d)"; mkdir -p "$CTL/hooks" "$CTL/rules"; cp "$HOOKS/require-status-sync.sh" "$CTL/hooks/"
+printf '# Core\x01 with\x1b control\n' > "$CTL/rules/00-core.md"; ln -s "$(command -v awk)" "$NOJQ/awk"
+out="$(printf '{}' | PATH="$NOJQ" CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$CTL" "$SA")"
+printf '%s' "$out" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; check "subagent-start: no-jq fallback survives control characters" 0 "$?"
+rm -rf "$CTL"
 rm -rf "$NOJQ" "$TMP"
 TMP="$(mktemp -d)"; mkdir -p "$TMP/.claude/hooks" "$TMP/.claude/rules"
 cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"; cp "$ROOT/.claude/rules/00-core.md" "$TMP/.claude/rules/"
@@ -406,7 +447,7 @@ NOH="$(mktemp -d)"; printf '{}' | CLAUDE_PROJECT_DIR="$NOH" "$SA" >/dev/null; ch
 # The shared emitter also fixed session-start's no-jq fallback, which embedded raw newlines.
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 NOJQ="$(mktemp -d)"
-for b in bash sh env cat grep sed head tr dirname ln cp readlink pwd mkdir; do
+for b in bash sh env cat grep sed head tr dirname ln cp readlink pwd mkdir awk; do
   p="$(command -v "$b" 2>/dev/null || true)"
   if [ -n "$p" ]; then ln -s "$p" "$NOJQ/$b" 2>/dev/null || true; fi
 done

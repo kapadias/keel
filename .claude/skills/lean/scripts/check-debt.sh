@@ -24,12 +24,12 @@ SKIP_DIRS=(.git node_modules dist build target vendor .venv venv __pycache__ cov
 
 usage() { sed -n '10,17p' "$0" >&2; exit 2; }
 
-ledger=0; range=""; paths=()
+ledger=0; range=""; range_given=0; paths=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --ledger) ledger=1 ;;
-    --range) [ $# -ge 2 ] || usage; range="$2"; shift ;;
-    --range=*) range="${1#--range=}" ;;
+    --range) [ $# -ge 2 ] || usage; range="$2"; range_given=1; shift ;;
+    --range=*) range="${1#--range=}"; range_given=1 ;;
     -h|--help) usage ;;
     --) shift; paths+=("$@"); break ;;
     -*) printf 'check-debt: unknown option %s\n' "$1" >&2; usage ;;
@@ -38,25 +38,48 @@ while [ $# -gt 0 ]; do
   shift
 done
 [ ${#paths[@]} -gt 0 ] || paths=(.)
+# A range is data: empty or option-shaped (leading '-') is a usage error, never git's problem.
+if [ "$range_given" -eq 1 ]; then
+  case "$range" in ''|-*) printf 'check-debt: --range needs a git range, got %s\n' "'$range'" >&2; exit 2 ;; esac
+fi
 
-# Collect candidate lines as  path:line:text  — one source per mode.
+# Collect candidate lines as  path<TAB>line:text  — one source per mode. A tab, not a
+# colon, separates the path: a path may contain colons, and a crafted one could otherwise
+# smuggle a fake ", trigger" into the classifier.
 collect() {
   if [ -n "$range" ]; then
     git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
       printf 'check-debt: --range needs a git repository\n' >&2; return 2; }
     local diff
-    diff="$(git diff -U0 --no-prefix --no-renames "$range" -- . ':(exclude)*.md' 2>/dev/null)" || {
+    # --end-of-options: the range is data, never a git option (--output=<path> would write
+    # the diff over any file from a pre-approved gate call). --no-color/--no-ext-diff: user
+    # config must not hide the +++ headers or replace the diff we parse.
+    # core.quotePath=false: a non-ASCII path arrives as bytes, not as a quoted C string.
+    diff="$(git -c core.quotePath=false diff --no-color --no-ext-diff -U0 --no-prefix --no-renames --end-of-options "$range" -- . ':(exclude)*.md' 2>/dev/null)" || {
       printf 'check-debt: cannot resolve range %s\n' "$range" >&2; return 2; }
+    # rem = added lines still owed by the current hunk (from the @@ header), so an added
+    # line that itself begins "++ " is content, never mistaken for the next +++ header.
+    # git appends a TAB to a +++ header whose path contains a space; strip it.
     printf '%s\n' "$diff" | awk -v pat="$PATTERN" '
-      /^\+\+\+ / { file = substr($0, 5); next }
-      /^--- /    { next }
-      /^@@/      { if (match($0, /\+[0-9]+/)) ln = substr($0, RSTART + 1, RLENGTH - 1) + 0; next }
-      /^\+/      { if (file != "/dev/null" && substr($0, 2) ~ pat) printf "%s:%d:%s\n", file, ln, substr($0, 2); ln++ }'
+      /^@@/ {
+        ln = 0; rem = 1
+        if (match($0, /\+[0-9]+(,[0-9]+)?/)) {
+          r = substr($0, RSTART + 1, RLENGTH - 1); c = index(r, ",")
+          ln = (c ? substr(r, 1, c - 1) : r) + 0; rem = (c ? substr(r, c + 1) : 1) + 0
+        }
+        next
+      }
+      rem > 0 && /^\+/ { if (file != "/dev/null" && substr($0, 2) ~ pat) printf "%s\t%d:%s\n", file, ln, substr($0, 2); ln++; rem--; next }
+      /^\+\+\+ / { file = substr($0, 5); sub(/\t$/, "", file); rem = 0; next }'
   else
-    local args=()
-    local d
+    local args=() d p rc
+    for p in "${paths[@]}"; do
+      [ -e "$p" ] || { printf 'check-debt: no such path %s\n' "$p" >&2; return 2; }
+    done
     for d in "${SKIP_DIRS[@]}"; do args+=("--exclude-dir=$d"); done
-    grep -rnIE "${args[@]}" --exclude='*.md' -- "$PATTERN" "${paths[@]}" 2>/dev/null | sed 's#^\./##'
+    grep -rnIZE "${args[@]}" --exclude='*.md' -- "$PATTERN" "${paths[@]}" | tr '\0' '\t' | sed 's#^\./##'
+    rc=${PIPESTATUS[0]}
+    [ "$rc" -le 1 ] || { printf 'check-debt: grep failed (%s)\n' "$rc" >&2; return 2; }
   fi
   return 0
 }
@@ -65,12 +88,15 @@ hits="$(collect)"; rc=$?
 [ "$rc" -eq 0 ] || exit "$rc"
 
 # Classify: split the marker text at the first comma; both halves must be non-empty.
-rows="$(printf '%s\n' "$hits" | awk -v pat="$PATTERN" -F: '
-  NF < 3 { next }
+rows="$(printf '%s\n' "$hits" | awk -v pat="$PATTERN" '
   {
-    file = $1; ln = $2; rest = substr($0, length(file) + length(ln) + 3)
+    t = index($0, "\t"); if (t == 0) next
+    file = substr($0, 1, t - 1); rest = substr($0, t + 1)
+    c = index(rest, ":"); if (c == 0) next
+    ln = substr(rest, 1, c - 1); rest = substr(rest, c + 1)
+    if (ln !~ /^[0-9]+$/) next
     if (!match(rest, pat)) next
-    text = substr(rest, RSTART + RLENGTH)
+    text = substr(rest, RSTART + RLENGTH); sub(/\r$/, "", text)
     i = index(text, ",")
     ceiling = (i > 0) ? substr(text, 1, i - 1) : text
     trigger = (i > 0) ? substr(text, i + 1) : ""

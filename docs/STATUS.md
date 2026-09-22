@@ -89,6 +89,17 @@ release; v1.0.0 is the first tagged artifact.
     in both ladder copies (they differ in depth by design); `/review` and `/sync` must invoke
     `check-debt.sh`; and the project whose ideas were adapted here is credited in `README.md` and
     named nowhere else in the harness.
+  - **Adversarial self-review (code + security, concurrent) found and fixed, each with a golden
+    test:** `--range` reached `git diff` unvalidated, so `--range=--output=<path>` from a
+    pre-approved gate call could overwrite an executable hook and pass the gate (now rejected
+    when option-shaped, and passed after `--end-of-options`); `color.diff=always` or
+    `diff.external` made the range gate fail open (`--no-color --no-ext-diff`); a space in a path
+    shifted the columns and a `++ ` content line read as a header (hunk lengths tracked, trailing
+    tab stripped); a colon in a path or a CRLF ending could forge a trigger (tab-delimited
+    records, `\r` trimmed); a missing PATH exited 0 (now 2); and the no-jq emitter dropped the
+    whole carrier without `awk` while the golden tests, missing `awk` too, passed on the empty
+    string — the escaper is now awk-only with C0 bytes stripped, emits nothing rather than an
+    empty carrier, and the fixtures link `awk` and assert the content.
   - **Rejected:** intensity modes (a flag file the model writes with no gate in front of it) and
     installing the source's own plugin alongside Keel (its test and report rules contradict
     `testing.md` and the four-line report). **Expected effect is an estimate, not a measurement:**

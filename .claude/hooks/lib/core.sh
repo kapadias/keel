@@ -6,6 +6,9 @@
 # keel_harness_root
 #   Prints the harness root: the project's own .claude/ in a standalone checkout,
 #   ${CLAUDE_PLUGIN_ROOT} under a plugin install, nothing when neither is found.
+#   The project wins on purpose: a repo that ships its own .claude/ is the copy-in
+#   install, and its rules/ already load natively. The carrier only ever injects
+#   00-core.md from the resolved root, never arbitrary project content.
 #   Runs from the project directory.
 keel_harness_root() {
   if [ -f ".claude/hooks/require-status-sync.sh" ]; then
@@ -46,8 +49,17 @@ keel_emit_context() {
       '{hookSpecificOutput: {hookEventName: $e, additionalContext: $c}}'
     return 0
   fi
+  # Order matters: backslashes first, then quotes; tab/CR become escapes; every other
+  # C0 control byte is dropped (JSON forbids them raw, and none carries meaning here);
+  # newlines are joined last. If the pipeline cannot run (no awk) it yields nothing
+  # from non-empty input — emit nothing and say so, never an empty, silent carrier.
   esc="$(printf '%s' "$text" \
-    | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\t/\\t/g' -e 's/\r/\\r/g' \
-    | awk 'NR > 1 { printf "\\n" } { printf "%s", $0 }')"
+    | tr -d '\000-\010\013\014\016-\037' \
+    | awk '{ gsub(/\\/, "\\\\"); gsub(/"/, "\\\""); gsub(/\t/, "\\t"); gsub(/\r/, "\\r")
+            if (NR > 1) printf "\\n"; printf "%s", $0 }' 2>/dev/null)"
+  if [ -n "$text" ] && [ -z "$esc" ]; then
+    printf 'keel: cannot emit %s context without jq or awk\n' "$event" >&2
+    return 0
+  fi
   printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":"%s"}}\n' "$event" "$esc"
 }

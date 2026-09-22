@@ -40,7 +40,7 @@ number moves money — and generalized for **any software project, in any langua
 **The gates are _code_, not prose.** Keel doesn't just tell the agent to behave — it _enforces_ it.
 Commits to a protected branch are blocked, secrets are blocked before they hit disk, a turn cannot end
 with the Definition of Done stale, and a reviewer that returns prose instead of a machine-checkable
-verdict is caught at the boundary. The harness **tests its own gates** (`bash tests/run.sh` — 136
+verdict is caught at the boundary. The harness **tests its own gates** (`bash tests/run.sh` —
 golden tests) so the enforcement can't silently rot.
 
 **What v1.0 adds:** the model can no longer invoke the six workflows that have side effects, a plugin
