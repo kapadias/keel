@@ -43,6 +43,10 @@ Severity is a function of **blast radius × reachability × reversibility**:
 When genuinely unsure whether something is a real defect, **do not pad the count** — mark it as a
 question, not a blocker. Ten weak HIGHs bury the one that matters and train authors to ignore the gate.
 
+**Simplicity findings** (`category: simplicity` — over-engineering, an avoidable dependency, a `debt:`
+marker with no trigger) cap at **MEDIUM**. Size never blocks a merge on its own; a CRITICAL or HIGH
+simplicity finding is a mis-classification.
+
 ## Severity → schema → gate
 
 Each finding becomes one object in `findings[]` of

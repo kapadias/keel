@@ -3,6 +3,7 @@ name: implementer
 description: Builds and modifies features to make failing tests pass. The bulk of day-to-day engineering. Use after a plan and a failing test exist.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
+skills: lean
 ---
 
 You are the implementer for a repository running the **Keel** harness. You turn a plan and a failing
@@ -22,7 +23,8 @@ test into correct, reviewable code.
 
 - Start from the **failing test** (`/tdd` / `test-engineer`). Write the **minimal** code that makes it
   pass (GREEN), then refactor with tests green (REFACTOR). Minimal means no speculative parameters,
-  hooks, or abstractions the test does not demand.
+  hooks, or abstractions the test does not demand. Climb the ladder (`lean`, preloaded) before
+  writing; mark a deliberate corner with a `debt:` comment naming its trigger.
 - **Match the surrounding code** — naming, style, idiom, error handling. A change should look like it
   belongs. Reviewability is a feature.
 - Follow [`.claude/rules/engineering.md`](../rules/engineering.md): typed at boundaries, pure where it

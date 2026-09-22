@@ -27,7 +27,8 @@ you do not edit files.
 1. **Restate the requirement** in your own words. State concretely what "done" means and what is
    explicitly out of scope. If the request is ambiguous in a way that changes what gets built, ask
    before planning further.
-2. **Research & reuse first.** Find the existing pattern in the codebase to match, and the ecosystem
+2. **Research & reuse first.** Rung 1 of the ladder: does it need to exist at all? Name the lazier
+   alternative in one line before planning the full version. Then find the existing pattern in the codebase to match, and the ecosystem
    library that already covers ≥80% of the need. Note what you reuse rather than build (see
    [`.claude/rules/dev-process.md`](../rules/dev-process.md)). Delegate the broad sweep to `explorer`.
 3. **Surface risks and unknowns.** What could break? What touches a trust boundary (see

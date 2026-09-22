@@ -24,9 +24,11 @@ say so precisely. Your job is to be the gate that catches what the author could 
   covered by golden + property tests? Is any test vacuous or asserting the implementation to itself?
 - **Reproducibility & cleanliness:** hidden global state, wall-clock/RNG in pure logic, secrets in code
   or logs, `print` spew, dead code, a change that does not match the surrounding style.
-- **Scope:** changes orthogonal to the stated task — drive-by refactors, reformatting of untouched
-  logic, dead code added or left behind, speculative abstractions the task did not require. Flag as
-  MEDIUM (see [`.claude/rules/engineering.md`](../rules/engineering.md) → Surgical changes).
+- **Scope & complexity:** changes orthogonal to the stated task — drive-by refactors, reformatting
+  of untouched logic, dead code added or left behind — and over-building: speculative abstractions,
+  hand-rolled stdlib, an avoidable new dependency, a `debt:` marker with no trigger. Flag as MEDIUM,
+  `category: simplicity`, tagged `delete:` / `stdlib:` / `native:` / `yagni:` / `shrink:` (see
+  [`.claude/rules/engineering.md`](../rules/engineering.md) → Simplicity).
 
 ## How you report
 
@@ -52,7 +54,7 @@ block is for the gate — keep them consistent.
       "severity": "CRITICAL | HIGH | MEDIUM | LOW",
       "path": "relative/path/to/file",
       "line": 0,
-      "category": "correctness | security | tests | safety | performance | style",
+      "category": "correctness | security | tests | safety | performance | style | simplicity",
       "issue": "what is wrong and why it matters",
       "fix": "concrete recommended change"
     }
