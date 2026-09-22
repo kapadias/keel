@@ -13,6 +13,7 @@ rather than edit.
 | 0005 | [Machine-checkable review verdict](0005-machine-checkable-review-verdict.md)                        | Accepted | 2026-06-23 |
 | 0006 | [Distribute Keel as a plugin (zero-duplication)](0006-distribute-keel-as-plugin.md)                 | Accepted | 2026-06-23 |
 | 0007 | [A plugin install is not equivalent to a copy-in install](0007-plugin-install-is-not-equivalent.md) | Accepted | 2026-08-01 |
+| 0008 | [A decision ladder for solution size](0008-decision-ladder-for-solution-size.md)                    | Accepted | 2026-09-22 |
 
 New ADRs are added with the **`/adr`** command, which scaffolds the next number from the Keel template
 and updates this index.

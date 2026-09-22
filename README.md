@@ -119,8 +119,8 @@ task gets longer. Keel is built the other way — **progressive disclosure**:
 
 |                 | Always-on (paid every turn)                                                                                                                              | On-demand (paid only when needed)                                         |
 | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| **What**        | `CLAUDE.md` + 9 rules, plus the name+description of each skill, agent and workflow                                                                       | 11 skill playbooks + 14 pipeline workflows + 8 agents — bodies only       |
-| **Footprint**   | **~6.9k tokens** — 3,599 words of prose (3,700-word budget) + ~1.1k tokens of descriptions (5,600-char budget), both enforced by `tests/harness_lint.py` | the bulk of Keel — loaded only when relevant                              |
+| **What**        | `CLAUDE.md` + 9 rules, plus the name+description of each skill, agent and workflow                                                                       | 12 skill playbooks + 15 pipeline workflows + 8 agents — bodies only       |
+| **Footprint**   | **~7.1k tokens** — 3,679 words of prose (3,700-word budget) + ~1.1k tokens of descriptions (5,600-char budget), both enforced by `tests/harness_lint.py` | the bulk of Keel — loaded only when relevant                              |
 | **When loaded** | Every request                                                                                                                                            | Only when a trigger matches, a workflow runs, or a subagent is dispatched |
 
 The six side-effecting workflows (`/ship`, `/release`, `/rollback`, `/adr`, `/sync`, `/intake`) carry
@@ -194,7 +194,7 @@ and refuses to mark work done while a mirror is out of sync. Next, [make it your
 
 ## The pipeline
 
-Fourteen workflows cover the development loop. Invoke them with `/<name>` in Claude Code. They live
+Fifteen workflows cover the development loop. Invoke them with `/<name>` in Claude Code. They live
 under `.claude/skills/` — Claude Code merged custom commands into skills, and only skills support
 invocation control. The six marked **human-only** set `disable-model-invocation: true`: Claude cannot
 trigger them, which is what makes "a human approves promotion to production"
@@ -207,6 +207,7 @@ trigger them, which is what makes "a human approves promotion to production"
 | `/implement`                 | Write minimal, typed, reviewable code against an existing failing test.                   |
 | `/fix`                       | Bounded fast lane for a trivial, reversible fix — `check-trivial.sh` decides eligibility. |
 | `/review`                    | Path-aware parallel review — correctness always, security when the change warrants it.    |
+| `/audit`                     | Repo-wide over-engineering sweep — ranked cuts plus the `debt:` ledger. Read-only.        |
 | `/test`                      | Run the project's lint + type-check + test + coverage gate and summarize.                 |
 | `/coverage`                  | Report line + branch coverage; spotlight the survival-critical surface and its gaps.      |
 | `/debug`                     | Reproduce → isolate → root-cause → fix the cause → leave a regression test.               |
@@ -236,7 +237,8 @@ Eight specialist agents, each model-tiered so you never burn a frontier model on
 
 **On-demand skills** deepen the agents when triggered — most bundling runnable scripts/templates/
 references: `tdd-workflow`, `code-review`, `debugging`, `refactoring`, `api-design`, `security-review`,
-`migration-safety`, `observability`, `concurrency-performance`, `supply-chain`, `fast-lane`.
+`migration-safety`, `observability`, `concurrency-performance`, `supply-chain`, `fast-lane`, `lean`
+(the decision ladder in depth, with `check-debt.sh`).
 
 ---
 
@@ -293,8 +295,8 @@ keel/
 │   ├── .claude-plugin/        # plugin manifest (plugin.json)
 │   ├── rules/                 # 9 always-on rules (00-core is the constitution)
 │   ├── agents/                # 8 specialists
-│   ├── skills/                # 11 playbooks + 14 pipeline workflows (6 human-only)
-│   └── hooks/                 # 8 enforcing hooks over 6 events + lib/ + hooks.json
+│   ├── skills/                # 12 playbooks + 15 pipeline workflows (6 human-only)
+│   └── hooks/                 # 9 enforcing hooks over 7 events + lib/ + hooks.json
 ├── tests/                     # gate golden tests + harness self-validation
 ├── stacks/                    # python · typescript · go · rust gate packs
 ├── docs/
@@ -334,6 +336,12 @@ rule, skill, command, or agent (and why most additions should be on-demand, not 
 
 See [`SECURITY.md`](SECURITY.md). In short: no secrets in code, logs, or prompts; report
 vulnerabilities privately.
+
+## Credits
+
+The decision ladder, the `debt:` marker convention, the over-engineering review tags and the
+subagent context carrier are adapted from [ponytail](https://github.com/dietrichgebert/ponytail)
+by Dietrich Gebert (MIT).
 
 ## License
 

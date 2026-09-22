@@ -7,6 +7,24 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The decision ladder** (ADR-0008). `rules/00-core.md` now says, in seven rungs, how much code
+  to write: YAGNI, already in this codebase, stdlib, native platform, installed dependency, one
+  line, only then the minimum that works. It lives in the constitution because that is the one rule
+  a plugin install receives. Always-on prose 3,599 → 3,679 words, budget unchanged.
+- **`debt:` markers and `check-debt.sh`.** A `debt: <ceiling>, <upgrade trigger>` comment marks a
+  deliberate corner; the new gate under `skills/lean/scripts/` fails closed on a marker with no
+  trigger, `--range` gates only the lines a PR adds, `--ledger` prints the ledger. `/review` runs
+  it on the diff, `/sync` prints the ledger.
+- **`lean` skill** (preloaded into `implementer`) and **`/audit`** (repo-wide over-engineering
+  sweep, read-only).
+- **`category: simplicity`** in the review verdict, capped at MEDIUM — over-engineering never blocks
+  a merge alone (ADR-0005 amended; `check-review.sh` unchanged).
+- **`SubagentStart` → `subagent-start.sh`.** Under a plugin install, subagents now receive
+  `00-core.md`; `SessionStart` context was parent-only, so they had been running with no policy.
+  Standalone checkouts emit nothing (subagents load `rules/` natively). `hooks/lib/core.sh` holds
+  the shared harness-root resolution, carrier and emitter.
+- **Three lint checks** with failing-case tests: the seven rung keywords in both ladder copies;
+  `/review` and `/sync` wire `check-debt.sh`; an adapted project's name appears only in `README.md`.
 - **Automated releases.** Pushing a `v*` tag now publishes the GitHub Release itself, with notes read
   from this file. v1.0.0 was assembled by hand, and the hand-assembly is exactly what argued for
   this: `git tag -F` defaults to `--cleanup=strip`, which deletes every `#`-prefixed line, so the
@@ -22,6 +40,13 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- `engineering.md` Simplicity now names what is never simplified away and the `debt:` marker;
+  "Reuse over rewrite" folded into `dev-process.md` §0; **Remaining risk** now includes what was
+  deliberately skipped and the trigger to add it. `code-review` gains a Complexity checklist;
+  `debugging` and `debugger` gain the grep-every-caller root-cause rule; `planner`/`/plan` ask rung
+  one first; `test-engineer` applies the ladder to test code without cutting the test.
+- The no-jq fallback of the SessionStart emitter now escapes its payload — a multi-line carrier
+  was not valid JSON without jq.
 - **The banner carries no version and no licence.** `assets/keel-banner.svg` hardcoded `v0.1.0` and
   `MIT` — the version was two releases stale and nobody noticed, which is the argument against
   putting expiring facts in a hand-edited image. The `License` and `release` badges are gone from the

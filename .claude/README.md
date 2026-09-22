@@ -8,7 +8,7 @@ discipline is **enforced by code, not prose**. Start with [`../CLAUDE.md`](../CL
 
 - **`rules/`** — always-on operating discipline (dense and short; you pay for them every turn), and
   budgeted by `harness_lint.py`. Start at [`00-core.md`](rules/00-core.md) — the constitution: three
-  principles, the loop, the never-list, who must approve, and routing. It is also the **only** thing
+  principles, the loop, the decision ladder, the never-list, who must approve, and routing. It is also the **only** thing
   a plugin install receives (ADR-0007), so it is budgeted under 9,000 chars to ride `SessionStart`.
   The rest elaborate it: [`boundaries.md`](rules/boundaries.md) (LLM proposes / gates decide),
   [`safety.md`](rules/safety.md) (blast radius & irreversible actions),
@@ -19,15 +19,16 @@ discipline is **enforced by code, not prose**. Start with [`../CLAUDE.md`](../CL
 - **`agents/`** — 8 specialists. `orchestrator` (router), `planner` (read-only plan author),
   `implementer`, `test-engineer`, `code-reviewer` (read-only; emits a machine-checkable JSON verdict),
   `security-reviewer` (read-only; same verdict contract), `explorer` (read-only fan-out, token-saver),
-  `debugger`. Each pins a model tier; the four that own a playbook **preload it** via `skills:`, so
-  the depth arrives deterministically instead of by description-trigger.
-- **`skills/`** — 25 entries, since Claude Code merged commands into skills. Two kinds:
-  - **11 playbooks** — knowledge Claude loads when the trigger matches, most bundling runnable
+  `debugger`. Each pins a model tier; the five that own a playbook **preload it** via `skills:`
+  (`implementer` ← `lean`), so the depth arrives deterministically instead of by description-trigger.
+- **`skills/`** — 27 entries, since Claude Code merged commands into skills. Two kinds:
+  - **12 playbooks** — knowledge Claude loads when the trigger matches, most bundling runnable
     scripts/templates/references that load only when opened: `tdd-workflow`, `code-review`,
     `debugging`, `refactoring`, `api-design`, `security-review`, `migration-safety`, `observability`,
-    `concurrency-performance`, `supply-chain`, `fast-lane` (bundles `check-trivial.sh`).
-  - **14 pipeline workflows** — `/plan`, `/tdd`, `/implement`, `/review`, `/test`, `/coverage`,
-    `/debug`, `/fix`, `/ship`, `/release`, `/rollback`, `/sync`, `/adr`, `/intake`. Each declares its
+    `concurrency-performance`, `supply-chain`, `fast-lane` (bundles `check-trivial.sh`), `lean`
+    (the decision ladder in depth; bundles `check-debt.sh`, the debt-marker gate and ledger).
+  - **15 pipeline workflows** — `/plan`, `/tdd`, `/implement`, `/review`, `/audit`, `/test`,
+    `/coverage`, `/debug`, `/fix`, `/ship`, `/release`, `/rollback`, `/sync`, `/adr`, `/intake`. Each declares its
     model tier; several use `!` bash injection / `@` refs to act on real repo state. The six with
     side effects — `/ship`, `/release`, `/rollback`, `/adr`, `/sync`, `/intake` — set
     **`disable-model-invocation: true`**: only a human can trigger them, and their descriptions stay
@@ -43,12 +44,14 @@ discipline is **enforced by code, not prose**. Start with [`../CLAUDE.md`](../CL
   `stop-dod.sh` (**Stop** — blocks a turn ending with tracked code changed and `docs/STATUS.md`
   stale), `subagent-verdict.sh` (**SubagentStop** — runs `check-review.sh` on the reviewer's own
   output, so ADR-0005 binds where the verdict is produced), `post-compact.sh` (**PostCompact** —
-  restates branch, STATUS state, and review verdicts after a summary). Shared logic in `lib/`
-  (`json.sh`, `secret-patterns.sh`); plugin wiring in `hooks.json`, asserted equivalent to
-  `settings.json` by the linter.
+  restates branch, STATUS state, and review verdicts after a summary), `subagent-start.sh`
+  (**SubagentStart** — carries `00-core.md` into every subagent under a plugin install, where
+  `SessionStart` context never reaches them; silent in a standalone checkout). Shared logic in
+  `lib/` (`json.sh`, `secret-patterns.sh`, `core.sh` — harness root, the core carrier, the context
+  emitter); plugin wiring in `hooks.json`, asserted equivalent to `settings.json` by the linter.
 - **`settings.json`** — denies reading secrets (`.env`/`*.pem`/`*.key`/`.ssh`/`.aws`/…) and
-  `git push --force`; wires the hooks (PreToolUse, PostToolUse, SessionStart, Stop, SubagentStop,
-  PostCompact).
+  `git push --force`; wires the hooks (PreToolUse, PostToolUse, SessionStart, SubagentStart, Stop,
+  SubagentStop, PostCompact).
 - **`.claude-plugin/`** — `plugin.json`, so Keel installs as a Claude Code plugin.
 
 Companion top-level surfaces: [`../tests/`](../tests/) (the harness's own gate golden tests +

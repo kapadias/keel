@@ -84,6 +84,10 @@ Keel's deny-list to your own project settings. This step is manual and mechanica
 
 ### What a plugin install DOES get right
 
+- **The constitution reaches every agent.** `SessionStart` carries `rules/00-core.md` — the three
+  principles, the loop, the decision ladder, the never-list — into the parent session, and
+  `SubagentStart` carries it into each subagent (`SessionStart` context is parent-only). The other
+  eight rules still need the copy-in above.
 - The **Definition-of-Done pre-push hook self-installs** from `${CLAUDE_PLUGIN_ROOT}` at
   `SessionStart` — no manual symlink. If it cannot be located, the session says so rather than
   going quiet.

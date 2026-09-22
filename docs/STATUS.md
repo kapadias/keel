@@ -12,43 +12,88 @@ the model can no longer invoke the six workflows that have side effects: `/ship`
 operating rules it was silently missing, and every token budget is enforced by the linter rather than
 asserted in a README. Language- and domain-agnostic.
 
-Always-on surface: **3,599 words** of prose (3,700-word budget) plus ~1.1k tokens of skill/agent
-descriptions (5,600-char budget) — roughly **6.9k tokens per turn**, down from ~9.1k.
+Always-on surface: **3,679 words** of prose (3,700-word budget) plus ~1.1k tokens of skill/agent
+descriptions (5,600-char budget) — roughly **7.1k tokens per turn**. Since v1.0.0 the constitution
+also carries the seven-rung decision ladder, and `SubagentStart` carries it into subagents under a
+plugin install.
 
 Previous: v0.2.0 "Gates as Code" turned prose discipline into blocking scripts. Never published as a
 release; v1.0.0 is the first tagged artifact.
 
 ## What exists
 
-- **Rules ×9** — `00-core` (the constitution; also the plugin carrier), `dev-process`, `testing`,
-  `engineering`, `git-workflow`, `sync`, `boundaries`, `safety`, `token-economy`. The dense,
-  always-on policy surface — **3599 words, budgeted at 3,700 by `harness_lint.py`**.
+- **Rules ×9** — `00-core` (the constitution, the decision ladder; also the plugin carrier),
+  `dev-process`, `testing`, `engineering`, `git-workflow`, `sync`, `boundaries`, `safety`,
+  `token-economy`. The dense, always-on policy surface — **3,679 words, budgeted at 3,700 by
+  `harness_lint.py`**.
 - **Agents ×8** — `orchestrator`, `planner`, `implementer`, `test-engineer`, `code-reviewer`,
   `security-reviewer`, `explorer`, `debugger`. Reviewers emit a structured JSON verdict.
-- **Skills ×11** — `tdd-workflow`, `code-review`, `debugging`, `refactoring`, `api-design`,
+- **Skills ×12** — `tdd-workflow`, `code-review`, `debugging`, `refactoring`, `api-design`,
   `security-review`, `migration-safety`, `observability`, `concurrency-performance`, `supply-chain`,
-  `fast-lane` — most bundling runnable scripts/templates/references.
-- **Pipeline workflows ×14** — also under `skills/`, since Claude Code merged commands into skills:
-  `/plan`, `/tdd`, `/implement`, `/review`, `/test`, `/coverage`, `/debug`, `/fix`, `/ship`,
-  `/release`, `/rollback`, `/sync`, `/adr`, `/intake`. Model-tiered; several use `!`/`@` injection.
+  `fast-lane`, `lean` (bundles `check-debt.sh`) — most bundling runnable scripts/templates/references.
+- **Pipeline workflows ×15** — also under `skills/`, since Claude Code merged commands into skills:
+  `/plan`, `/tdd`, `/implement`, `/review`, `/audit`, `/test`, `/coverage`, `/debug`, `/fix`,
+  `/ship`, `/release`, `/rollback`, `/sync`, `/adr`, `/intake`. Model-tiered; several use `!`/`@` injection.
   The six with side effects set `disable-model-invocation: true` — human-triggered only, and out of
   context entirely.
-- **Hooks ×8** — `guard-branch` (blocks protected-branch commits/pushes + `--all`/`--mirror`/`+refspec`
+- **Hooks ×9** — `guard-branch` (blocks protected-branch commits/pushes + `--all`/`--mirror`/`+refspec`
   force pushes), `secret-scan` (blocks secret writes + Bash reads of secret files), `format`,
   `require-status-sync` (pre-push DoD + strict secret scan, auto-installed at SessionStart — warns on
   a foreign hook), `session-start` (also carries `00-core.md` into plugin installs), `stop-dod`
   (Stop — no turn ends with STATUS stale), `subagent-verdict` (SubagentStop — ADR-0005 enforced where
-  the verdict is produced), `post-compact` (PostCompact — restates loop state). Six events wired;
-  shared `lib/` + plugin `hooks.json`, asserted equivalent to `settings.json` by the linter.
+  the verdict is produced), `post-compact` (PostCompact — restates loop state), `subagent-start`
+  (SubagentStart — carries `00-core.md` into every subagent under a plugin install). Seven events
+  wired; shared `lib/` + plugin `hooks.json`, asserted equivalent to `settings.json` by the linter.
 - **Settings** — denies reading secrets and force-push; wires all hooks.
 - **Tests** — `tests/run.sh` (gate golden tests; the count is derived and drift-linted, never
   hardcoded) + `tests/harness_lint.py` (self-validation).
 - **Stacks** — `stacks/{python,typescript,go,rust}` wiring the test gate.
 - **Plugin** — `.claude/.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json`.
-- **Docs** — this `STATUS.md`, `ROADMAP.md`, `INSTALL.md`, the `docs/adr/` index, and ADRs 0001–0007.
+- **Docs** — this `STATUS.md`, `ROADMAP.md`, `INSTALL.md`, the `docs/adr/` index, and ADRs 0001–0008.
 - **CI** — `.github/workflows/ci.yml`: shellcheck (all scripts) + harness-lint + gate self-tests.
 
 ## Recently changed
+
+- **2026-09-22** — The decision ladder: solution size becomes a rule and a gate (ADR-0008):
+  - **Keel governed process, not size.** TDD, review and sync were enforced; how _much_ code to
+    write was a 42-word Simplicity bullet. `00-core.md` now carries a seven-rung ladder — YAGNI,
+    this codebase, stdlib, native platform, installed dependency, one line, only then minimum
+    code — placed in the constitution because it is the one rule a plugin install receives.
+    `engineering.md` names what is never simplified away; `dev-process.md` §0 folds "Reuse over
+    rewrite" into one paragraph. Always-on prose **3,599 → 3,679 words** inside the unchanged
+    3,700-word budget; the per-rule budget (520) has three words of headroom on `00-core.md`.
+  - **A deliberate corner is now a tracked one.** A `debt: <ceiling>, <upgrade trigger>` comment
+    marks a simplification with a known ceiling; `skills/lean/scripts/check-debt.sh` fails closed
+    on a marker with no trigger after the comma, `--range` gates only the lines a PR adds (so debt
+    someone else left never blocks a stranger's PR), `--ledger` prints the grouped ledger. `/review`
+    runs the gate on the diff; `/sync` prints the ledger as part of the docs mirror. The comma is
+    the only separator — a keyword would have been a dialect nobody else uses.
+  - **Over-engineering is a review category, not a new reviewer.** `code-review` gains a Complexity
+    checklist with five tags (`delete:` / `stdlib:` / `native:` / `yagni:` / `shrink:`); the verdict
+    enum gains `category: simplicity`, capped at MEDIUM by the rubric so size never blocks a merge
+    alone (ADR-0005 amended; `check-review.sh` unchanged — it validates severity, not category).
+    A third concurrent reviewer was rejected: one more opus run per review for findings that can
+    never block.
+  - **Plugin-mode subagents received no policy at all.** `SessionStart` context is parent-only, so
+    every Task-spawned agent under a plugin install ran without the constitution the parent got.
+    New `SubagentStart` → `subagent-start.sh` carries `00-core.md` in; a standalone checkout emits
+    nothing because subagents load `rules/` natively (verified against the sub-agents reference).
+    Harness-root resolution, the carrier and the context emitter moved into `hooks/lib/core.sh`,
+    shared by both hooks — and the no-jq emitter now escapes, so a multi-line carrier is valid
+    JSON without jq (it was not before).
+  - **New surfaces:** the `lean` playbook (preloaded into `implementer`; the ladder in depth, the
+    marker, the tags, a "you think you need X → the platform has Y" table) and `/audit` (repo-wide
+    sweep, read-only, model-invocable — the six human-only workflows are unchanged). Descriptions
+    5,281 → 5,571 chars under the 5,600 cap.
+  - **Three new lint checks, each with a failing-case test:** the seven rung keywords must appear
+    in both ladder copies (they differ in depth by design); `/review` and `/sync` must invoke
+    `check-debt.sh`; and the project whose ideas were adapted here is credited in `README.md` and
+    named nowhere else in the harness.
+  - **Rejected:** intensity modes (a flag file the model writes with no gate in front of it) and
+    installing the source's own plugin alongside Keel (its test and report rules contradict
+    `testing.md` and the four-line report). **Expected effect is an estimate, not a measurement:**
+    the source reports −54% source LOC at 100% safety against a no-guidance baseline; Keel already
+    banked part of that, so the first WS7 behavioural eval should be a ladder on/off comparison.
 
 - **2026-08-01** — Release automation; expiring facts removed from the banner:
   - **Pushing a `v*` tag now publishes the GitHub Release**, notes read from `CHANGELOG.md`.

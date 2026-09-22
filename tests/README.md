@@ -49,6 +49,14 @@ Exercises each deterministic gate with fixed inputs and asserts the exit code:
   the real gate.
 - **post-compact** (PostCompact): restates branch, STATUS state, and whether
   review verdicts exist for the current SHA after a summary.
+- **subagent-start** (SubagentStart): carries `00-core.md` into a subagent under
+  a plugin install (valid JSON with and without jq, never waits on stdin); emits
+  nothing in a standalone checkout; fails **open** when the harness cannot be
+  located.
+- **check-debt** (debt-marker gate + ledger): a `debt:` marker with no upgrade
+  trigger after the comma fails closed; `--range` gates only lines a PR adds;
+  `--ledger` groups by file and tags `no-trigger`; skips dependency dirs and
+  markdown; fails closed on an unknown flag, outside a repo, or on a bad range.
 - **harness_lint itself** — see below.
 
 ### `harness_lint.py` — structural self-validation
@@ -61,9 +69,11 @@ skills missing a trigger, a side-effecting workflow that does not set
 wired hooks absent on disk, `settings.json` and `hooks.json` disagreeing about
 which gates are wired, dead intra-repo markdown links, backticked `docs/`
 references that do not exist, domain-specific vocabulary in a domain-agnostic
-harness, malformed plugin manifests, and five token budgets (CLAUDE.md, per-rule,
+harness, malformed plugin manifests, five token budgets (CLAUDE.md, per-rule,
 total always-on, `00-core.md`'s SessionStart-channel size, and the combined
-skill/agent description metadata).
+skill/agent description metadata), a ladder rung missing from either of its two
+copies, `/review` or `/sync` no longer wiring `check-debt.sh`, and an adapted
+project's name anywhere but `README.md`.
 
 ### The linter is itself a gate
 
