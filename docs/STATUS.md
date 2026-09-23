@@ -5,20 +5,14 @@ pre-push hook (`require-status-sync.sh`) blocks code pushes that leave it stale.
 
 ## Current state
 
-**v1.0.0 "The Model Cannot Ship Itself"** — the first published release. Keel's discipline is
-enforced by code at seven lifecycle events, the harness tests its own gates _and its own linter_, and
-the model can no longer invoke the six workflows that have side effects: `/ship`, `/release`,
-`/rollback`, `/adr`, `/sync` and `/intake` are human-triggered only. A plugin install now carries the
-constitution (`00-core.md`) it was silently missing, and every token budget is enforced by the linter rather than
-asserted in a README. Language- and domain-agnostic.
+Keel's discipline is enforced by code at seven lifecycle events plus the git pre-push hook. The
+harness tests its own gates and its own linter. The six workflows with side effects (`/ship`,
+`/release`, `/rollback`, `/adr`, `/sync`, `/intake`) are human-triggered only. A plugin install
+carries the constitution (`00-core.md`) into the session and into every subagent. Language- and
+domain-agnostic.
 
 Always-on surface: **3,690 words** of prose (3,700-word budget) plus 5,570 chars of skill/agent
-descriptions (5,600-char budget), both enforced by the linter. Since v1.0.0 the constitution
-also carries the seven-rung decision ladder, and `SubagentStart` carries it into subagents under a
-plugin install.
-
-Previous: v0.2.0 "Gates as Code" turned prose discipline into blocking scripts (never tagged);
-v0.1.0 was the initial extraction.
+descriptions (5,600-char budget), both enforced by the linter.
 
 ## What exists
 
@@ -57,10 +51,8 @@ v0.1.0 was the initial extraction.
 
 History lives in `CHANGELOG.md` and `git log`. Entries here describe the current unit of work.
 
-- **2026-09-23** — Open-source cleanup: the internal planning doc and this file's history removed;
-  every kept document corrected against the tree (plugin coverage, counts, budgets, paths).
-  ADRs 0004–0008 carry dated corrections; INSTALL, OVERVIEW, CONTRIBUTING, SECURITY, tests and
-  stacks READMEs match the tree.
+- **2026-09-23** — Public docs describe Keel as it is: release-note framing removed from this
+  file and from the benchmark write-ups; the bare-agent eval leads with bare agent vs Keel.
 
 ## Next / open
 
