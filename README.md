@@ -16,7 +16,7 @@
 
 <p align="center">
   <strong>Failing test first &middot; secrets and force-pushes blocked &middot; every review machine-checked &middot; "done" means the docs agree</strong><br>
-  <sub>Enforced by hooks and scripts, not by asking nicely: 220 golden tests prove each gate blocks what it should and allows what it should. Drop it into any repo, any language, in one command.</sub>
+  <sub>Enforced by hooks and scripts, not by asking nicely: 220 golden tests prove each gate blocks what it should and allows what it should. Drop it into any repo, any language, in four commands.</sub>
 </p>
 
 <p align="center">
@@ -47,13 +47,13 @@ on every turn.
   test behind it does not count as done.
 - **Gates that block, not warn.** Commits to `main`, force-pushes, secrets in a diff, and pushes
   that skip the status doc are refused by hooks — the agent cannot talk its way past a script.
-- **Review the model cannot rubber-stamp.** Two independent reviewers return a JSON verdict; a
-  script, not the model, decides whether it merges.
+- **Review the model cannot rubber-stamp.** Up to two independent reviewers return a JSON verdict;
+  a script, not the model, decides whether it merges.
 - **A ladder against over-building.** Does it need to exist, is it already here, stdlib,
   platform, installed dependency, one line — asked before any new code, and again of every review
   ask; every corner deliberately cut carries a `debt:` marker with the trigger to revisit it.
-- **A budget for context.** ~7.1k always-on tokens, enforced by the linter; everything else loads
-  on demand, so the agent stays sharp on turn forty.
+- **A budget for context.** Under 3,700 always-on words, enforced by the linter; everything else
+  loads on demand, so the agent stays sharp on turn forty.
 - **Six things only a human can trigger.** Ship, release, rollback, sync, ADR, intake — the model
   cannot invoke them at all.
 
@@ -79,7 +79,7 @@ Same model, same six tasks, with no harness and with Keel — twelve runs each, 
 checks the agent never saw:
 
 <p align="center">
-  <img src="assets/benchmark-ladder.svg" width="860" alt="Keel versus a bare agent on six trap tasks: both 12 of 12 correct; runs that left a test behind 0 versus 12; dependency files 0 and 0; median source lines 6.5 versus 16.5; cost per run $0.13 versus $2.82.">
+  <img src="assets/benchmark-bare-vs-keel.svg" width="860" alt="Keel versus a bare agent on six trap tasks: both 12 of 12 correct; runs that left a test behind 0 versus 12; dependency files 0 and 0; median source lines 6.5 versus 16.5; cost per run $0.13 versus $2.82.">
 </p>
 
 | Claude Sonnet, six trap tasks, n = 12 per arm | correct | left a test behind | added a dependency | src LOC (median) |  cost |
@@ -94,8 +94,8 @@ reviews, a verdict a script decided, and a status doc that agrees with the code.
 worth it depends on what a wrong "done" costs you. Method, raw rows and the earlier ladder evals:
 [`docs/benchmarks/`](docs/benchmarks/).
 
-The always-on surface is ~7.1k tokens, budgeted by the linter; the six human-only workflows cost
-zero. The full accounting is in [`docs/OVERVIEW.md`](docs/OVERVIEW.md).
+The always-on surface is under 3,700 words, budgeted by the linter; the six human-only workflows
+cost zero. The full accounting is in [`docs/OVERVIEW.md`](docs/OVERVIEW.md).
 
 ## How it works
 
@@ -222,7 +222,7 @@ by Dietrich Gebert (MIT).
 
 ## Star History
 
-<a href="https://www.star-history.com/kapadias/keel#history">
+<a href="https://www.star-history.com/#kapadias/keel&Date">
  <picture>
    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=kapadias/keel&type=Date&theme=dark" />
    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=kapadias/keel&type=Date" />

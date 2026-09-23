@@ -377,11 +377,10 @@ for cmd in ("review", "sync"):
 
 # --- token budget: the always-on surface is gated, not aspirational ---
 # CLAUDE.md + rules/*.md are paid on every turn (token-economy.md). Budgets are
-# words (whitespace-split — deterministic, no tokenizer dependency); ~0.75
-# words/token puts the total near the README's ≈5k-token claim. Raising a
+# words (whitespace-split — deterministic, no tokenizer dependency). Raising a
 # budget is an explicit, reviewable act — that is the point.
-# Calibrated 2026-08-01: CLAUDE.md 836, largest rule 679 (dev-process.md), total
-# 4,252 by this metric (str.split() counts slightly above `wc -w`).
+# Calibrated 2026-09-23: CLAUDE.md 236, largest rule 517 (00-core.md), total
+# 3,690 by this metric (str.split() counts slightly above `wc -w`).
 MAX_CLAUDE_MD_WORDS = 300
 MAX_RULE_WORDS = 520
 MAX_ALWAYS_ON_WORDS = 3700
