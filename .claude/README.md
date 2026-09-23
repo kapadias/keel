@@ -54,7 +54,8 @@ discipline is **enforced by code, not prose**. Start with [`../CLAUDE.md`](../CL
   SubagentStop, PostCompact).
 - **`.claude-plugin/`** — `plugin.json`, so Keel installs as a Claude Code plugin.
 
-Companion top-level surfaces: [`../tests/`](../tests/) (the harness's own gate golden tests +
+Companion top-level surfaces: [`../docs/OVERVIEW.md`](../docs/OVERVIEW.md) (how the pieces
+fit — token economy, crew, gates, layout), [`../tests/`](../tests/) (the harness's own gate golden tests +
 self-validation — `bash tests/run.sh`), [`../stacks/`](../stacks/) (python/typescript/go/rust gate
 packs), and [`../.claude-plugin/marketplace.json`](../.claude-plugin/marketplace.json) (plugin
 distribution).

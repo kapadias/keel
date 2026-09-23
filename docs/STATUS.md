@@ -54,6 +54,11 @@ release; v1.0.0 is the first tagged artifact.
 
 ## Recently changed
 
+- **2026-09-23** — README rewritten as a landing page: a staff-engineer persona, code before
+  prose, the v2 benchmark as a chart (`assets/benchmark-ladder.svg`), a five-entry FAQ, Star
+  History. Sections of 10–30 lines. The token-economy, layer and crew tables, the gate list and the
+  repository tree moved verbatim to the new `docs/OVERVIEW.md`; nothing was dropped.
+
 - **2026-09-22** — Second WS7 eval, the ladder on trap tasks with `/review` forced
   (`docs/benchmarks/2026-09-22-ladder-v2.md`): six tasks, Sonnet, n = 12 per arm, hidden checks.
   **`after` 12/12 correct vs 10/12, zero new dependency files vs one, cost −11%, wall −23%, median

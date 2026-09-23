@@ -40,6 +40,8 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **README is a landing page**; the architecture detail (token economy, layers, crew, gates,
+  repository tree) lives verbatim in the new `docs/OVERVIEW.md`, and the v2 benchmark is a chart.
 - **A review ask that adds code must name a failing input** (ADR-0008, amended). The severity
   rubric, `code-review`, `code-reviewer`, `implementer` and `dev-process.md` §4 ("fix MEDIUM when it
   names a failing case; one that only adds code without one gets a `debt:` marker instead")

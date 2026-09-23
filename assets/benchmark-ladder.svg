@@ -1,0 +1,35 @@
+<svg viewBox="0 0 860 300" width="860" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-labelledby="t d">
+  <title id="t">Keel with the decision ladder versus the v1.0.0 harness, as a share of the v1.0.0 value</title>
+  <desc id="d">Six trap tasks, Claude Sonnet, twelve runs per arm, /review forced. After as a percentage of before: median source lines 75%, cost 89%, wall time 77%, new dependency files 0%. Correct runs: 12 of 12 after versus 10 of 12 before. Mean source lines were flat.</desc>
+  <style>
+    .ink { fill: #52514e; } .bar { fill: #2a78d6; } .ref { stroke: #8b949e; }
+    @media (prefers-color-scheme: dark) { .ink { fill: #c3c2b7; } .bar { fill: #3987e5; } }
+  </style>
+  <text x="430" y="26" font-size="15" font-weight="600" class="ink" text-anchor="middle">After the decision ladder, as a share of the v1.0.0 harness (lower is leaner)</text>
+  <text x="430" y="46" font-size="12" class="ink" text-anchor="middle">six trap tasks · Claude Sonnet · n = 12 per arm · /review forced · correct runs 12/12 vs 10/12</text>
+
+  <!-- axis: 0% at x=250, 100% at x=790 (5.4 px per point) -->
+  <line x1="250" y1="70" x2="250" y2="250" class="ref" stroke-opacity="0.55"/>
+  <line x1="790" y1="70" x2="790" y2="250" class="ref" stroke-opacity="0.45" stroke-dasharray="4 4"/>
+  <text x="790" y="264" font-size="11" class="ink" text-anchor="middle">100% = v1.0.0</text>
+  <text x="250" y="264" font-size="11" class="ink" text-anchor="middle">0%</text>
+
+  <!-- bars: y rows 84,124,164,204; height 26; rounded data-end -->
+  <text x="238" y="102" font-size="12" class="ink" text-anchor="end">source lines (median)</text>
+  <rect x="250" y="84" width="405" height="26" rx="4" class="bar"/>
+  <text x="663" y="102" font-size="12" font-weight="600" class="ink">75% · 22 → 16.5</text>
+
+  <text x="238" y="142" font-size="12" class="ink" text-anchor="end">cost per run</text>
+  <rect x="250" y="124" width="481" height="26" rx="4" class="bar"/>
+  <text x="739" y="142" font-size="12" font-weight="600" class="ink">89% · $3.18 → $2.82</text>
+
+  <text x="238" y="182" font-size="12" class="ink" text-anchor="end">wall time</text>
+  <rect x="250" y="164" width="416" height="26" rx="4" class="bar"/>
+  <text x="674" y="182" font-size="12" font-weight="600" class="ink">77% · 556 s → 429 s</text>
+
+  <text x="238" y="222" font-size="12" class="ink" text-anchor="end">new dependency files</text>
+  <rect x="250" y="204" width="3" height="26" rx="1" class="bar"/>
+  <text x="261" y="222" font-size="12" font-weight="600" class="ink">0% · 1 → 0</text>
+
+  <text x="430" y="290" font-size="11" class="ink" text-anchor="middle">Mean source lines were flat (21.4 → 21.7): one run over-built the date picker by 80 lines. Small n, high variance.</text>
+</svg>
