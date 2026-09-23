@@ -2,8 +2,8 @@
   <title id="t">Keel versus a bare agent on six trap tasks</title>
   <desc id="d">Twelve runs per arm, Claude Sonnet. Correct runs: bare agent 12 of 12, Keel 12 of 12. Runs that left a test behind: bare agent 0 of 12, Keel 12 of 12. Runs that added a dependency file: 0 and 0. Median source lines: 6.5 versus 16.5. Cost per run: 13 cents versus 2 dollars 82.</desc>
   <style>
-    .ink { fill: #52514e; } .bare { fill: #8b949e; } .keel { fill: #2a78d6; } .ref { stroke: #8b949e; }
-    @media (prefers-color-scheme: dark) { .ink { fill: #c3c2b7; } .keel { fill: #3987e5; } }
+    .ink { fill: #52514e; } .bare { fill: #eb6834; } .keel { fill: #2a78d6; } .ref { stroke: #8b949e; }
+    @media (prefers-color-scheme: dark) { .ink { fill: #c3c2b7; } .bare { fill: #d95926; } .keel { fill: #3987e5; } }
   </style>
   <text x="430" y="26" font-size="15" font-weight="600" class="ink" text-anchor="middle">Same model, same six tasks: a bare agent vs Keel</text>
   <text x="430" y="46" font-size="12" class="ink" text-anchor="middle">Claude Sonnet · headless Claude Code · n = 12 per arm · scored on hidden checks</text>
