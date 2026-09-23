@@ -5,7 +5,7 @@
 <h1 align="center">Keel</h1>
 
 <p align="center">
-  <em>She writes the failing test first. Then the code. Then she shows you the verdict.</em>
+  <em>The harness that makes your AI coding agent prove its work before anything ships.</em>
 </p>
 
 <p align="center">
@@ -15,8 +15,8 @@
 </p>
 
 <p align="center">
-  <strong>220 golden tests &middot; 9 blocking gates over 7 hook events &middot; ~7.1k always-on tokens &middot; every review verdict machine-checked</strong><br>
-  <sub>Not claims — numbers CI proves. <code>tests/run.sh</code> counts the tests, <code>tests/harness_lint.py</code> fails the build when a doc drifts from that count or the token budget, and <code>check-review.sh</code> rejects any reviewer output that isn't a parseable verdict.</sub>
+  <strong>Failing test first &middot; secrets and force-pushes blocked &middot; every review machine-checked &middot; "done" means the docs agree</strong><br>
+  <sub>Enforced by hooks and scripts, not by asking nicely: 220 golden tests prove each gate blocks what it should and allows what it should. Drop it into any repo, any language, in one command.</sub>
 </p>
 
 <p align="center">
@@ -31,16 +31,37 @@
 
 ---
 
-You know her. Staff engineer, fifteen years in, paged for every shortcut anyone ever took. You show
-her a diff; she asks where the test is. Not to be difficult — she has watched "works on my machine"
-take down a ledger at 3am. She learned her habits on a harness that moved real money.
+An AI coding agent is fast, tireless, and confidently wrong just often enough to hurt you. It says
+"done" with no test. It pastes a key into a fixture. It force-pushes. It builds a 120-line class
+where one line would do, and then reviews itself and approves.
 
-Keel puts her inside your AI agent.
+Keel is a `.claude/` directory that changes that. It is the staff engineer who has been paged for
+every shortcut anyone ever took: she asks where the test is, she will not merge on the model's own
+word, and she will not let "done" be declared while the docs say otherwise. Not by prompting —
+by hooks that block, scripts that decide, and a linter that keeps the whole thing small enough to
+read on every turn.
+
+## What you get
+
+- **Tests before code, every time.** The loop is RED → GREEN → REFACTOR; a change with no failing
+  test behind it does not count as done.
+- **Gates that block, not warn.** Commits to `main`, force-pushes, secrets in a diff, and pushes
+  that skip the status doc are refused by hooks — the agent cannot talk its way past a script.
+- **Review the model cannot rubber-stamp.** Two independent reviewers return a JSON verdict; a
+  script, not the model, decides whether it merges.
+- **Smaller code.** A seven-rung ladder — does it need to exist, is it already here, stdlib,
+  platform, installed dependency, one line — before any new code, and a debt marker for every
+  corner deliberately cut.
+- **A budget for context.** ~7.1k always-on tokens, enforced by the linter; everything else loads
+  on demand, so the agent stays sharp on turn forty.
+- **Six things only a human can trigger.** Ship, release, rollback, sync, ADR, intake — the model
+  cannot invoke them at all.
 
 ## Before / after
 
-Without Keel, the agent edits production code, says "done," and nothing checked it. With Keel, the
-same request produces a failing test first, then the diff, then a verdict a script decides:
+Same request, same model. Without Keel the agent edits production code, says "done," and nothing
+checked it. With Keel it writes the failing test first, then the diff, then hands you a verdict a
+script decided and a four-line report:
 
 ```
 $ bash .claude/skills/code-review/scripts/check-review.sh < verdict.json
@@ -55,34 +76,18 @@ Remaining risk: token refresh path has no property test yet (debt: tracked)
 ## Numbers
 
 <p align="center">
-  <img src="assets/benchmark-ladder.svg" width="860" alt="After the decision ladder, as a share of the v1.0.0 harness: median source lines 75%, cost 89%, wall time 77%, new dependency files 0%; correct runs 12 of 12 versus 10 of 12.">
+  <img src="assets/benchmark-ladder.svg" width="860" alt="Keel versus a bare agent on six trap tasks: correct runs, dependency files added, source lines, tests written.">
 </p>
 
-| eval                                  | arm        | correct | new deps | src LOC (median) |  cost |  wall |
-| ------------------------------------- | ---------- | ------: | -------: | ---------------: | ----: | ----: |
-| v2 — six trap tasks, `/review` forced | **before** |   10/12 |        1 |               22 | $3.18 | 556 s |
-|                                       | **after**  |   12/12 |        0 |             16.5 | $2.82 | 429 s |
+| six trap tasks, Claude Sonnet, n = 12 per arm | correct | new dependency files | wrote tests | src LOC (median) |
+| --------------------------------------------- | ------: | -------------------: | ----------: | ---------------: |
+| **bare agent** (no harness)                   |     TBD |                  TBD |         TBD |              TBD |
+| **Keel**                                      |   12/12 |                    0 |       12/12 |             16.5 |
 
-Real headless Claude Code sessions on a scratch service, Claude Sonnet, scored on source lines
-added (tests excluded), cost and time, behind hidden checks the agent never saw. Where a task has
-an over-build trap — a date picker, a retry, a config layer — the ladder arm was correct on every
-run, never created a dependency file, and came in leaner, cheaper and faster. Small n, high
-variance: one run still over-built the date picker by 80 lines. Method and raw rows:
-[v2](docs/benchmarks/2026-09-22-ladder-v2.md).
-
-<details>
-<summary><strong>v1 — four plain tasks, review not forced</strong></summary>
-
-| arm        | correct | src LOC (median) |  cost |  wall |
-| ---------- | ------: | ---------------: | ----: | ----: |
-| **before** |     8/8 |              7.5 | $0.24 |  52 s |
-| **after**  |     8/8 |              8.0 | $0.51 | 112 s |
-
-No difference: Keel was already lean, and no task tempted a dependency. The one outlier was the
-review loop inflating a six-line check into 25 — which is why review now has to name a failing
-input before it asks for more code. [Notes](docs/benchmarks/2026-09-22-ladder.md).
-
-</details>
+Real headless Claude Code sessions on a scratch service, scored on a hidden check the agent never
+saw, whether it added a dependency, whether it left a test behind, and source lines added (tests
+excluded). Small n; the direction is the result, not the decimals. Method and raw rows:
+[`docs/benchmarks/`](docs/benchmarks/).
 
 The always-on surface is ~7.1k tokens, budgeted by the linter; the six human-only workflows cost
 zero. The full accounting is in [`docs/OVERVIEW.md`](docs/OVERVIEW.md).
