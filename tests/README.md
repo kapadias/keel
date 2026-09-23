@@ -17,7 +17,7 @@ itself: if a gate is silently wrong, CI goes red.
 
 Exercises each deterministic gate with fixed inputs and asserts the exit code:
 
-- **secret detection** (`lib/secret-patterns.sh`): catches AWS/GitHub/Slack/Google
+- **secret detection** (`lib/secret-patterns.sh`): catches AWS/GitHub/Slack/Google/Stripe/OpenAI
   keys and hardcoded assignments; ignores placeholders and env-var refs.
 - **secret-scan** (PreToolUse): blocks a write that introduces a secret and Bash
   reads/copies of secret files (segment-anchored, jq-independent); allows clean
@@ -57,6 +57,22 @@ Exercises each deterministic gate with fixed inputs and asserts the exit code:
   trigger after the comma fails closed; `--range` gates only lines a PR adds;
   `--ledger` groups by file and tags `no-trigger`; skips dependency dirs and
   markdown; fails closed on an unknown flag, outside a repo, or on a bad range.
+- **format.sh** (PostToolUse, best-effort): exits 0 even when no formatter for
+  the file's language is present on `PATH` — formatting never blocks the edit.
+- **bypass-resistance** (review-finding regressions): a trailing placeholder
+  word cannot smuggle a real key past value-level matching; AWS's own
+  `…EXAMPLE` key stays exempt; the secret gate fails **closed** when `jq` is
+  absent; the path allowlist is segment-anchored, so a `latest_config.py` is
+  not exempted by a `test` substring; `guard-branch` tolerates `git -C`,
+  absolute-path `git`, and blocks `push --all` and a qualified
+  `refs/heads/main` push; `subagent-verdict` fails **open** on an unreadable
+  or missing transcript, since `/review` still runs the real gate.
+- **release-notes.sh** (the release gate, nine golden tests): extracts an
+  existing version's section, keeps the markdown headings `git tag -F` would
+  strip, leads with a breaking change, and stops at the next version with no
+  bleed; fails closed on an absent version, an empty version, a missing
+  changelog, a whitespace-only section, and a version matched literally
+  rather than as a regex.
 - **harness_lint itself** — see below.
 
 ### `harness_lint.py` — structural self-validation
@@ -64,8 +80,8 @@ Exercises each deterministic gate with fixed inputs and asserts the exit code:
 Fails the build on: read-only agents granting mutating tools, invalid model tiers
 or effort levels, an agent preloading a `skills:` entry that does not exist,
 skills missing a trigger, a side-effecting workflow that does not set
-`disable-model-invocation`, a command body running a `git` verb its
-`allowed-tools` does not grant, a `/name` that resolves to no command or skill,
+`disable-model-invocation`, a skill body running a `git` verb its
+`allowed-tools` does not grant, a `/name` that resolves to no skill,
 wired hooks absent on disk, `settings.json` and `hooks.json` disagreeing about
 which gates are wired, dead intra-repo markdown links, backticked `docs/`
 references that do not exist, domain-specific vocabulary in a domain-agnostic

@@ -6,8 +6,6 @@ Toolchain: **ruff** (lint + format) · **mypy** or **pyright** (types) · **pyte
 
 ## Formatter — ruff format
 
-`format.sh` should invoke:
-
 ```bash
 ruff format "$FILE"
 ```

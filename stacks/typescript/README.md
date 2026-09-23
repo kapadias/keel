@@ -6,8 +6,6 @@ Toolchain: **eslint + prettier** (lint + format) · **tsc** (types) · **vitest 
 
 ## Formatter — prettier
 
-`format.sh` should invoke:
-
 ```bash
 prettier --write "$FILE"
 ```

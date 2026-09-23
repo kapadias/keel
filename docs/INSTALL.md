@@ -1,8 +1,9 @@
 # Installing Keel
 
 Keel is files, not a dependency. Two supported paths. **They are not equivalent** — a plugin install
-cannot carry the always-on rules or the permission posture (see the limitations below). Option A is
-the complete harness; Option B trades completeness for versioned, shareable distribution.
+carries only `rules/00-core.md`, not the other eight rules, `CLAUDE.md`, or the permission posture
+(see the limitations below). Option A is the complete harness; Option B trades completeness for
+versioned, shareable distribution.
 
 ## Option A — copy it in (standalone)
 
@@ -26,23 +27,25 @@ instead of overwriting it — chain `.claude/hooks/require-status-sync.sh` from 
 /plugin install keel@keel
 ```
 
-A plugin install brings the agents, skills, commands, and hooks
+A plugin install brings the agents, skills, and hooks
 (see [ADR 0006](adr/0006-distribute-keel-as-plugin.md) and
 [ADR 0007](adr/0007-plugin-install-is-not-equivalent.md)).
 
-### Known limitation 1 — the always-on rules are NOT loaded
+### Known limitation 1 — only `00-core.md` rides along
 
 Claude Code's plugin schema has **no `rules` component**, and the root `CLAUDE.md` lives outside the
-plugin root. A plugin install therefore loads **none** of Keel's operating discipline — the eight
-`.claude/rules/*.md` files and `CLAUDE.md` — even though those files sit inside the published plugin
-directory. The agents, skills, commands and hooks all arrive; the policy surface that tells the agent
-_how to work_ does not.
+plugin root. `rules/00-core.md` — the constitution: the three principles, the loop, the ladder, the
+never-list — rides `SessionStart` into the parent session and `SubagentStart` into every subagent, so
+that much of the operating discipline reaches the agent regardless. The other eight
+`.claude/rules/*.md` files and `CLAUDE.md` do **not** load, even though those files sit inside the
+published plugin directory. The agents, skills and hooks all arrive; the rest of the policy surface
+that tells the agent _how to work_ does not.
 
 Until that is closed, copy the discipline in alongside the plugin:
 
 ```bash
 git clone --depth 1 https://github.com/kapadias/keel /tmp/keel
-mkdir -p .claude && cp -r /tmp/keel/.claude/rules .claude/rules
+mkdir -p .claude/rules && cp -r /tmp/keel/.claude/rules/. .claude/rules/
 cp /tmp/keel/CLAUDE.md CLAUDE.md
 ```
 
