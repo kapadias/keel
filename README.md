@@ -36,10 +36,10 @@ An AI coding agent is fast, tireless, and confidently wrong just often enough to
 where one line would do, and then reviews itself and approves.
 
 Keel is a `.claude/` directory that changes that. It is the staff engineer who has been paged for
-every shortcut anyone ever took: she asks where the test is, she will not merge on the model's own
-word, and she will not let "done" be declared while the docs say otherwise. Not by prompting —
-by hooks that block, scripts that decide, and a linter that keeps the whole thing small enough to
-read on every turn.
+every shortcut anyone ever took: the one who asks where the test is, will not merge on the model's
+own word, and will not let "done" be declared while the docs say otherwise. Not by prompting — by
+hooks that block, scripts that decide, and a linter that keeps the whole thing small enough to read
+on every turn.
 
 ## What you get
 
@@ -202,7 +202,7 @@ It front-loads the work that prevents the 3am. A plan, a failing test and a revi
 than debugging in production. Net faster.
 
 **What if I really need to ship without a test?**
-She'll let you. On a branch. Behind a `debt:` marker naming when you'll fix it. While looking at you.
+You can. On a branch. Behind a `debt:` marker naming when you'll fix it. The gate will be watching.
 
 **Does it lock me into a language?**
 No. Three small files name tooling; everything else is principle and transfers unchanged.

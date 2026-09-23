@@ -63,6 +63,7 @@ release; v1.0.0 is the first tagged artifact.
   verdict and a synced status doc on every change. The "smaller code" claim is gone from the
   benefits list; the ladder is framed as a guard against over-building and against review asks.
   The chart uses the validated orange/blue pair on both themes (gray failed the palette check).
+  The staff-engineer persona is gender-neutral.
 
 - **2026-09-23** — README rewritten as a landing page: a staff-engineer persona, code before
   prose, the v2 benchmark as a chart (`assets/benchmark-ladder.svg`), a five-entry FAQ, Star
