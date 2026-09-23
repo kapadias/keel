@@ -139,7 +139,7 @@ match the code where the code is right, and the code was fixed where it failed o
   containing exactly one json-fenced block; zero-after-fence or multiple blocks fail closed as
   ambiguous. The orchestrating LLM never hand-extracts the block — that step is deterministic.
 
-`/ship` and `/review` are wired to run the script (see the commands); the "the parser decides" claim
+`/ship` and `/review` are wired to run the script (see the skills); the "the parser decides" claim
 in this ADR is true as of this amendment.
 
 ## Amendment (2026-09-22)

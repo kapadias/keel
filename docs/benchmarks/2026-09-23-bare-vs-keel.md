@@ -9,10 +9,13 @@ compared Keel to its own previous version; this one adds the arm that matters.
 Same six trap tasks and scratch project as v2 (date picker, debounce, id, retry, config,
 snapshot). Three arms: `none` = no `.claude/`, no `CLAUDE.md`, the prompt's "Run /review before
 you finish" replaced by "Review your change before you finish"; `before` = the v1.0.0 harness;
-`after` = this branch (ladder, `lean`, review-inflation rule), `/review` forced. Claude Sonnet,
-headless, two runs per task per arm (n = 12 per arm). Scored on a hidden check the agent never
-saw, whether a dependency file was created, whether any test file was left behind, source lines
-added (tests excluded), cost and wall time. Rows: [`2026-09-23-bare-vs-keel-runs.tsv`](2026-09-23-bare-vs-keel-runs.tsv).
+`after` = the ladder change (v1.0.0 → the next release) (ladder, `lean`, review-inflation rule),
+`/review` forced. Claude Sonnet, headless, two runs per task per arm (n = 12 per arm). The
+`before` and `after` rows are the v2 runs reused unchanged, from the same archived commit
+`04f0772`; only the `none` arm was newly run for this eval. Scored on a hidden check the agent
+never saw, whether a dependency file was created, whether any test file was left behind, source
+lines added (tests excluded), cost and wall time. Rows:
+[`2026-09-23-bare-vs-keel-runs.tsv`](2026-09-23-bare-vs-keel-runs.tsv).
 
 ## Result
 

@@ -59,6 +59,8 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
 
 - **2026-09-23** — Open-source cleanup: the internal planning doc and this file's history removed;
   every kept document corrected against the tree (plugin coverage, counts, budgets, paths).
+  Part 2 (ADRs, benchmark notes, INSTALL, OVERVIEW, CONTRIBUTING, SECURITY, tests and stacks
+  READMEs) is in progress in this working tree.
 
 ## Next / open
 

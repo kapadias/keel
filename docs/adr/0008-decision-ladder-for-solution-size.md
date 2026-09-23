@@ -31,9 +31,9 @@ loads it for none.
    which requires golden and property tests on the critical surface. Its output rule — code first, at
    most three lines — contradicts the Assumptions/Changed/Verified/Remaining-risk report this harness
    requires of every completed unit. And its intensity level is a flag file the model itself writes,
-   with no deterministic gate in front of it — the same objection that already rejected persistent
-   agent `memory:` state (ROADMAP WS3): free-text model output steering future model behavior, with
-   nothing between it and the consequence.
+   with no deterministic gate in front of it — the same objection that already rejected the
+   persistent-memory option rejected earlier: free-text model output steering future model
+   behavior, with nothing between it and the consequence.
 3. **Port intensity modes (lite/full/ultra) into Keel.** Rejected as YAGNI: Keel's loop is always
    "full" — there is no lighter mode to select, so a mode switch would be state with no use.
 4. **Absorb the ideas natively as Keel content and gates** (chosen). Take the parts that survive
@@ -83,17 +83,21 @@ subagents, so the hook emits nothing there and never pays twice.
   not `category` — see the amendment to ADR-0005). The upgrade path, if a simplicity finding is ever
   observed blocking a merge alone, is a category-aware cap inside `check-review.sh`.
 - The expected saving from the ladder is an estimate, not a measurement, until it is tested inside
-  Keel. The first ROADMAP WS7 behavioral eval should be a ladder on/off comparison on the same
-  tickets, scoring source LOC, tokens, cost, and turns, behind a correctness and safety gate.
+  Keel. The first behavioural eval should be a ladder on/off comparison on the same tickets,
+  scoring source LOC, tokens, cost, and turns, behind a correctness and safety gate.
 
 The source of these ideas is credited in `README.md`.
 
 ## Amendment (2026-09-22) — the lens must bind in review
 
-The first WS7 eval (`../benchmarks/2026-09-22-ladder.md`) found no difference between arms on plain
-tasks and one outlier where the review loop, not the first draft, inflated a six-line check into
-25 lines: every MEDIUM was built because §4 said "fix MEDIUM when feasible". The ladder now applies
-to the reviewer's ask: a finding whose fix adds code must name the input that reaches the bad path
-today, and a MEDIUM without one is answered with a `debt:` marker rather than code. Two lint pins
-hold the rule. A deterministic inflation gate (diff size before vs. after review) is the upgrade
-path if the second eval shows prose is not enough.
+The first behavioural eval (`../benchmarks/2026-09-22-ladder.md`) found no difference between arms
+on plain tasks and one outlier where the review loop, not the first draft, inflated a six-line
+check into 25 lines: every MEDIUM was built because §4 said "fix MEDIUM when feasible". The ladder
+now applies to the reviewer's ask: a finding whose fix adds code must name the input that reaches
+the bad path today, and a MEDIUM without one is answered with a `debt:` marker rather than code.
+Two lint pins hold the rule. The v2 eval (`../benchmarks/2026-09-22-ladder-v2.md`, six trap tasks,
+`/review` forced) and the bare-agent eval (`../benchmarks/2026-09-23-bare-vs-keel.md`) are what
+followed: Keel with the ladder landed 12/12 correct with no dependency file and a lower median
+than v1.0.0, while a bare agent on the same tasks was also 12/12 correct with fewer lines and no
+tests. A deterministic inflation gate (diff size before vs. after review) remains the upgrade path
+if prose review discipline proves insufficient.

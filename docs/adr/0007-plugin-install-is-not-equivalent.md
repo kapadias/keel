@@ -73,3 +73,12 @@ assumption:
 - Compressing the always-on surface is now load-bearing for distribution, not only for tokens: below
   ~9,000 characters the core can ride the `SessionStart` channel and the rules gap closes for real.
 - ADR 0006's distribution decision stands. Only its component-coverage claim is superseded.
+
+## Amendment (2026-09-23)
+
+The `SessionStart` carrier deferred above shipped. `rules/00-core.md` is ~3,420 characters, well
+under the 10,000-character `additionalContext` cap, so it rides the channel intact — the rules gap
+this ADR describes is closed for the top-level conversation. ADR 0008's `SubagentStart` hook
+extends the same carrier to spawned subagents in plugin mode. The "deferred … the current core is
+~29,000 characters" text in Options considered is historical: it describes the pre-compaction core,
+not the shipped one.
