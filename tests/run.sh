@@ -476,7 +476,7 @@ BQ="$(mktemp -d)"; mkdir -p "$BQ/hooks" "$BQ/rules"; cp "$HOOKS/require-status-s
 printf '# Core\nsay "hi" and C:\\path\\ end\\\n' > "$BQ/rules/00-core.md"
 out="$(printf '{}' | PATH="$NOJQ" CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$BQ" "$SA")"
 dec="$(printf '%s' "$out" | python3 -c 'import json,sys; print(json.load(sys.stdin)["hookSpecificOutput"]["additionalContext"])' 2>/dev/null)"; check "subagent-start: no-jq fallback with backslashes and quotes is valid JSON" 0 "$?"
-contains "subagent-start: no-jq fallback round-trips a backslash and a quote" 'say "hi" and C:\path\ end\' "$dec"
+contains "subagent-start: no-jq fallback round-trips a backslash and a quote" "say \"hi\" and C:\\path\\ end\\" "$dec"
 rm -rf "$BQ"
 # A control character in the carrier must not break the JSON.
 CTL="$(mktemp -d)"; mkdir -p "$CTL/hooks" "$CTL/rules"; cp "$HOOKS/require-status-sync.sh" "$CTL/hooks/"

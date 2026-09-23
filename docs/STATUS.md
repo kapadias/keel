@@ -53,6 +53,7 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
 
 - **2026-09-23** — Public docs describe Keel as it is: release-note framing removed from this
   file and from the benchmark write-ups; the bare-agent eval leads with bare agent vs Keel.
+  CI shellcheck note (SC1003) in `tests/run.sh` cleared; PR to `main` open.
 
 ## Next / open
 
