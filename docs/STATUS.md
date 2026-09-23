@@ -54,11 +54,14 @@ release; v1.0.0 is the first tagged artifact.
 
 ## Recently changed
 
-- **2026-09-23** — README copy rewritten to say what Keel is and why (in progress): the intro
-  names the problem (an agent that says "done" with no test, pastes a key, force-pushes,
-  over-builds), a "What you get" list states the benefit, and the Numbers section is being
-  re-based on **Keel vs a bare agent** on the same six trap tasks — the bare-agent arm is running;
-  its cells read TBD until it lands and the chart is redrawn.
+- **2026-09-23** — README says what Keel is and why, and the Numbers are **Keel vs a bare agent**
+  (`docs/benchmarks/2026-09-23-bare-vs-keel.md`): same six trap tasks, Sonnet, n = 12 per arm.
+  **The bare agent was also 12/12 correct, added no dependency, wrote a median of 6.5 lines at
+  $0.13 — and left zero tests behind in twelve runs.** Keel: 12/12, 0 dependencies, 16.5 lines,
+  $2.82, a test on every run. The page now says that straight: Keel does not win on lines or
+  price against a good model on small tasks; it buys a test, two reviews, a machine-checked
+  verdict and a synced status doc on every change. The "smaller code" claim is gone from the
+  benefits list; the ladder is framed as a guard against over-building and against review asks.
 
 - **2026-09-23** — README rewritten as a landing page: a staff-engineer persona, code before
   prose, the v2 benchmark as a chart (`assets/benchmark-ladder.svg`), a five-entry FAQ, Star

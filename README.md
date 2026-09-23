@@ -49,9 +49,9 @@ read on every turn.
   that skip the status doc are refused by hooks — the agent cannot talk its way past a script.
 - **Review the model cannot rubber-stamp.** Two independent reviewers return a JSON verdict; a
   script, not the model, decides whether it merges.
-- **Smaller code.** A seven-rung ladder — does it need to exist, is it already here, stdlib,
-  platform, installed dependency, one line — before any new code, and a debt marker for every
-  corner deliberately cut.
+- **A ladder against over-building.** Does it need to exist, is it already here, stdlib,
+  platform, installed dependency, one line — asked before any new code, and again of every review
+  ask; every corner deliberately cut carries a `debt:` marker with the trigger to revisit it.
 - **A budget for context.** ~7.1k always-on tokens, enforced by the linter; everything else loads
   on demand, so the agent stays sharp on turn forty.
 - **Six things only a human can trigger.** Ship, release, rollback, sync, ADR, intake — the model
@@ -75,18 +75,23 @@ Remaining risk: token refresh path has no property test yet (debt: tracked)
 
 ## Numbers
 
+Same model, same six tasks, with no harness and with Keel — twelve runs each, scored on hidden
+checks the agent never saw:
+
 <p align="center">
-  <img src="assets/benchmark-ladder.svg" width="860" alt="Keel versus a bare agent on six trap tasks: correct runs, dependency files added, source lines, tests written.">
+  <img src="assets/benchmark-ladder.svg" width="860" alt="Keel versus a bare agent on six trap tasks: both 12 of 12 correct; runs that left a test behind 0 versus 12; dependency files 0 and 0; median source lines 6.5 versus 16.5; cost per run $0.13 versus $2.82.">
 </p>
 
-| six trap tasks, Claude Sonnet, n = 12 per arm | correct | new dependency files | wrote tests | src LOC (median) |
-| --------------------------------------------- | ------: | -------------------: | ----------: | ---------------: |
-| **bare agent** (no harness)                   |     TBD |                  TBD |         TBD |              TBD |
-| **Keel**                                      |   12/12 |                    0 |       12/12 |             16.5 |
+| Claude Sonnet, six trap tasks, n = 12 per arm | correct | left a test behind | added a dependency | src LOC (median) |  cost |
+| --------------------------------------------- | ------: | -----------------: | -----------------: | ---------------: | ----: |
+| **bare agent** (no harness)                   |   12/12 |               0/12 |                  0 |              6.5 | $0.13 |
+| **Keel**                                      |   12/12 |              12/12 |                  0 |             16.5 | $2.82 |
 
-Real headless Claude Code sessions on a scratch service, scored on a hidden check the agent never
-saw, whether it added a dependency, whether it left a test behind, and source lines added (tests
-excluded). Small n; the direction is the result, not the decimals. Method and raw rows:
+Read it straight. On tasks this small a good model does not over-build, so Keel does not win on
+lines or price — it costs about twenty times more per change. What it buys, on every one of the
+twelve runs and on none of the bare agent's: a failing test written first, two independent
+reviews, a verdict a script decided, and a status doc that agrees with the code. Whether that is
+worth it depends on what a wrong "done" costs you. Method, raw rows and the earlier ladder evals:
 [`docs/benchmarks/`](docs/benchmarks/).
 
 The always-on surface is ~7.1k tokens, budgeted by the linter; the six human-only workflows cost
