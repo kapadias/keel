@@ -20,7 +20,7 @@ Walk the five-mirror Definition of Done (full checklist: [`.claude/rules/sync.md
 4. **Harness** — any agent/skill/command/rule/hook changed? → `.claude/README.md` and `CLAUDE.md` updated?
 5. **Memory** — durable decisions (the _why_, rejected alternatives, learned invariants) captured to survive a context reset?
 6. **Tests** — suite green? A task is never done in any mirror while tests are red.
-7. **Debt ledger** — run `bash $KEEL/skills/lean/scripts/check-debt.sh --ledger` (`$KEEL` = the
+7. **Debt ledger** — run `bash $NONNA/skills/lean/scripts/check-debt.sh --ledger` (`$NONNA` = the
    harness root announced at SessionStart). The ledger is part of the docs mirror: a `no-trigger`
    marker is drift — name its trigger or delete the corner.
 

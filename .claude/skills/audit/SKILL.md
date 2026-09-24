@@ -22,7 +22,7 @@ and security are `/review`'s job, not this skill's.
 2. **Rank.** Merge the returned findings, deduplicate, and order biggest cut first. One line per
    finding, tagged `delete:` / `stdlib:` / `native:` / `yagni:` / `shrink:` (the tag format is
    defined in the `lean` skill).
-3. **Ledger.** Run `bash $KEEL/skills/lean/scripts/check-debt.sh --ledger`, where `$KEEL` is the
+3. **Ledger.** Run `bash $NONNA/skills/lean/scripts/check-debt.sh --ledger`, where `$NONNA` is the
    harness root announced at SessionStart (`.claude` in a standalone checkout — never guess it),
    and append its output to the report. A `no-trigger` marker from the script is itself a finding —
    report it, do not discard it.

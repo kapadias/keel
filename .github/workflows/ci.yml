@@ -1,8 +1,8 @@
-# Keel CI — the harness held to its own bar. Three deterministic gates:
+# Nonna CI — the harness held to its own bar. Three deterministic gates:
 # shellcheck (every script), harness-lint (the harness validates itself), and
 # the gate golden tests (proof each gate blocks vs. allows).
 # Adopters: add your own lint/type/test gate as another job — see stacks/.
-name: Keel CI
+name: Nonna CI
 
 on:
   push:

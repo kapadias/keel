@@ -1,11 +1,51 @@
 # Changelog
 
-All notable changes to Keel. Format follows [Keep a Changelog](https://keepachangelog.com/1.1.0/);
+All notable changes to Nonna. Format follows [Keep a Changelog](https://keepachangelog.com/1.1.0/);
 versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
 ### Added
+
+- **"Done" means the suite passes.** In the benchmark, agents said "done" on a broken suite in 16 of
+  16 bare runs and most harnessed ones: nothing deterministic ran the tests. Now the Stop hook and
+  the pre-push hook run the project's own test command (pytest, npm, go or cargo, detected; or
+  `NONNA_TEST_CMD`) whenever code changed, and refuse on red. `hooks/lib/tests.sh` holds it.
+  Detection runs only in a copy-in install; under the plugin the gate waits for an explicit
+  `NONNA_TEST_CMD`. A green tree is not re-tested at every turn end, a Stop-time timeout does not
+  block, and the pre-push gate reads the pushed range from git, so a branch's first push is gated.
+  The push scan covers every commit the remote lacks, one diff per commit, so a key in a local-only
+  base commit, or one added and removed inside the push, is caught; colour, external-diff config and
+  non-ASCII names no longer hide a line. Merge resolutions are scanned too, a URL push is judged
+  against that URL, a failed `git log` blocks, a shallow clone's graft is excluded, and the scan is
+  one pass over the push rather than one history walk per file.
+- **One-command install** (`install.sh`, `--host` for eight agent hosts), host rules generated from
+  `00-core.md` (`hosts/build.py`, drift-linted), and a git `pre-commit` hook every host gets.
+
+### Changed
+
+- **Security review of the installer and the new hooks.** `install.sh` merges into an existing
+  `.claude/`, never writes through a symlink, chmods only what it copied, and exits non-zero rather
+  than linking a git hook to a missing script. `pre-commit` reads staged file names literally and
+  binary-safe (type changes included), and fails closed when git cannot diff. The Stop hook's no-jq
+  output is valid JSON. The macOS timeout fallback kills the suite's whole process group. The
+  installer says so when your kept `.claude/settings.json` leaves Nonna's hooks unwired.
+- **Keel is now Nonna** (ADR-0010). The plugin id is `nonna@nonna`, environment variables are
+  `NONNA_*` (for example `NONNA_CRITICAL_PATHS`), and gate messages open with a line in her voice
+  before the technical reason. Reinstall the plugin under the new id.
+
+### Added
+
+- **Proportional review** (ADR-0009). `skills/review/scripts/review-lanes.sh` decides how much
+  review a diff buys: a diff the fast-lane classifier accepts gets one `code-reviewer` on the
+  cheaper tier, and the security reviewer runs only when a changed path or added line touches a
+  risky surface, on added or removed lines, in any file name, from any directory. It fails closed
+  to full review with security. `/review` itself and `/fix`'s single
+  reviewer move to the cheaper tier. Small changes start in `/fix`; off the critical surface, one
+  test that would have failed before is enough.
+- **Optional findings are named by the gate.** A verdict finding may carry `adds_code` and
+  `failing_input`. On approve, `check-review.sh` lists each adds-code finding with no failing input
+  as `optional:`, and the implementer leaves it. Exit codes unchanged.
 
 - **The decision ladder** (ADR-0008). `rules/00-core.md` now says, in seven rungs, how much code
   to write: YAGNI, already in this codebase, stdlib, native platform, installed dependency, one
@@ -34,9 +74,9 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **README says what Keel is and why**, with Keel measured against a bare agent, not against its
+- **README says what Nonna is and why**, with Nonna measured against a bare agent, not against its
   own previous version; the architecture detail (token economy, layers, crew, gates,
-  repository tree) lives verbatim in the new `docs/OVERVIEW.md`, and the bare-agent-vs-Keel
+  repository tree) lives verbatim in the new `docs/OVERVIEW.md`, and the bare-agent-vs-Nonna
   benchmark is a chart.
 - **A review ask that adds code must name a failing input** (ADR-0008, amended). The severity
   rubric, `code-review`, `code-reviewer`, `implementer` and `dev-process.md` §4 ("fix MEDIUM when it
@@ -50,11 +90,29 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
   one first; `test-engineer` applies the ladder to test code without cutting the test.
 - The no-jq fallback of the SessionStart emitter now escapes its payload — a multi-line carrier
   was not valid JSON without jq.
-- **The banner carries no version and no licence.** `assets/keel-banner.svg` hardcoded `v0.1.0` and
+- **The banner carries no version and no licence.** `assets/nonna-banner.svg` hardcoded `v0.1.0` and
   `MIT` — the version was two releases stale and nobody noticed, which is the argument against
   putting expiring facts in a hand-edited image. The `License` and `release` badges are gone from the
   README header for the same reason. The live version lives in `CHANGELOG.md` and the manifests; the
   licence lives in `LICENSE`.
+
+### Fixed
+
+- **`subagent-verdict.sh` graded the wrong transcript and blocked the wrong verdicts** (#7). The
+  SubagentStop gate read `transcript_path`, which for that event is the _parent_ session's
+  transcript — so `check-review.sh` ran against the orchestrator's prose and rejected every
+  reviewer verdict as "not valid JSON". It now reads `last_assistant_message` (the subagent's final
+  text; the hooks reference names it as the source because the transcript file may lag), falls
+  back to the last assistant text in `agent_transcript_path`, and never touches the parent
+  transcript — if neither field is present it fails open with a stderr note, since grading the
+  parent can only produce a false verdict. It also blocked on _any_ non-zero checker exit; only
+  exit 2 (no verdict, unparseable, ambiguous) is a breach of the contract, while exit 1 is a
+  well-formed `request_changes` or a blocking finding — the reviewer doing its job, which `/review`
+  and `/ship` turn into a red gate. **Behaviour change:** an approve carrying a CRITICAL finding no
+  longer bounces the reviewer; it stops, and the downstream checker on the same text still exits 1.
+  And it honours `stop_hook_active`, so a reviewer that cannot produce the contract is sent back
+  once, not forever. The `tests/run.sh` section is rewritten (24 checks, 8 red against the old
+  hook); the old section had pinned the bug by feeding `transcript_path`.
 
 ## [1.0.0] — 2026-08-01 — "The Model Cannot Ship Itself"
 

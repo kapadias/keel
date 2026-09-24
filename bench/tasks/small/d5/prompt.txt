@@ -1,0 +1,1 @@
+Make the rates URL in app/rates.py configurable per environment instead of hardcoded. Run /review before you finish. Do not commit; do not push.

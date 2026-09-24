@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Keel harness linter — the harness validated against its own rules.
+"""Nonna harness linter — the harness validated against its own rules.
 
 Every check below fails the build (boundaries.md: deterministic gates decide):
   - agents: valid frontmatter (name/description/model/tools); model in the
@@ -10,7 +10,7 @@ Every check below fails the build (boundaries.md: deterministic gates decide):
   - cross-links: every intra-repo markdown link resolves to a real file.
   - slash refs: every `/name` named in the harness resolves to a command or skill.
   - domain leak: no domain-specific vocabulary in a domain-agnostic harness.
-  - external names: a project whose ideas Keel adapted is credited in README.md
+  - external names: a project whose ideas Nonna adapted is credited in README.md
     and named nowhere else.
   - the ladder: the seven rung keywords appear in both 00-core.md (always-on)
     and skills/lean/SKILL.md (depth), so the two copies cannot drift (ADR-0008).
@@ -18,7 +18,7 @@ Every check below fails the build (boundaries.md: deterministic gates decide):
   - review inflation: dev-process §4 and the severity rubric keep the rule that a
     review ask which adds code must name a failing input (ADR-0008).
 
-KEEL_LINT_ROOT points the linter at a different tree. It exists so tests/run.sh
+NONNA_LINT_ROOT points the linter at a different tree. It exists so tests/run.sh
 can golden-test the linter itself against mutated copies of this repo — a linter
 with no failing-case test is an unverified gate. CI never sets it.
 """
@@ -31,7 +31,7 @@ import os
 import re
 import sys
 
-ROOT = os.environ.get("KEEL_LINT_ROOT") or os.path.dirname(
+ROOT = os.environ.get("NONNA_LINT_ROOT") or os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))
 )
 offenders: list[str] = []
@@ -149,7 +149,9 @@ for cmd in ("review", "ship"):
 # any "N-gate" / "N golden" number in the living docs must equal it. Historical
 # entries under STATUS.md's "Recently changed" are records, not claims — skipped.
 with open(f"{ROOT}/tests/run.sh", encoding="utf-8") as fh:
-    ACTUAL_GATES = len(re.findall(r'\b(?:check|contains) "', fh.read()))
+    ACTUAL_GATES = len(
+        re.findall(r'\b(?:check|contains|sv_blocks|sv_allows) "', fh.read())
+    )
 COUNT = re.compile(r"\b(\d+)[- ](?:gate|golden)\b", re.IGNORECASE)
 for rel in (
     "CLAUDE.md",
@@ -321,18 +323,23 @@ for md in glob.glob(f"{ROOT}/.claude/**/*.md", recursive=True):
 # was built. dev-process §4 and the rubric carry the rule; pin the load-bearing phrases.
 for rel, phrase in (
     (".claude/rules/dev-process.md", "names a failing case"),
-    (".claude/skills/code-review/references/severity-rubric.md", "Does the fix add code?"),
+    (
+        ".claude/skills/code-review/references/severity-rubric.md",
+        "Does the fix add code?",
+    ),
 ):
     path = os.path.join(ROOT, rel)
     try:
         with open(path, encoding="utf-8") as fh:
             if phrase not in fh.read():
-                bad(f"{rel}: missing '{phrase}' — a review ask that adds code must name a failing input (ADR-0008)")
+                bad(
+                    f"{rel}: missing '{phrase}' — a review ask that adds code must name a failing input (ADR-0008)"
+                )
     except FileNotFoundError:
         bad(f"review-inflation rule: missing {rel}")
 
 # --- external names: credit lives in README.md and nowhere else ---
-# Keel adapts ideas from other projects; the credit line in the root README is the
+# Nonna adapts ideas from other projects; the credit line in the root README is the
 # one place their names appear. Everything the harness ships stays brand-free. The
 # term is assembled at runtime so this file cannot trip its own check.
 EXTERNAL_NAMES = ("pony" + "tail",)
@@ -349,11 +356,21 @@ for dirpath, dirnames, filenames in os.walk(ROOT):
         with open(path, encoding="utf-8", errors="replace") as fh:
             for n, line in enumerate(fh, 1):
                 if EXTERNAL.search(line):
-                    bad(f"{rel}:{n}: external project name — credit belongs in README.md only")
+                    bad(
+                        f"{rel}:{n}: external project name — credit belongs in README.md only"
+                    )
 
 # --- the ladder: one ruleset, two copies (always-on rungs; on-demand depth) ---
 # The seven rungs are pinned by keyword because the copies differ in depth by design.
-LADDER = ("YAGNI", "codebase", "stdlib", "native", "installed", "one line", "minimum code")
+LADDER = (
+    "YAGNI",
+    "codebase",
+    "stdlib",
+    "native",
+    "installed",
+    "one line",
+    "minimum code",
+)
 for rel in (".claude/rules/00-core.md", ".claude/skills/lean/SKILL.md"):
     path = os.path.join(ROOT, rel)
     if not os.path.isfile(path):
@@ -363,7 +380,9 @@ for rel in (".claude/rules/00-core.md", ".claude/skills/lean/SKILL.md"):
         text = fh.read()
     for rung in LADDER:
         if rung not in text:
-            bad(f"{rel}: ladder rung '{rung}' missing — 00-core.md and the lean skill must agree (ADR-0008)")
+            bad(
+                f"{rel}: ladder rung '{rung}' missing — 00-core.md and the lean skill must agree (ADR-0008)"
+            )
 
 # --- debt gate wiring: /review gates the delta, /sync prints the ledger (ADR-0008) ---
 for cmd in ("review", "sync"):
@@ -374,6 +393,31 @@ for cmd in ("review", "sync"):
                 bad(f"{cmd_path}: does not wire check-debt.sh (ADR-0008)")
     except FileNotFoundError:
         bad(f"debt gate wiring: missing {os.path.relpath(cmd_path, ROOT)}")
+
+# --- host rule files: generated from 00-core.md, never hand-edited (hosts/build.py) ---
+_hb = os.path.join(ROOT, "hosts", "build.py")
+if os.path.exists(_hb):
+    import subprocess
+
+    _r = subprocess.run(
+        [sys.executable, _hb, "--check"],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "NONNA_LINT_ROOT": ROOT},
+    )
+    for _line in _r.stderr.splitlines():
+        bad(_line)
+else:
+    bad("hosts/build.py is missing — every agent host's rules file is generated by it")
+
+# --- review lanes: /review sizes itself by script, never by the model's judgement (ADR-0009) ---
+review_path = f"{ROOT}/.claude/skills/review/SKILL.md"
+try:
+    with open(review_path, encoding="utf-8") as fh:
+        if "review-lanes.sh" not in fh.read():
+            bad(f"{review_path}: does not wire review-lanes.sh (ADR-0009)")
+except FileNotFoundError:
+    bad("review lanes wiring: missing .claude/skills/review/SKILL.md")
 
 # --- token budget: the always-on surface is gated, not aspirational ---
 # CLAUDE.md + rules/*.md are paid on every turn (token-economy.md). Budgets are
@@ -498,7 +542,7 @@ if os.path.isfile(plugin_hooks):
     for _event, entries in (ph.get("hooks") or {}).items():
         for entry in entries:
             for hook in entry.get("hooks", []):
-                # The keel plugin's root is .claude/ (marketplace source "./.claude").
+                # The nonna plugin's root is .claude/ (marketplace source "./.claude").
                 m = re.search(
                     r"\$\{CLAUDE_PLUGIN_ROOT\}/(\S+\.sh)", hook.get("command", "")
                 )

@@ -1,9 +1,9 @@
-# Keel self-tests — the harness held to its own bar
+# Nonna self-tests — the harness held to its own bar
 
-Keel's thesis is _deterministic gates decide_. A harness that preaches gates must
+Nonna's thesis is _deterministic gates decide_. A harness that preaches gates must
 **prove its own gates fire** — otherwise it is the very "green suite that asserts
 nothing" it warns against ([ADR 0002](../docs/adr/0002-llm-proposes-gates-decide.md)).
-These tests are [`boundaries.md`](../.claude/rules/boundaries.md) applied to Keel
+These tests are [`boundaries.md`](../.claude/rules/boundaries.md) applied to Nonna
 itself: if a gate is silently wrong, CI goes red.
 
 ## What runs
@@ -33,11 +33,23 @@ Exercises each deterministic gate with fixed inputs and asserts the exit code:
 - **check-review** (review verdict gate): blocks on `request_changes`, any
   CRITICAL/HIGH, or an out-of-schema verdict/severity; extracts one fenced json
   block; fails closed on invalid JSON — same on the jq and no-jq paths.
+- **check-review, optional findings** (ADR-0009): an approving verdict lists each MEDIUM/LOW
+  finding whose fix adds code with no failing input as `optional:`; a named input or a
+  non-code fix is not listed; the exit code never changes.
 - **check-trivial** (fast-lane eligibility): qualifies a small reversible change;
   disqualifies over-budget, lockfile, critical-surface, and rename-into-critical
   changes; fails closed off a repo.
+- **review-lanes** (review proportionality, ADR-0009): a fast-lane-sized, ordinary diff takes the
+  light lane with no security review. Risky added **or removed** code (Python, Go, Node shell calls,
+  a deleted auth check), a deleted risky file, a dependency manifest, harness markdown, a
+  `NONNA_CRITICAL_PATHS` match, a non-ASCII file name, a subdirectory cwd and an untracked symlink
+  all end in security review. No `develop`/`main` base, a bad base, no repo, a missing classifier
+  or a legacy `KEEL_CRITICAL_PATHS` alone fail closed.
 - **dep-audit** (supply-chain): exits non-zero when a required scanner is missing
   (a skipped scan is not a pass).
+- **tests say no** (Stop and pre-push): when code changed, both run the project's own test
+  command (detected, or `NONNA_TEST_CMD`) and refuse on red; the Stop hook blocks once, then lets
+  an agent that cannot fix it stop and say so.
 - **stop-dod** (Stop): blocks a turn ending with tracked code changed and
   `docs/STATUS.md` untouched; lets doc-only edits, untracked scratch, and a clean
   tree end freely; fails **open** outside a git repo, because a Stop hook that
@@ -96,7 +108,7 @@ project's name anywhere but `README.md`.
 
 A linter with no failing-case test is an unverified gate: it would still print
 `OK` if a check silently stopped firing — the same unwired-gate defect ADR-0005
-exists to prevent, one level up. `KEEL_LINT_ROOT` retargets the linter at a
+exists to prevent, one level up. `NONNA_LINT_ROOT` retargets the linter at a
 different tree so `run.sh` can copy the repo, break exactly one thing, and assert
 it is caught. CI never sets the variable.
 

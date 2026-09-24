@@ -1,4 +1,4 @@
-# Keel Stack Pack — Rust
+# Nonna Stack Pack — Rust
 
 Toolchain: **rustfmt** (format) · **clippy** (lint) · **cargo test** (tests) · **cargo-llvm-cov** or **cargo-tarpaulin** (coverage) · **proptest** (property tests).
 

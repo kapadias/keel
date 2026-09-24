@@ -6,14 +6,14 @@
 
 ## Context
 
-Keel governs process — TDD, machine-checked review, five-mirror sync — with rigor, but it says almost
+Nonna governs process — TDD, machine-checked review, five-mirror sync — with rigor, but it says almost
 nothing about the **size** of the solution an agent should produce. `engineering.md`'s "Simplicity"
 bullet is 42 words. In practice, agents over-build: hand-rolled stdlib logic, single-implementation
 abstractions, avoidable dependencies, scaffolding "for later" that nobody asked for. A shortcut
 deferred without a marker and a trigger tends to rot into "later means never" — there is no gate that
 ever asks whether the deferred work should have happened by now.
 
-Separately, a real gap exists under a plugin install: subagents received none of Keel's constitution.
+Separately, a real gap exists under a plugin install: subagents received none of Nonna's constitution.
 `SessionStart`'s `additionalContext` is parent-only — it reaches the top-level conversation, never a
 Task-spawned subagent. Verified against the Claude Code hooks reference: `SubagentStart` hooks "can
 inject context into the subagent" via the same `additionalContext` mechanism, and a non-fork
@@ -26,7 +26,7 @@ loads it for none.
 1. **Do nothing.** Rejected: agents keep over-building with no vocabulary, no marker, and no gate to
    catch it, and plugin-mode subagents keep running with zero policy — a silent gap this project is
    built to prevent.
-2. **Adopt a third-party "simplest solution" guidance plugin alongside Keel.** Rejected as the primary
+2. **Adopt a third-party "simplest solution" guidance plugin alongside Nonna.** Rejected as the primary
    path. Its test rule — one runnable check, no frameworks — contradicts [testing.md](./../../.claude/rules/testing.md),
    which requires golden and property tests on the critical surface. Its output rule — code first, at
    most three lines — contradicts the Assumptions/Changed/Verified/Remaining-risk report this harness
@@ -34,12 +34,12 @@ loads it for none.
    with no deterministic gate in front of it — the same objection that already rejected the
    persistent-memory option rejected earlier: free-text model output steering future model
    behavior, with nothing between it and the consequence.
-3. **Port intensity modes (lite/full/ultra) into Keel.** Rejected as YAGNI: Keel's loop is always
+3. **Port intensity modes (lite/full/ultra) into Nonna.** Rejected as YAGNI: Nonna's loop is always
    "full" — there is no lighter mode to select, so a mode switch would be state with no use.
-4. **Absorb the ideas natively as Keel content and gates** (chosen). Take the parts that survive
-   contact with Keel's existing principles — an ordered ladder, a marker convention for deliberate
+4. **Absorb the ideas natively as Nonna content and gates** (chosen). Take the parts that survive
+   contact with Nonna's existing principles — an ordered ladder, a marker convention for deliberate
    corners, a review lens for over-building, a root-cause discipline for bug fixes — and express each
-   one as Keel content or a Keel gate, dropping anything that would create a second, ungated authority
+   one as Nonna content or a Nonna gate, dropping anything that would create a second, ungated authority
    alongside the existing loop.
 
 ## Decision
@@ -47,7 +47,7 @@ loads it for none.
 A seven-rung decision ladder — YAGNI, already in this codebase, stdlib, native platform, installed
 dependency, one line, minimum code — lives compactly in `rules/00-core.md`, the only rule file a
 plugin install actually receives (via the `SessionStart` carrier), with full depth and worked examples
-in the new `lean` skill. A Keel-native `debt: <ceiling>, <upgrade trigger>` comment marks a deliberate
+in the new `lean` skill. A Nonna-native `debt: <ceiling>, <upgrade trigger>` comment marks a deliberate
 corner; `check-debt.sh` fails a marker that has a ceiling but no upgrade trigger named after the comma,
 and is wired into `/review` (gates the diff for newly introduced markers) and `/sync` (prints the
 ledger of every marker in the tree). Over-engineering findings become a new `category: simplicity` in
@@ -60,12 +60,12 @@ subagents, so the hook emits nothing there and never pays twice.
 
 | Topic              | Resolution                                                                                      | Why                                                                                                                     |
 | ------------------ | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Tests              | Keel's TDD + golden/property tests win outright                                                 | Safety is lexicographically prior; the ladder shortens the solution, never the test                                     |
+| Tests              | Nonna's TDD + golden/property tests win outright                                                 | Safety is lexicographically prior; the ladder shortens the solution, never the test                                     |
 | Report             | Kept as Assumptions/Changed/Verified/Remaining-risk; skipped-and-when goes under Remaining risk | The report format is load-bearing; no fifth shape competes with it                                                      |
 | Dependencies       | The existing ≥80% rule; always a library for parsing, dates, crypto, auth                       | Hand-rolling those is a security risk, not a flex                                                                       |
 | Intensity          | None — not ported                                                                               | The loop is always "full"; a mode switch is unused state                                                                |
 | Explanations       | Comment the why, ADRs, the audit trail                                                          | Matches [engineering.md](./../../.claude/rules/engineering.md) and [safety.md](./../../.claude/rules/safety.md) already |
-| Review tags        | Carried by Keel's existing JSON verdict contract, with a MEDIUM cap                             | One schema, one decider — see ADR-0005                                                                                  |
+| Review tags        | Carried by Nonna's existing JSON verdict contract, with a MEDIUM cap                             | One schema, one decider — see ADR-0005                                                                                  |
 | Bug fixes          | Root cause: grep every caller, fix the shared function once                                     | A per-caller patch leaves siblings broken; a shared fix is the smaller diff                                             |
 | Subagent injection | Plugin mode only; a standalone checkout loads rules natively                                    | Do not pay for a gap that does not exist in that install mode                                                           |
 
@@ -83,7 +83,7 @@ subagents, so the hook emits nothing there and never pays twice.
   not `category` — see the amendment to ADR-0005). The upgrade path, if a simplicity finding is ever
   observed blocking a merge alone, is a category-aware cap inside `check-review.sh`.
 - The expected saving from the ladder is an estimate, not a measurement, until it is tested inside
-  Keel. The first behavioural eval should be a ladder on/off comparison on the same tickets,
+  Nonna. The first behavioural eval should be a ladder on/off comparison on the same tickets,
   scoring source LOC, tokens, cost, and turns, behind a correctness and safety gate.
 
 The source of these ideas is credited in `README.md`.
@@ -96,8 +96,8 @@ check into 25 lines: every MEDIUM was built because §4 said "fix MEDIUM when fe
 now applies to the reviewer's ask: a finding whose fix adds code must name the input that reaches
 the bad path today, and a MEDIUM without one is answered with a `debt:` marker rather than code.
 Two lint pins hold the rule. The v2 eval (`../benchmarks/2026-09-22-ladder-v2.md`, six trap tasks,
-`/review` forced) and the bare-agent eval (`../benchmarks/2026-09-23-bare-vs-keel.md`) are what
-followed: Keel with the ladder landed 12/12 correct with no dependency file and a lower median
+`/review` forced) and the bare-agent eval (`../benchmarks/2026-09-23-bare-vs-nonna.md`) are what
+followed: Nonna with the ladder landed 12/12 correct with no dependency file and a lower median
 than v1.0.0, while a bare agent on the same tasks was also 12/12 correct with fewer lines and no
 tests. A deterministic inflation gate (diff size before vs. after review) remains the upgrade path
 if prose review discipline proves insufficient.

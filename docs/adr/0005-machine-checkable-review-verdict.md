@@ -13,11 +13,11 @@ Accepted
 
 ## Deciders
 
-Keel maintainers (owner: Shashank Kapadia)
+Nonna maintainers (owner: Shashank Kapadia)
 
 ## Context
 
-Keel's dev loop gates merges on review (see [dev-process.md](../../.claude/rules/dev-process.md)).
+Nonna's dev loop gates merges on review (see [dev-process.md](../../.claude/rules/dev-process.md)).
 In v0.1 the `code-reviewer` and `security-reviewer` agents produced **prose verdicts** — paragraphs
 of findings, a summary sentence, sometimes an explicit "approved" or "changes requested" embedded in
 free text. A human still had to read the prose and decide whether review had passed. This made "review
@@ -70,7 +70,7 @@ unstructured, making it impossible for any downstream step to consume it determi
 
 ## Decision
 
-Keel's review gate is machine-checkable. `code-reviewer` and `security-reviewer` agents **must** emit
+Nonna's review gate is machine-checkable. `code-reviewer` and `security-reviewer` agents **must** emit
 a JSON block conforming to the review-verdict schema as part of every verdict. The schema:
 
 ```json

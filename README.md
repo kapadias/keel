@@ -1,214 +1,120 @@
 <div align="center">
 
-<img src="assets/keel-banner.svg" alt="Keel — a production-grade, token-efficient harness for Claude Code" width="100%">
+<img src="assets/nonna-banner.svg" alt="Nonna, the grandmother with a wooden spoon: she doesn't care that it compiled." width="100%">
 
-<h1 align="center">Keel</h1>
+**Your AI agent says "done". Nonna makes it prove it.**
 
-<p align="center">
-  <em>The harness that makes your AI coding agent prove its work before anything ships.</em>
-</p>
-
-<p align="center">
-  <a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/Built%20for-Claude%20Code-D97757?style=for-the-badge" alt="Built for Claude Code"></a>
-  <a href="#install"><img src="https://img.shields.io/badge/Language-agnostic-2f855a?style=for-the-badge" alt="Language agnostic"></a>
-  <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-d97757?style=for-the-badge" alt="PRs welcome"></a>
-</p>
-
-<p align="center">
-  <strong>Failing test first &middot; secrets and force-pushes blocked &middot; every review machine-checked &middot; "done" means the docs agree</strong><br>
-  <sub>Enforced by hooks and scripts, not by asking nicely: 220 golden tests prove each gate blocks what it should and allows what it should. Drop it into any repo, any language, in four commands.</sub>
-</p>
-
-<p align="center">
-  <a href="#install">Install</a> &middot;
-  <a href="#how-it-works">How it works</a> &middot;
-  <a href="#commands">Commands</a> &middot;
-  <a href="docs/OVERVIEW.md">Overview</a> &middot;
-  <a href="CHANGELOG.md">Changelog</a>
-</p>
+<a href="#install"><img src="https://img.shields.io/badge/install-one_command-C8412B?style=flat-square" alt="One-command install"></a>
+<a href="#install"><img src="https://img.shields.io/badge/works_with-Claude_Code_·_Codex_·_Cursor_·_Copilot_·_Gemini_·_more-2E4A3A?style=flat-square" alt="Works with Claude Code, Codex, Cursor, Copilot, Gemini and more"></a>
+<a href="bench/"><img src="https://img.shields.io/badge/benchmark-reproducible-2E4A3A?style=flat-square" alt="Reproducible benchmark"></a>
+<a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-5A4A3F?style=flat-square" alt="MIT"></a>
 
 </div>
 
----
-
-An AI coding agent is fast, tireless, and confidently wrong just often enough to hurt you. It says
-"done" with no test. It pastes a key into a fixture. It force-pushes. It builds a 120-line class
-where one line would do, and then reviews itself and approves.
-
-Keel is a `.claude/` directory that changes that. It is the staff engineer who has been paged for
-every shortcut anyone ever took: the one who asks where the test is, will not merge on the model's
-own word, and will not let "done" be declared while the docs say otherwise. Not by prompting — by
-hooks that block, scripts that decide, and a linter that keeps the whole thing small enough to read
-on every turn.
-
-## What you get
-
-- **Tests before code, every time.** The loop is RED → GREEN → REFACTOR; a change with no failing
-  test behind it does not count as done.
-- **Gates that block, not warn.** Commits to `main`, force-pushes, secrets in a diff, and pushes
-  that skip the status doc are refused by hooks — the agent cannot talk its way past a script.
-- **Review the model cannot rubber-stamp.** Up to two independent reviewers return a JSON verdict;
-  a script, not the model, decides whether it merges.
-- **A ladder against over-building.** Does it need to exist, is it already here, stdlib,
-  platform, installed dependency, one line — asked before any new code, and again of every review
-  ask; every corner deliberately cut carries a `debt:` marker with the trigger to revisit it.
-- **A budget for context.** Under 3,700 always-on words, enforced by the linter; everything else
-  loads on demand, so the agent stays sharp on turn forty.
-- **Six things only a human can trigger.** Ship, release, rollback, sync, ADR, intake — the model
-  cannot invoke them at all.
+Agents say "done" when one test file passes and another is broken. They push straight to `main`. They
+skip the test. Nonna is a drop-in harness that stops all three: it runs your tests before the agent
+is allowed to stop, and git hooks refuse the rest.
 
 ## Before / after
 
-Same request, same model. Without Keel the agent edits production code, says "done," and nothing
-checked it. With Keel it writes the failing test first, then the diff, then hands you a verdict a
-script decided and a four-line report:
+Same prompt, same model. The obvious fix to `div_cents()` breaks a test in another file.
 
+```text
+bare agent                                    nonna
+──────────                                    ─────
+runs tests/test_money.py: 3 passed            runs tests/test_money.py: 3 passed
+"Fixed. All 3 tests in                        tries to stop
+ tests/test_money.py pass."                   ✗ Nonna: you said done; the tests say no.
+                                                `python3 -m pytest -q` failed:
+full suite: 2 failed, 7 passed                  FAILED tests/test_split.py::test_odd_cent…
+                                              fixes app/split.py
+                                              "Done. All 9 tests pass."
 ```
-$ bash .claude/skills/code-review/scripts/check-review.sh < verdict.json
-✓ check-review: no blocking findings; verdict approves.
 
-Assumptions:    the caller wants OAuth device-flow login, not password grant
-Changed:        src/auth/device_flow.py, tests/test_device_flow.py
-Verified:       pytest -q (42 passed) + ruff + mypy — all green, observed
-Remaining risk: token refresh path has no property test yet (debt: tracked)
-```
+Both columns are verbatim from the benchmark. Without Nonna, 8 of 8 runs of this task ended with a
+broken suite and a "done". With Nonna, 0 of 8.
 
-## Numbers
-
-Same model, same six tasks, with no harness and with Keel — twelve runs each, scored on hidden
-checks the agent never saw:
+## The numbers
 
 <p align="center">
-  <img src="assets/benchmark-bare-vs-keel.svg" width="860" alt="Keel versus a bare agent on six trap tasks: both 12 of 12 correct; runs that left a test behind 0 versus 12; dependency files 0 and 0; median source lines 6.5 versus 16.5; cost per run $0.13 versus $2.82.">
+  <img src="assets/scorecard.svg" width="860" alt="Cut a corner on eight trap tasks: bare agent 23 of 64 runs, Nonna 0 of 64. Said done on a broken test suite: 8 of 8 versus 0 of 8. Pushed to main when told to push: 7 of 8 versus 0 of 8. Cost per change, Claude Sonnet: trap tasks $0.09 versus $0.25, small feature tasks $0.11 versus $1.06.">
 </p>
 
-| Claude Sonnet, six trap tasks, n = 12 per arm | correct | left a test behind | added a dependency | src LOC (median) |  cost |
-| --------------------------------------------- | ------: | -----------------: | -----------------: | ---------------: | ----: |
-| **bare agent** (no harness)                   |   12/12 |               0/12 |                  0 |              6.5 | $0.13 |
-| **Keel**                                      |   12/12 |              12/12 |                  0 |             16.5 | $2.82 |
+Eight tasks that tempt an agent to cut a corner, run 4 times each on Claude Sonnet and Claude Haiku,
+scored by hidden checks the agent never sees. The bare agent cut one in 23 of 64 runs; with Nonna,
+0 of 64 (Fisher p < 0.001 on each model).
 
-Read it straight. On tasks this small a good model does not over-build, so Keel does not win on
-lines or price — it costs about twenty times more per change. What it buys, on every one of the
-twelve runs and on none of the bare agent's: a failing test written first, two independent
-reviews, a verdict a script decided, and a status doc that agrees with the code. Whether that is
-worth it depends on what a wrong "done" costs you. Method, raw rows and the earlier ladder evals:
-[`docs/benchmarks/`](docs/benchmarks/).
+Nonna costs more per change. She pays for herself when a cleanup costs more than **$2.64**: the extra
+$0.95 on a small feature task, divided by the 36% of runs where the bare agent cut a corner. One
+revert of an unreviewed push to `main` costs more than that.
 
-The always-on surface is under 3,700 words, budgeted by the linter; the six human-only workflows
-cost zero. The full accounting is in [`docs/OVERVIEW.md`](docs/OVERVIEW.md).
+Reproduce it (about $40 for both models; the checkers are verified first, with no API calls):
 
-## How it works
-
-Three rules, in priority order:
-
-- **The LLM proposes; deterministic gates decide.** Tests, types, linters and a human decide what
-  merges. Model output never crosses into production, money or user data unchecked.
-- **Safety is lexicographically prior to speed.** Rolling back is automatic; deploying, deleting
-  and force-pushing wait for a gate or a human.
-- **Context is a budget.** The always-on surface stays tiny; depth loads on demand; fan-out reading
-  goes to subagents that return conclusions, not files.
-
-Every change walks the loop, in order:
-
-```
-Research & Reuse → Plan → TDD (RED → GREEN → REFACTOR) → Implement → Review → Verify → Commit & PR → Sync
+```bash
+git clone https://github.com/kapadias/keel /tmp/nonna-src
+bash bench/verify/verify.sh
+bash bench/run.sh --arm none,nonna --model sonnet --reps 4 --installer /tmp/nonna-src
 ```
 
-And before writing code, the agent stops at the first rung that holds:
-
-```
-1. Does this need to exist?   → no: skip it (YAGNI)
-2. Already in this codebase?  → reuse it, don't rewrite
-3. Stdlib does it?            → use it
-4. Native platform feature?   → use it
-5. Installed dependency?      → use it
-6. One line?                  → one line
-7. Only then: the minimum code that works
-```
-
-The ladder sizes the solution, never the loop — a test, a review verdict and a sync are never
-simplified away. What the layers are and how they fit: [`docs/OVERVIEW.md`](docs/OVERVIEW.md) and
-the harness index, [`.claude/README.md`](.claude/README.md).
+Method, raw rows and every caveat: [`bench/`](bench/).
 
 ## Install
 
-The most effort Keel will ever ask of you:
+From the root of a git repository:
 
 ```bash
-git clone https://github.com/kapadias/keel /tmp/keel
-cp -r /tmp/keel/.claude .claude && cp /tmp/keel/CLAUDE.md CLAUDE.md
-mkdir -p docs && cp /tmp/keel/docs/STATUS.md docs/STATUS.md
-chmod +x .claude/hooks/*.sh      # the pre-push gate self-installs at SessionStart
+curl -fsSL https://raw.githubusercontent.com/kapadias/keel/main/install.sh | bash
 ```
 
-Or as a plugin: `/plugin marketplace add kapadias/keel`, then `/plugin install keel@keel`. A plugin
-install is **not** equivalent to a copy-in — it cannot carry the permission posture or the other
-eight rules — see [`docs/INSTALL.md`](docs/INSTALL.md).
+For another agent, add `-s -- --host <name>`:
 
-Then open the repo in [Claude Code](https://claude.com/claude-code) and say `/plan add OAuth
-device-flow login`. Make it yours in three edits:
+| Agent                                                           | `--host`                      |
+| --------------------------------------------------------------- | ----------------------------- |
+| Claude Code                                                     | `claude` (default)            |
+| Codex, Zed, Amp, opencode, Roo Code, Jules, Junie (`AGENTS.md`) | `agents`                      |
+| Cursor                                                          | `cursor`                      |
+| GitHub Copilot                                                  | `copilot`                     |
+| Gemini CLI                                                      | `gemini`                      |
+| Windsurf · Cline · Kiro                                         | `windsurf` · `cline` · `kiro` |
+| all of them                                                     | `all`                         |
 
-- **Your test gate** — copy a pack from [`stacks/`](stacks/) (python · typescript · go · rust), or
-  edit [`.claude/skills/test/SKILL.md`](.claude/skills/test/SKILL.md).
-- **Your tracker** — the issue prefix in [`.claude/rules/git-workflow.md`](.claude/rules/git-workflow.md).
-- **Your formatter** — [`.claude/hooks/format.sh`](.claude/hooks/format.sh) (Python, JS/TS, Go and
-  Rust work out of the box).
+Every agent gets Nonna's rules and git hooks that refuse a commit on `main`, a staged secret, and a
+push with red tests or a stale `docs/STATUS.md`. Claude Code also gets the end-of-turn test gate,
+review agents and fifteen workflows. Nothing you already have is overwritten.
+More: [`docs/INSTALL.md`](docs/INSTALL.md).
 
-## Commands
+## How she works
 
-Fifteen workflows, invoked as `/<name>`. The six marked **human-only** cannot be triggered by the
-model at all — that is what makes "a human approves promotion" a mechanism, not a request.
+- **Tests decide "done".** When code changed, the agent cannot end its turn or push with a red
+  suite. It runs your test command, not a file it picked.
+- **Test first.** A change with no test that would have failed before it is not finished.
+- **Scripts decide, not the model.** A git hook refuses the push to `main`. A script parses the
+  reviewer's verdict. Another sizes the review: small, low-risk diffs get one quick reviewer.
+- **Look in the pantry first.** Before writing code: does it need to exist, is it already here,
+  does the standard library do it, is it one line?
 
-| Workflow                     | Does                                                                                      |
-| ---------------------------- | ----------------------------------------------------------------------------------------- |
-| `/plan`                      | Restate the requirement, research reuse, surface risks, decompose into reviewable steps.  |
-| `/tdd`                       | Run RED → GREEN → REFACTOR for a unit of behavior. The default way to build.              |
-| `/implement`                 | Write minimal, typed, reviewable code against an existing failing test.                   |
-| `/fix`                       | Bounded fast lane for a trivial, reversible fix — `check-trivial.sh` decides eligibility. |
-| `/review`                    | Path-aware parallel review — correctness always, security when the change warrants it.    |
-| `/audit`                     | Repo-wide over-engineering sweep — ranked cuts plus the `debt:` ledger. Read-only.        |
-| `/test`                      | Run the project's lint + type-check + test + coverage gate and summarize.                 |
-| `/coverage`                  | Report line + branch coverage; spotlight the survival-critical surface and its gaps.      |
-| `/debug`                     | Reproduce → isolate → root-cause → fix the cause → leave a regression test.               |
-| `/ship` **(human-only)**     | Full gate → conventional commit → push → PR to `develop`, linked to the issue.            |
-| `/release` **(human-only)**  | Promote `develop → main` — human-gated production release with tag + notes.               |
-| `/rollback` **(human-only)** | Revert a bad change or roll back a deploy — the risk-reducing counterpart to `/ship`.     |
-| `/sync` **(human-only)**     | Reconcile the five mirrors so every record of the system agrees.                          |
-| `/adr` **(human-only)**      | Write a numbered Architecture Decision Record with real alternatives.                     |
-| `/intake` **(human-only)**   | Turn a raw idea or bug into a well-formed, de-duplicated tracked issue.                   |
-
-Eight model-tiered agents do the work behind them — planner, implementer, test-engineer, two
-reviewers, an explorer, a debugger and a router. Who runs on what: [`docs/OVERVIEW.md`](docs/OVERVIEW.md).
-
-## Development
-
-Keel is held to its own bar. Before any change lands:
-
-```bash
-bash tests/run.sh              # gate golden tests — each hook proven to block vs. allow
-python3 tests/harness_lint.py  # token budgets, stale counts, verdict format, hook wiring
-```
-
-CI runs both plus shellcheck over every script. How to add a rule, skill or agent, and why most
-additions belong on demand: [`CONTRIBUTING.md`](CONTRIBUTING.md). Vulnerabilities: [`SECURITY.md`](SECURITY.md).
+The rules, workflows and agents in depth: [`docs/OVERVIEW.md`](docs/OVERVIEW.md).
 
 ## FAQ
 
-**Is it just a prompt?**
-No. Hooks block, tests decide, and the linter budgets the prose. A prompt cannot refuse a push.
+**Is it just a prompt?** No. A prompt cannot refuse a push. Hooks run your tests and refuse; the
+rules are what agents follow before a hook has to.
 
-**Will this slow me down?**
-It front-loads the work that prevents the 3am. A plan, a failing test and a review are cheaper
-than debugging in production. Net faster.
+**Isn't it more expensive?** Per change, yes. Per mistake, no. See the numbers above.
 
-**What if I really need to ship without a test?**
-You can. On a branch. Behind a `debt:` marker naming when you'll fix it. The gate will be watching.
+**What if I need to ship without a test?** On a branch, behind a `debt:` marker that says when you
+will add it. She will remember.
 
-**Does it lock me into a language?**
-No. Three small files name tooling; everything else is principle and transfers unchanged.
+**Why Nonna?** Because she doesn't care that it compiled.
 
-**Why "Keel"?**
-The part of the ship you never see, and the reason it doesn't tip.
+## Development
+
+```bash
+bash tests/run.sh              # every gate proven to block and to allow (362 golden tests)
+python3 tests/harness_lint.py  # word budgets, host files in sync, hook wiring
+```
+
+[`CONTRIBUTING.md`](CONTRIBUTING.md) · [`SECURITY.md`](SECURITY.md) · [`CHANGELOG.md`](CHANGELOG.md)
 
 ## Credits
 
@@ -218,7 +124,7 @@ by Dietrich Gebert (MIT).
 
 ## License
 
-[MIT](LICENSE) © 2026 Shashank Kapadia.
+[MIT](LICENSE) © 2026 Shashank Kapadia. Short, like a good recipe.
 
 ## Star History
 

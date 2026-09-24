@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-08-01
 - **Supersedes:** the component-coverage claim in
-  [ADR 0006](0006-distribute-keel-as-plugin.md) (its distribution decision stands)
+  [ADR 0006](0006-distribute-as-plugin.md) (its distribution decision stands)
 
 ## Context
 
@@ -21,7 +21,7 @@ One factual claim inside it was wrong. ADR 0006 states:
 nothing else. `.claude/rules/` sits inside the published plugin directory and is never scanned. The
 root `CLAUDE.md` is outside the plugin root entirely.
 
-The consequence was measured, not theorised: a `/plugin install keel@keel` loaded **zero** of the
+The consequence was measured, not theorised: a `/plugin install nonna@nonna` loaded **zero** of the
 4,252 words of always-on operating discipline, while `docs/INSTALL.md` claimed both install paths
 "end with the same harness." Three further defects followed from the same project-relative
 assumption:

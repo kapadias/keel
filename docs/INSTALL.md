@@ -1,34 +1,57 @@
-# Installing Keel
+# Installing Nonna
 
-Keel is files, not a dependency. Two supported paths. **They are not equivalent** — a plugin install
-carries only `rules/00-core.md`, not the other eight rules, `CLAUDE.md`, or the permission posture
-(see the limitations below). Option A is the complete harness; Option B trades completeness for
-versioned, shareable distribution.
-
-## Option A — copy it in (standalone)
+One command, from the root of a git repository:
 
 ```bash
-# From the root of your repository:
-git clone https://github.com/kapadias/keel /tmp/keel
-cp -r /tmp/keel/.claude .claude
-cp /tmp/keel/CLAUDE.md CLAUDE.md
-mkdir -p docs && cp /tmp/keel/docs/STATUS.md docs/STATUS.md
-chmod +x .claude/hooks/*.sh
+curl -fsSL https://raw.githubusercontent.com/kapadias/keel/main/install.sh | bash
 ```
 
-The pre-push Definition-of-Done gate self-installs at `SessionStart` (see
-[ADR 0004](adr/0004-gates-as-code.md)). If your repo already has a `pre-push` hook, Keel warns
-instead of overwriting it — chain `.claude/hooks/require-status-sync.sh` from your hook manually.
+That installs for Claude Code. For another agent, name it (several at once: `--host cursor,agents`):
+
+| Host                                                                      | Command                           | Rules file written                |
+| ------------------------------------------------------------------------- | --------------------------------- | --------------------------------- |
+| Claude Code                                                               | `… \| bash`                       | `CLAUDE.md` + `.claude/`          |
+| Codex, Zed, Amp, opencode, Roo Code, Jules, Junie, any `AGENTS.md` reader | `… \| bash -s -- --host agents`   | `AGENTS.md`                       |
+| Cursor                                                                    | `… \| bash -s -- --host cursor`   | `.cursor/rules/nonna.mdc`         |
+| GitHub Copilot                                                            | `… \| bash -s -- --host copilot`  | `.github/copilot-instructions.md` |
+| Gemini CLI                                                                | `… \| bash -s -- --host gemini`   | `GEMINI.md`                       |
+| Windsurf                                                                  | `… \| bash -s -- --host windsurf` | `.windsurf/rules/nonna.md`        |
+| Cline                                                                     | `… \| bash -s -- --host cline`    | `.clinerules/nonna.md`            |
+| Kiro                                                                      | `… \| bash -s -- --host kiro`     | `.kiro/steering/nonna.md`         |
+| All of them                                                               | `… \| bash -s -- --host all`      | all of the above                  |
+
+Every host gets the same thing:
+
+- **The house rules**, generated from `.claude/rules/00-core.md` by `hosts/build.py`, plus the full
+  rules under `.claude/rules/` for depth.
+- **Git hooks that enforce them for any agent**: `pre-commit` refuses a commit on `main`, `master` or
+  `develop`, a staged secret file, and a staged credential; `pre-push` refuses a code push that leaves
+  `docs/STATUS.md` stale, any secret, and a red test suite. A repo born on `main` makes its very
+  first commit with `git commit --no-verify`, then branches.
+- **A blank `docs/STATUS.md`** and, if it finds `pyproject.toml`, `package.json`, `go.mod` or
+  `Cargo.toml`, that stack's test-gate permissions.
+
+It never overwrites a file or a git hook that already exists, and never writes through a symlink; it
+merges into an existing `.claude/` file by file and lists what it left alone. If a gate could not be
+installed it says so and exits non-zero. If you
+use a hook manager (a custom `core.hooksPath`), it tells you which scripts to point it at. Pin a
+release with `curl … | NONNA_REF=<tag> bash`. Prefer to read before you pipe? `curl -fsSLO …/install.sh`, read it,
+then `bash install.sh`.
+
+Claude Code gets more than the other hosts: the tool-level hooks (a write is scanned before it
+lands, a turn cannot end with the status doc stale, a reviewer's verdict is machine-checked), the
+agents, and the fifteen workflows. On other hosts the rules and the git hooks do the work; the
+benchmark showed the rules are what kept agents off `main` and away from secrets.
 
 ## Option B — install as a plugin (versioned, shareable)
 
 ```
 /plugin marketplace add kapadias/keel
-/plugin install keel@keel
+/plugin install nonna@nonna
 ```
 
 A plugin install brings the agents, skills, and hooks
-(see [ADR 0006](adr/0006-distribute-keel-as-plugin.md) and
+(see [ADR 0006](adr/0006-distribute-as-plugin.md) and
 [ADR 0007](adr/0007-plugin-install-is-not-equivalent.md)).
 
 ### Known limitation 1 — only `00-core.md` rides along
@@ -44,16 +67,16 @@ that tells the agent _how to work_ does not.
 Until that is closed, copy the discipline in alongside the plugin:
 
 ```bash
-git clone --depth 1 https://github.com/kapadias/keel /tmp/keel
-mkdir -p .claude/rules && cp -r /tmp/keel/.claude/rules/. .claude/rules/
-cp /tmp/keel/CLAUDE.md CLAUDE.md
+git clone --depth 1 https://github.com/kapadias/keel /tmp/nonna
+mkdir -p .claude/rules && cp -r /tmp/nonna/.claude/rules/. .claude/rules/
+cp /tmp/nonna/CLAUDE.md CLAUDE.md
 ```
 
 ### Known limitation 2 — the permission posture is NOT injected
 
 The plugin mechanism does not propagate `settings.json` permissions to the host project. A fresh
 plugin install therefore has **weaker secret protection** than a standalone copy until you add
-Keel's deny-list to your own project settings. This step is manual and mechanical — copy the
+Nonna's deny-list to your own project settings. This step is manual and mechanical — copy the
 `permissions.deny` block below (kept in sync with
 [`.claude/settings.json`](../.claude/settings.json)) into your project's
 `.claude/settings.json`:
@@ -94,6 +117,14 @@ Keel's deny-list to your own project settings. This step is manual and mechanica
 - The **Definition-of-Done pre-push hook self-installs** from `${CLAUDE_PLUGIN_ROOT}` at
   `SessionStart` — no manual symlink. If it cannot be located, the session says so rather than
   going quiet.
+- **The test gate is opt-in.** A copy-in install detects your test command. A plugin install does
+  not: nobody agreed to have each repo's own code run at every turn end, so the Stop and pre-push
+  test gates run only once you set `NONNA_TEST_CMD` (for example in `.claude/settings.json` `env`).
+  The copy-in marker (`.claude/hooks/lib/tests.sh`) lives in the repo, so a repo can carry it; the
+  real consent boundary is Claude Code's folder trust, which already covers the repo's own hooks.
+- **The pre-push test gate tastes what you push.** It runs in the working tree, so it refuses a push
+  while the tree differs from `HEAD`, untracked files included. A pushed branch that is not checked
+  out gets a warning that its tests did not run; tags and deletes run nothing.
 - **Gate scripts stay reachable.** `SessionStart` announces the resolved harness root, so
   `/review`, `/ship` and `/fix` can invoke `check-review.sh` and `check-trivial.sh` wherever the
   plugin is installed. Their first run may prompt for approval, because the absolute plugin path

@@ -21,7 +21,7 @@ Ship: **$ARGUMENTS**
 2. **Review gate — deterministic.** Verdict files for the **current** `git rev-parse --short HEAD`
    must exist under `.claude/reviews/` (missing or stale — the SHA in the filename differs — means
    `/review` has not run against this exact code: run it first). Then run
-   `bash $KEEL/skills/code-review/scripts/check-review.sh` on each file — `$KEEL` is the harness root
+   `bash $NONNA/skills/code-review/scripts/check-review.sh` on each file — `$NONNA` is the harness root
    announced at SessionStart (`.claude` standalone, the plugin directory under a plugin install).
    **Any non-zero exit blocks the ship** (ADR-0005). Do not argue with the parser — fix and re-review.
 3. **Branch check.** Ensure you are on a `feature|fix|chore|refactor/<id>-<slug>` branch, not

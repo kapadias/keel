@@ -65,5 +65,5 @@ commits, one logical change each. → [git-workflow.md](./git-workflow.md)
 
 Command and agent descriptions are already in context — this is only the non-obvious wiring.
 `orchestrator` routes anything cross-cutting. `/plan`→`planner`; `/tdd`→`test-engineer` then
-`implementer`; `/debug`→`debugger`; `/review`→`code-reviewer` **and** `security-reviewer`, launched
-concurrently. Reading broadly → `explorer`, always. `/release` is human-gated.
+`implementer`; `/debug`→`debugger`; `/review`→`code-reviewer`, plus `security-reviewer` when
+`review-lanes.sh` says so, concurrently. Reading broadly → `explorer`, always. `/release` is human-gated.

@@ -18,7 +18,7 @@ ecosystem and runs the right vuln scanner, failing on findings.
 
 Adding a dependency is a permanent liability and a new entry in your attack surface. The bar is high.
 
-1. **Do you need it at all?** The Keel rule: reuse a maintained library when it covers **≥80% of the
+1. **Do you need it at all?** The Nonna rule: reuse a maintained library when it covers **≥80% of the
    need** — but a one-liner you can write and own beats pulling a transitive tree for a trivial
    helper (`left-pad`). For **parsing, dates, crypto, auth** — always the vetted library, never
    hand-rolled (`.claude/rules/dev-process.md`, `.claude/rules/engineering.md`).

@@ -1,6 +1,6 @@
-# Keel Stack Packs
+# Nonna Stack Packs
 
-Keel's `/test` skill and `format.sh` hook are deliberately language-agnostic. Stack packs wire them to a concrete toolchain in three steps.
+Nonna's `/test` skill and `format.sh` hook are deliberately language-agnostic. Stack packs wire them to a concrete toolchain in three steps.
 
 ## What is a stack pack?
 
@@ -24,11 +24,11 @@ stacks/rust/
 
 ### Step 2 — Copy the allow-list into your project
 
-Copy `stacks/<lang>/settings.local.json` to the root of your project as `.claude/settings.local.json` (create the `.claude/` directory if it does not exist). This pre-approves the gate commands so Keel can run them non-interactively.
+Copy `stacks/<lang>/settings.local.json` to the root of your project as `.claude/settings.local.json` (create the `.claude/` directory if it does not exist). This pre-approves the gate commands so Nonna can run them non-interactively.
 
 ```bash
 mkdir -p .claude
-cp /path/to/keel/stacks/<lang>/settings.local.json .claude/settings.local.json
+cp /path/to/nonna/stacks/<lang>/settings.local.json .claude/settings.local.json
 ```
 
 If you already have a `.claude/settings.local.json`, merge the `permissions.allow` array entries into it.

@@ -1,4 +1,4 @@
-# Keel Stack Pack — Go
+# Nonna Stack Pack — Go
 
 Toolchain: **gofmt + golangci-lint** (format + lint) · **go vet** (static analysis) · **go test -race -cover** (tests + coverage) · **testing/quick** or **pgregory.net/rapid** (property tests).
 

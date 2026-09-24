@@ -10,7 +10,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
 . "$here/lib/core.sh"
 cd "${CLAUDE_PROJECT_DIR:-$(pwd)}" 2>/dev/null || exit 0
-core="$(keel_core_carrier)"
+core="$(nonna_core_carrier)"
 [ -n "$core" ] || exit 0
-keel_emit_context SubagentStart "$core"
+nonna_emit_context SubagentStart "$core"
 exit 0
