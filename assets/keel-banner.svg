@@ -104,6 +104,6 @@
 
   <!-- footer -->
   <rect x="282" y="344" width="958" height="1" fill="url(#foot)"/>
-  <text x="282" y="372" font-size="15.5" font-weight="600" letter-spacing="3" fill="#7c9bb4">RULES&#160;&#160;&#183;&#160;&#160;AGENTS&#160;&#160;&#183;&#160;&#160;SKILLS&#160;&#160;&#183;&#160;&#160;COMMANDS&#160;&#160;&#183;&#160;&#160;HOOKS</text>
+  <text x="282" y="372" font-size="15.5" font-weight="600" letter-spacing="3" fill="#7c9bb4">RULES&#160;&#160;&#183;&#160;&#160;AGENTS&#160;&#160;&#183;&#160;&#160;SKILLS&#160;&#160;&#183;&#160;&#160;WORKFLOWS&#160;&#160;&#183;&#160;&#160;HOOKS</text>
   <text x="1240" y="372" text-anchor="end" font-size="14.5" font-style="italic" fill="#5f7e98">the LLM proposes; gates decide</text>
 </svg>

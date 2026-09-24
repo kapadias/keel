@@ -61,8 +61,8 @@ truth that drift).
    plugin with `"source": "./.claude"` — a relative subdirectory source, which the marketplace spec
    supports. All component directories (`agents/`, `skills/`, `hooks/`, `commands/`, `rules/`) are
    already at the correct relative paths within the plugin root. There is no duplication and no
-   release-time copy step: what ships is what runs. Hooks are declared in `hooks.json` at the plugin
-   root so they wire correctly on install.
+   release-time copy step: what ships is what runs. Hooks are declared in `.claude/hooks/hooks.json`
+   so they wire correctly on install.
    - One known limitation: a plugin's `settings.json` is honored only for `agentStatusLine` and
      `subagentStatusLine`; the read-deny permission posture (blocking `.env`, `secrets/**`, dangerous
      Bash patterns) cannot be injected into the host project's settings through the plugin mechanism
@@ -74,12 +74,13 @@ truth that drift).
 
 Keel is distributed as a Claude Code plugin whose **root is the existing `.claude/` directory**.
 
-- `.claude/.claude-plugin/plugin.json` is the plugin manifest: it declares the plugin name, version,
-  description, and component paths relative to `.claude/`.
+- `.claude/.claude-plugin/plugin.json` is the plugin manifest: it declares the plugin name,
+  version, and description; it declares no component paths — Claude Code discovers `agents/`,
+  `skills/`, and `hooks/hooks.json` at their default locations under the plugin root.
 - `.claude-plugin/marketplace.json` at the repository root is the marketplace registration, with
   `"source": "./.claude"` pointing to the plugin root as a subdirectory.
-- Hooks are declared in `.claude/hooks.json` so that a plugin install wires them without requiring the
-  adopter to run a SessionStart hook manually. (The SessionStart auto-install from
+- Hooks are declared in `.claude/hooks/hooks.json` so that a plugin install wires them without
+  requiring the adopter to run a SessionStart hook manually. (The SessionStart auto-install from
   [ADR 0004](0004-gates-as-code.md) remains in place for standalone-copy adopters.)
 - The plugin is installable via `/plugin marketplace add kapadias/keel` and updatable in place.
   Standalone-copy adoption continues to work unchanged — the plugin structure is additive, not a
@@ -101,10 +102,20 @@ Keel is distributed as a Claude Code plugin whose **root is the existing `.claud
 - **Known limitation: settings.json permission posture is not injected.** The plugin mechanism does
   not propagate deny-list entries to the host project. Adopters must add them manually. This is a
   real gap — a freshly installed plugin without the deny-list has weaker secret protection than a
-  fully configured standalone copy. The `docs/INSTALL.md` template and the SessionStart hook
-  (which can check for missing entries and warn) mitigate this; the gap should be revisited as the
-  plugin spec evolves.
+  fully configured standalone copy. The `docs/INSTALL.md` template mitigates this; the gap should
+  be revisited as the plugin spec evolves.
 - **`plugin.json` and `marketplace.json` are harness files and are treated as code.** Changes to
   either go through the same review and gate process as any other `.claude/**` file (see
   [ADR 0004](0004-gates-as-code.md)). A malformed manifest that breaks plugin installation is a
   regression, not a configuration typo.
+
+## Correction (2026-09-23)
+
+Two claims in the Decision section overstated what ships:
+
+- `plugin.json` declares no component paths — it carries name, version, and description only.
+  Claude Code discovers `agents/`, `skills/`, and `hooks/hooks.json` at their default locations
+  under the plugin root without any path being declared.
+- The SessionStart hook does not check for missing `settings.json` deny-list entries or warn about
+  them; no such check is implemented. The mitigation for the permission-posture gap is the
+  `docs/INSTALL.md` template alone.

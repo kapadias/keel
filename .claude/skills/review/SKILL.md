@@ -3,7 +3,7 @@ name: review
 description: Path-aware parallel review before merge — always a correctness review; adds a security review when the change touches auth, data, money, input handling, or anything outward-facing.
 argument-hint: "[scope — paths/files; defaults to the current branch diff vs develop]"
 model: opus
-allowed-tools: Task, Read, Grep, Glob, Write, Bash(git diff:*), Bash(git branch:*), Bash(git status:*), Bash(git rev-parse:*), Bash(bash .claude/skills/code-review/scripts/check-review.sh:*)
+allowed-tools: Task, Read, Grep, Glob, Write, Bash(git diff:*), Bash(git branch:*), Bash(git status:*), Bash(git rev-parse:*), Bash(bash .claude/skills/code-review/scripts/check-review.sh:*), Bash(bash .claude/skills/lean/scripts/check-debt.sh:*)
 ---
 
 !git branch --show-current
@@ -34,10 +34,15 @@ Review: **$ARGUMENTS** (if empty, review the current branch's diff vs `develop`)
    directory in a plugin install — never guess it). A non-zero exit means the review gate is red.
    Report the script's output as the verdict and **never override it** — the parser, not the model,
    decides merge-readiness (ADR-0005).
-5. **Synthesize for the human.** Merge findings into one report, deduplicated, grouped by severity —
+5. **Debt gate.** Run `bash $KEEL/skills/lean/scripts/check-debt.sh --range develop...HEAD` (the
+   same range as the diff). A new `debt:` marker with no upgrade trigger is a gate failure (exit 1)
+   — report it alongside the verdict gates; it is fixed by naming the trigger, never by deleting the
+   comment while keeping the corner.
+6. **Synthesize for the human.** Merge findings into one report, deduplicated, grouped by severity —
    **CRITICAL / HIGH / MEDIUM / LOW** — each with `path:line`, the issue, and a concrete fix. Any breach
    of a trust boundary, a safety gate, or "fail-closed" is automatically CRITICAL. The prose explains;
-   the gate's exit code decides.
+   the gate's exit code decides. If any finding carries `category: simplicity`, end with the line
+   `net: -N lines possible.`
 
 ## Output
 

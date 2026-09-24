@@ -171,6 +171,123 @@ NOREPO="$(mktemp -d)"
 ( cd "$NOREPO" && bash "$CT" ); check "not a git repo fails closed" 1 "$?"
 rm -rf "$TMP" "$NOREPO"
 
+echo "== check-debt.sh (debt-marker gate + ledger) =="
+# A deliberate corner is only tracked if its marker names the trigger to revisit it.
+# The script decides well-formedness; prose cannot. Fixtures build the marker from a
+# split literal so this file never carries the marker form itself.
+CD="$SKILLS/lean/scripts/check-debt.sh"
+M='debt:'
+TMP="$(mktemp -d)"; mkdir -p "$TMP/src" "$TMP/node_modules/x" "$TMP/docs"
+printf 'lock = Lock()  # %s global lock, per-account locks if throughput matters\n' "$M" > "$TMP/src/ok.py"
+( cd "$TMP" && bash "$CD" ); check "check-debt: marker with a trigger passes" 0 "$?"
+out="$(cd "$TMP" && bash "$CD" --ledger 2>/dev/null)"; contains "check-debt: ledger counts it" "1 markers, 0 with no trigger." "$out"
+contains "check-debt: ledger names the trigger" "upgrade: per-account locks" "$out"
+printf 'for a in xs:  # %s O(n^2) scan\n' "$M" > "$TMP/src/rot.py"
+( cd "$TMP" && bash "$CD" 2>/dev/null ); check "check-debt: marker with no trigger fails closed" 1 "$?"
+out="$(cd "$TMP" && bash "$CD" --ledger 2>&1)"
+contains "check-debt: ledger tags the rotting marker" "no-trigger" "$out"
+contains "check-debt: ledger summary counts both" "2 markers, 1 with no trigger." "$out"
+contains "check-debt: ledger groups by file" "src/rot.py" "$out"
+contains "check-debt: stderr names path:line of the offender" "src/rot.py:1" "$out"
+printf '// %s trailing comma,   \n' "$M" > "$TMP/src/empty.js"
+( cd "$TMP" && bash "$CD" 2>/dev/null ); check "check-debt: empty text after the comma is still no-trigger" 1 "$?"
+rm -f "$TMP/src/rot.py" "$TMP/src/empty.js"
+printf '# %s nothing\n' "$M" > "$TMP/node_modules/x/dep.py"
+( cd "$TMP" && bash "$CD" 2>/dev/null ); check "check-debt: node_modules is skipped" 0 "$?"
+printf 'example: `# %s global lock`\n' "$M" > "$TMP/docs/lean.md"
+( cd "$TMP" && bash "$CD" 2>/dev/null ); check "check-debt: markdown quoting the convention is not a marker" 0 "$?"
+printf 'x = 1  # technical %s later\n' "$M" > "$TMP/src/prose.py"
+( cd "$TMP" && bash "$CD" 2>/dev/null ); check "check-debt: the word without the comment prefix is not a marker" 0 "$?"
+EMPTY="$(mktemp -d)"; out="$(cd "$EMPTY" && bash "$CD" --ledger 2>/dev/null)"; check "check-debt: clean tree exits 0" 0 "$?"
+contains "check-debt: clean tree says so" "Clean ledger." "$out"
+( cd "$EMPTY" && bash "$CD" --range main...HEAD 2>/dev/null ); check "check-debt: --range outside a git repo fails closed" 2 "$?"
+( cd "$EMPTY" && bash "$CD" --bogus 2>/dev/null ); check "check-debt: unknown flag fails closed" 2 "$?"
+# --range gates only ADDED lines: debt someone else left does not block this PR.
+rm -rf "$TMP/node_modules"; "${GIT[@]}" -C "$TMP" init -q
+printf 'y = 2  # %s naive heuristic\n' "$M" > "$TMP/src/old.py"
+"${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -qm base; "${GIT[@]}" -C "$TMP" branch -M main
+"${GIT[@]}" -C "$TMP" checkout -q -b feature/debt
+printf 'z = 3  # %s single worker, pool when queue depth > 100\n' "$M" > "$TMP/src/new.py"
+"${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -qm new
+( cd "$TMP" && bash "$CD" --range main...HEAD 2>/dev/null ); check "check-debt: --range ignores a pre-existing no-trigger marker outside the diff" 0 "$?"
+( cd "$TMP" && bash "$CD" 2>/dev/null ); check "check-debt: default scan still sees the pre-existing debt" 1 "$?"
+printf 'w = 4  # %s cache never expires\n' "$M" >> "$TMP/src/new.py"
+"${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -qm rot
+out="$(cd "$TMP" && bash "$CD" --range main...HEAD 2>&1)"; check "check-debt: --range blocks a new no-trigger marker" 1 "$?"
+contains "check-debt: --range names path:line of the new offender" "src/new.py:2" "$out"
+( cd "$TMP" && bash "$CD" --range nosuchref...HEAD 2>/dev/null ); check "check-debt: unresolvable range fails closed" 2 "$?"
+# An option-shaped range must never reach git: --output=<path> would write the diff over any
+# file, exec bit intact, from a pre-approved gate call (security review, 2026-09-22).
+printf 'keep\n' > "$TMP/victim.sh"
+( cd "$TMP" && bash "$CD" --range=--output=victim.sh 2>/dev/null ); check "check-debt: option-shaped --range= fails closed" 2 "$?"
+check "check-debt: option-shaped range wrote nothing" "keep" "$(cat "$TMP/victim.sh")"
+( cd "$TMP" && bash "$CD" --range --stat 2>/dev/null ); check "check-debt: option-shaped --range fails closed" 2 "$?"
+( cd "$TMP" && bash "$CD" --range '' 2>/dev/null ); check "check-debt: empty range fails closed" 2 "$?"
+# User git config must not turn the gate off: colour hides the +++ headers, an external diff
+# replaces the output entirely.
+( cd "$TMP" && git config --local color.diff always && git config --local diff.external /bin/true && bash "$CD" --range main...HEAD 2>/dev/null ); check "check-debt: --range ignores colour and external-diff config" 1 "$?"
+( cd "$TMP" && git config --local --unset color.diff && git config --local --unset diff.external )
+# A colon in the path must not let a trigger-less marker pass as well-formed.
+mkdir -p "$TMP/src/a:1:x, y"; printf 'v = 5  # %s no trigger here\n' "$M" > "$TMP/src/a:1:x, y/z.py"
+( cd "$TMP" && bash "$CD" src 2>/dev/null ); check "check-debt: a colon in the path cannot forge a trigger" 1 "$?"
+rm -rf "$TMP/src/a:1:x, y"
+# A space in the path makes git append a TAB to the +++ header; the columns must not shift.
+printf 'q = 6  # %s no trigger\n' "$M" > "$TMP/src/my file.py"
+"${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -qm spaced
+out="$(cd "$TMP" && bash "$CD" --range main...HEAD 2>&1)"; contains "check-debt: --range names a marker in a path with a space" "src/my file.py:1: no-trigger" "$out"
+rm -f "$TMP/src/my file.py"; "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -qm unspaced
+# An added line that begins '++ ' shows as '+++ ' in the diff and is content, not a header.
+printf '++ x  # %s no trigger\ny = 1\n' "$M" > "$TMP/src/plus.txt"
+"${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -qm plus
+out="$(cd "$TMP" && bash "$CD" --range main...HEAD 2>&1)"; contains "check-debt: --range does not mistake a '++ ' content line for a header" "src/plus.txt:1: no-trigger" "$out"
+rm -f "$TMP/src/plus.txt"; "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -qm noplus
+# CRLF: a trailing comma followed by \r is still no trigger.
+printf 'r = 7  # %s ceiling,\r\n' "$M" > "$TMP/src/crlf.py"
+out="$(cd "$TMP" && bash "$CD" src 2>&1)"; contains "check-debt: CRLF cannot turn a bare comma into a trigger" "src/crlf.py:1: no-trigger" "$out"
+rm -f "$TMP/src/crlf.py"
+( cd "$TMP" && bash "$CD" nosuchdir 2>/dev/null ); check "check-debt: a missing PATH fails closed" 2 "$?"
+# A PR-controlled .gitattributes ('* -diff' / binary) must not hide added lines from --range.
+printf '* -diff\n' > "$TMP/.gitattributes"; printf 's = 8  # %s hidden by attributes\n' "$M" > "$TMP/src/attr.py"
+"${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -qm attrs
+out="$(cd "$TMP" && bash "$CD" --range main...HEAD 2>&1)"; contains "check-debt: --range sees through a -diff gitattribute" "src/attr.py:1: no-trigger" "$out"
+rm -f "$TMP/.gitattributes" "$TMP/src/attr.py"; "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -qm noattrs
+# A TAB in a file name is refused before grep runs — fail closed, never a guess.
+printf 't = 9  # %s ceiling, trigger\n' "$M" > "$TMP/src/tab	name.py"
+out="$(cd "$TMP" && bash "$CD" src 2>&1)"; check "check-debt: a tab in a file name fails closed" 2 "$?"
+contains "check-debt: a tab in a file name is explained" "tab or newline" "$out"
+rm -f "$TMP/src/tab	name.py"
+# A crafted directory name with a tab and record-shaped text must not forge a record
+# for the files beneath it: any tab or newline in a scanned path fails closed.
+mkdir -p "$TMP/src/d	5:# $M c, t"; printf 'h = 1  # %s hidden\n' "$M" > "$TMP/src/d	5:# $M c, t/x.py"
+( cd "$TMP" && bash "$CD" src 2>/dev/null ); check "check-debt: a crafted tab-bearing path fails closed" 2 "$?"
+rm -rf "$TMP/src/d	5:# $M c, t"
+# The guard checks the whole path, not just the last component, and a failing find is a stop.
+mkdir -p "$TMP/src/p	1:# $M a, b"; printf 'k = 1  # %s hidden\n' "$M" > "$TMP/src/p	1:# $M a, b/f.py"
+( cd "$TMP" && bash "$CD" "src/p	1:# $M a, b/f.py" 2>/dev/null ); check "check-debt: a tab in a parent of a path operand fails closed" 2 "$?"
+rm -rf "$TMP/src/p	1:# $M a, b"
+NOFIND="$(mktemp -d)"; printf '#!/bin/sh\nexit 1\n' > "$NOFIND/find"; chmod +x "$NOFIND/find"
+( cd "$TMP" && PATH="$NOFIND:$PATH" bash "$CD" src 2>/dev/null ); check "check-debt: a failing find is a stop, not a skipped guard" 2 "$?"
+rm -rf "$NOFIND"
+mkdir -p "$TMP/node_modules/t	ab"; printf 'n = 1\n' > "$TMP/node_modules/t	ab/x.js"
+( cd "$TMP" && bash "$CD" 2>/dev/null ); check "check-debt: a tab-named file inside a skipped dir is not a false stop (debt found, guard silent)" 1 "$?"
+rm -rf "$TMP/node_modules"
+# grep must read every file: a NUL byte or an invalid UTF-8 byte must not make a file
+# "binary" and skipped, and a single-file operand still carries its filename.
+printf 'v = 1  # %s nul byte\n\0\n' "$M" > "$TMP/src/nul.py"
+out="$(cd "$TMP" && bash "$CD" src 2>&1)"; contains "check-debt: a NUL byte does not hide a marker" "src/nul.py:1: no-trigger" "$out"
+printf 'w = 1  # %s bad byte \xff\n' "$M" > "$TMP/src/utf.py"
+out="$(cd "$TMP" && LC_ALL=C.UTF-8 bash "$CD" src 2>&1)"; contains "check-debt: an invalid UTF-8 byte does not hide a marker" "src/utf.py:1: no-trigger" "$out"
+rm -f "$TMP/src/nul.py" "$TMP/src/utf.py"
+printf 'x = 1  # %s single file\n' "$M" > "$TMP/src/single.py"
+out="$(cd "$TMP" && bash "$CD" src/single.py 2>&1)"; contains "check-debt: a single-file operand keeps its filename" "src/single.py:1: no-trigger" "$out"
+rm -f "$TMP/src/single.py"
+# A path argument of exactly '-' is a file, never stdin.
+printf 'u = 1  # %s dash file\n' "$M" > "$TMP/-"
+( cd "$TMP" && bash "$CD" -- - 2>/dev/null ); check "check-debt: a path named '-' is scanned as a file" 1 "$?"
+rm -f "$TMP/-"
+( cd "$ROOT" && bash "$CD" 2>/dev/null ); check "check-debt: Keel's own tree carries no untriggered marker" 0 "$?"
+rm -rf "$TMP" "$EMPTY"
+
 echo "== format.sh (PostToolUse, best-effort) =="
 TF="$(mktemp).py"; echo 'x=1' > "$TF"
 printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$TF" | "$HOOKS/format.sh"; check "exits 0 even if no formatter present" 0 "$?"
@@ -249,6 +366,7 @@ if [ -x "$CR" ] || [ -f "$CR" ]; then
   printf '%s' '{"verdict":"lgtm","summary":"x","findings":[]}' | bash "$CR"; check "out-of-schema verdict fails closed" 2 "$?"
   printf '%s' '{"summary":"x","findings":[]}' | bash "$CR"; check "missing verdict fails closed" 2 "$?"
   printf '%s' '{"verdict":"approve","summary":"x","findings":[{"severity":"MEDIUM","path":"a","line":1,"category":"tests","issue":"i","fix":"f"}]}' | bash "$CR"; check "MEDIUM-only approve still passes" 0 "$?"
+  printf '%s' '{"verdict":"approve","summary":"x","findings":[{"severity":"MEDIUM","path":"a","line":1,"category":"simplicity","issue":"yagni: one impl","fix":"inline"}]}' | bash "$CR"; check "a MEDIUM simplicity finding approves (ADR-0008: size never blocks alone)" 0 "$?"
   printf 'Prose before.\n```json\n{"verdict":"request_changes","summary":"x","findings":[]}\n```\nProse after.\n' | bash "$CR"; check "fenced request_changes block extracted and blocks" 1 "$?"
   printf 'Prose before.\n```json\n{"verdict":"approve","summary":"x","findings":[]}\n```\nProse after.\n' | bash "$CR"; check "fenced approve block extracted and passes" 0 "$?"
   printf '```json\n{"verdict":"approve","summary":"x","findings":[]}\n```\n```json\n{"verdict":"approve","summary":"y","findings":[]}\n```\n' | bash "$CR"; check "two fenced blocks is ambiguous, fails closed" 2 "$?"
@@ -327,6 +445,62 @@ printf '%s' "$out" | grep -q '"decision"'; check "docs-only + untracked scratch:
 NOGIT="$(mktemp -d)"
 printf '{}' | CLAUDE_PROJECT_DIR="$NOGIT" "$SD" >/dev/null; check "non-repo: fails open, never wedges the turn" 0 "$?"
 rm -rf "$TMP" "$NOGIT"
+
+echo "== subagent-start.sh (SubagentStart: the constitution reaches subagents) =="
+# SessionStart additionalContext is parent-only, so under a plugin install every
+# Task-spawned agent ran with no policy. Plugin mode carries 00-core.md in; a
+# standalone checkout loads rules/ natively for subagents too and must not double-pay.
+SA="$HOOKS/subagent-start.sh"
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+out="$(printf '{"agent_type":"implementer"}' | CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$SA")"; check "subagent-start: plugin install exits 0" 0 "$?"
+contains "subagent-start: plugin install emits SubagentStart context" '"hookEventName":"SubagentStart"' "$out"
+contains "subagent-start: plugin install carries the constitution" "The three principles" "$out"
+contains "subagent-start: plugin install carries the ladder" "YAGNI" "$out"
+printf '%s' "$out" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; check "subagent-start: plugin output is valid JSON" 0 "$?"
+out="$(sleep 3 | CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" timeout 2 "$SA")"; check "subagent-start: never waits on stdin" 0 "$?"
+NOJQ="$(mktemp -d)"
+for b in bash sh env cat grep sed head tr dirname awk; do
+  p="$(command -v "$b" 2>/dev/null || true)"
+  if [ -n "$p" ]; then ln -s "$p" "$NOJQ/$b" 2>/dev/null || true; fi
+done
+out="$(printf '{}' | PATH="$NOJQ" CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$SA")"
+printf '%s' "$out" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; check "subagent-start: no-jq fallback is still valid JSON" 0 "$?"
+contains "subagent-start: no-jq fallback still carries the constitution" "The three principles" "$out"
+# Without awk the escaper cannot run: emit nothing rather than an empty (valid, silent) carrier.
+rm -f "$NOJQ/awk"
+out="$(printf '{}' | PATH="$NOJQ" CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$SA" 2>/dev/null)"; check "subagent-start: no-jq, no-awk exits 0" 0 "$?"
+check "subagent-start: no-jq, no-awk emits nothing instead of an empty carrier" "" "$out"
+# Backslashes and quotes in the carrier must survive the awk escaper on any awk.
+ln -sf "$(command -v awk)" "$NOJQ/awk"
+BQ="$(mktemp -d)"; mkdir -p "$BQ/hooks" "$BQ/rules"; cp "$HOOKS/require-status-sync.sh" "$BQ/hooks/"
+printf '# Core\nsay "hi" and C:\\path\\ end\\\n' > "$BQ/rules/00-core.md"
+out="$(printf '{}' | PATH="$NOJQ" CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$BQ" "$SA")"
+dec="$(printf '%s' "$out" | python3 -c 'import json,sys; print(json.load(sys.stdin)["hookSpecificOutput"]["additionalContext"])' 2>/dev/null)"; check "subagent-start: no-jq fallback with backslashes and quotes is valid JSON" 0 "$?"
+contains "subagent-start: no-jq fallback round-trips a backslash and a quote" "say \"hi\" and C:\\path\\ end\\" "$dec"
+rm -rf "$BQ"
+# A control character in the carrier must not break the JSON.
+CTL="$(mktemp -d)"; mkdir -p "$CTL/hooks" "$CTL/rules"; cp "$HOOKS/require-status-sync.sh" "$CTL/hooks/"
+printf '# Core\x01 with\x1b control\n' > "$CTL/rules/00-core.md"; ln -sf "$(command -v awk)" "$NOJQ/awk"
+out="$(printf '{}' | PATH="$NOJQ" CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$CTL" "$SA")"
+printf '%s' "$out" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; check "subagent-start: no-jq fallback survives control characters" 0 "$?"
+rm -rf "$CTL"
+rm -rf "$NOJQ" "$TMP"
+TMP="$(mktemp -d)"; mkdir -p "$TMP/.claude/hooks" "$TMP/.claude/rules"
+cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"; cp "$ROOT/.claude/rules/00-core.md" "$TMP/.claude/rules/"
+out="$(printf '{}' | CLAUDE_PROJECT_DIR="$TMP" "$SA")"; check "subagent-start: standalone exits 0" 0 "$?"
+check "subagent-start: standalone emits nothing (rules load natively — no double-pay)" "" "$out"
+rm -rf "$TMP"
+NOH="$(mktemp -d)"; printf '{}' | CLAUDE_PROJECT_DIR="$NOH" "$SA" >/dev/null; check "subagent-start: unlocatable harness fails open" 0 "$?"; rm -rf "$NOH"
+# The shared emitter also fixed session-start's no-jq fallback, which embedded raw newlines.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+NOJQ="$(mktemp -d)"
+for b in bash sh env cat grep sed head tr dirname ln cp readlink pwd mkdir awk; do
+  p="$(command -v "$b" 2>/dev/null || true)"
+  if [ -n "$p" ]; then ln -s "$p" "$NOJQ/$b" 2>/dev/null || true; fi
+done
+out="$(PATH="$NOJQ" CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
+printf '%s' "$out" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; check "session-start: no-jq plugin-mode output is valid JSON" 0 "$?"
+rm -rf "$NOJQ" "$TMP"
 
 echo "== post-compact.sh (PostCompact: restate loop state) =="
 PC="$HOOKS/post-compact.sh"
@@ -521,6 +695,50 @@ FX="$(lint_fixture)"
 sed -i 's/check-review\.sh/checkreview.sh/g' "$FX/.claude/skills/ship/SKILL.md"
 out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks /ship that no longer wires check-review.sh" 1 "$?"
 contains "lint: cites ADR-0005 on unwiring" "ADR-0005" "$out"
+rm -rf "$FX"
+
+# The ladder lives twice by design — always-on rungs in 00-core.md, on-demand depth in
+# the lean skill — so the seven rung keywords are pinned in both copies (ADR-0008).
+FX="$(lint_fixture)"
+sed -i 's/\*\*stdlib\*\*/standard library/' "$FX/.claude/rules/00-core.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a rung dropped from the always-on ladder" 1 "$?"
+contains "lint: names the missing rung" "stdlib" "$out"
+rm -rf "$FX"
+FX="$(lint_fixture)"
+sed -i 's/YAGNI/you are not going to need it/g' "$FX/.claude/skills/lean/SKILL.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a rung dropped from the lean skill" 1 "$?"
+contains "lint: names the drifted copy" "skills/lean/SKILL.md" "$out"
+rm -rf "$FX"
+# The debt gate is only a gate if /review runs it — ADR-0005's wiring lesson, applied again.
+FX="$(lint_fixture)"
+sed -i 's/check-debt\.sh/checkdebt.sh/g' "$FX/.claude/skills/review/SKILL.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks /review that no longer wires check-debt.sh" 1 "$?"
+contains "lint: cites ADR-0008 on unwiring the debt gate" "ADR-0008" "$out"
+rm -rf "$FX"
+# Ideas borrowed from another project are credited in README.md and nowhere else; the
+# harness carries no external brand. The term is split so this file cannot trip the check.
+FX="$(lint_fixture)"
+printf '\nSee also pony%s.\n' 'tail' >> "$FX/.claude/skills/lean/SKILL.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks an external project name outside README.md" 1 "$?"
+contains "lint: names the file carrying the external name" "skills/lean/SKILL.md" "$out"
+contains "lint: says where credit belongs" "README.md" "$out"
+rm -rf "$FX"
+FX="$(lint_fixture)"
+printf '\nCredit: pony%s.\n' 'tail' >> "$FX/README.md"
+KEEL_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: README.md may credit the external project" 0 "$?"
+rm -rf "$FX"
+
+# The review loop must not un-size what the ladder sized: a MEDIUM that only adds code is
+# answered with a debt marker, and a finding whose fix adds code names a failing input.
+FX="$(lint_fixture)"
+sed -i 's/names a failing case/is convenient/' "$FX/.claude/rules/dev-process.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks dev-process losing the MEDIUM-names-a-failing-case rule" 1 "$?"
+contains "lint: names dev-process for the review-inflation rule" "missing 'names a failing case'" "$out"
+rm -rf "$FX"
+FX="$(lint_fixture)"
+sed -i 's/Does the fix add code?/Is it nice?/' "$FX/.claude/skills/code-review/references/severity-rubric.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks the rubric losing the adds-code calibration" 1 "$?"
+contains "lint: names the rubric for the review-inflation rule" "missing 'Does the fix add code?'" "$out"
 rm -rf "$FX"
 
 printf '\n%s passed, %s failed\n' "$PASS" "$FAIL"

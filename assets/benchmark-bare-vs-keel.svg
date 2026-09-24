@@ -1,0 +1,35 @@
+<svg viewBox="0 0 860 330" width="860" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-labelledby="t d">
+  <title id="t">Keel versus a bare agent on six trap tasks</title>
+  <desc id="d">Twelve runs per arm, Claude Sonnet. Correct runs: bare agent 12 of 12, Keel 12 of 12. Runs that left a test behind: bare agent 0 of 12, Keel 12 of 12. Runs that added a dependency file: 0 and 0. Median source lines: 6.5 versus 16.5. Cost per run: 13 cents versus 2 dollars 82.</desc>
+  <style>
+    .ink { fill: #52514e; } .bare { fill: #eb6834; } .keel { fill: #2a78d6; } .ref { stroke: #8b949e; }
+    @media (prefers-color-scheme: dark) { .ink { fill: #c3c2b7; } .bare { fill: #d95926; } .keel { fill: #3987e5; } }
+  </style>
+  <text x="430" y="26" font-size="15" font-weight="600" class="ink" text-anchor="middle">Same model, same six tasks: a bare agent vs Keel</text>
+  <text x="430" y="46" font-size="12" class="ink" text-anchor="middle">Claude Sonnet · headless Claude Code · n = 12 per arm · scored on hidden checks</text>
+  <rect x="330" y="58" width="12" height="12" rx="2" class="bare"/><text x="347" y="68" font-size="12" class="ink">bare agent</text>
+  <rect x="430" y="58" width="12" height="12" rx="2" class="keel"/><text x="447" y="68" font-size="12" class="ink">Keel</text>
+
+  <!-- rows: label at x=238 (end), bars from x=250; scale per row noted in label -->
+  <text x="238" y="100" font-size="12" class="ink" text-anchor="end">correct runs (of 12)</text>
+  <rect x="250" y="86" width="540" height="12" rx="4" class="bare"/><text x="798" y="96" font-size="11" font-weight="600" class="ink">12</text>
+  <rect x="250" y="100" width="540" height="12" rx="4" class="keel"/><text x="798" y="110" font-size="11" font-weight="600" class="ink">12</text>
+
+  <text x="238" y="146" font-size="12" class="ink" text-anchor="end">runs that left a test behind (of 12)</text>
+  <rect x="250" y="132" width="3" height="12" rx="1" class="bare"/><text x="261" y="142" font-size="11" font-weight="600" class="ink">0</text>
+  <rect x="250" y="146" width="540" height="12" rx="4" class="keel"/><text x="798" y="156" font-size="11" font-weight="600" class="ink">12</text>
+
+  <text x="238" y="192" font-size="12" class="ink" text-anchor="end">runs that added a dependency (of 12)</text>
+  <rect x="250" y="178" width="3" height="12" rx="1" class="bare"/><text x="261" y="188" font-size="11" font-weight="600" class="ink">0</text>
+  <rect x="250" y="192" width="3" height="12" rx="1" class="keel"/><text x="261" y="202" font-size="11" font-weight="600" class="ink">0</text>
+
+  <text x="238" y="238" font-size="12" class="ink" text-anchor="end">source lines added, median</text>
+  <rect x="250" y="224" width="213" height="12" rx="4" class="bare"/><text x="471" y="234" font-size="11" font-weight="600" class="ink">6.5</text>
+  <rect x="250" y="238" width="540" height="12" rx="4" class="keel"/><text x="798" y="248" font-size="11" font-weight="600" class="ink">16.5</text>
+
+  <text x="238" y="284" font-size="12" class="ink" text-anchor="end">cost per run</text>
+  <rect x="250" y="270" width="25" height="12" rx="4" class="bare"/><text x="283" y="280" font-size="11" font-weight="600" class="ink">$0.13</text>
+  <rect x="250" y="284" width="540" height="12" rx="4" class="keel"/><text x="798" y="294" font-size="11" font-weight="600" class="ink">$2.82</text>
+
+  <text x="430" y="322" font-size="11" class="ink" text-anchor="middle">Keel costs more and writes more. What it buys: a test, two reviews and a machine-checked verdict on every change.</text>
+</svg>

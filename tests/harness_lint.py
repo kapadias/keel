@@ -10,6 +10,13 @@ Every check below fails the build (boundaries.md: deterministic gates decide):
   - cross-links: every intra-repo markdown link resolves to a real file.
   - slash refs: every `/name` named in the harness resolves to a command or skill.
   - domain leak: no domain-specific vocabulary in a domain-agnostic harness.
+  - external names: a project whose ideas Keel adapted is credited in README.md
+    and named nowhere else.
+  - the ladder: the seven rung keywords appear in both 00-core.md (always-on)
+    and skills/lean/SKILL.md (depth), so the two copies cannot drift (ADR-0008).
+  - debt gate wiring: /review and /sync invoke check-debt.sh (ADR-0008).
+  - review inflation: dev-process §4 and the severity rubric keep the rule that a
+    review ask which adds code must name a failing input (ADR-0008).
 
 KEEL_LINT_ROOT points the linter at a different tree. It exists so tests/run.sh
 can golden-test the linter itself against mutated copies of this repo — a linter
@@ -309,13 +316,71 @@ for md in glob.glob(f"{ROOT}/.claude/**/*.md", recursive=True):
             if DENY.search(line):
                 bad(f"{md}:{n}: domain-specific term in a domain-agnostic harness")
 
+# --- review inflation: the review loop must not un-size what the ladder sized ---
+# The first WS7 eval's outlier: a six-line check became 25 lines because every MEDIUM
+# was built. dev-process §4 and the rubric carry the rule; pin the load-bearing phrases.
+for rel, phrase in (
+    (".claude/rules/dev-process.md", "names a failing case"),
+    (".claude/skills/code-review/references/severity-rubric.md", "Does the fix add code?"),
+):
+    path = os.path.join(ROOT, rel)
+    try:
+        with open(path, encoding="utf-8") as fh:
+            if phrase not in fh.read():
+                bad(f"{rel}: missing '{phrase}' — a review ask that adds code must name a failing input (ADR-0008)")
+    except FileNotFoundError:
+        bad(f"review-inflation rule: missing {rel}")
+
+# --- external names: credit lives in README.md and nowhere else ---
+# Keel adapts ideas from other projects; the credit line in the root README is the
+# one place their names appear. Everything the harness ships stays brand-free. The
+# term is assembled at runtime so this file cannot trip its own check.
+EXTERNAL_NAMES = ("pony" + "tail",)
+EXTERNAL = re.compile("|".join(re.escape(t) for t in EXTERNAL_NAMES), re.IGNORECASE)
+SCAN_EXT = re.compile(r"\.(md|sh|py|json|ya?ml|txt)$")
+# os.walk, not glob: glob("**") skips dot-directories, and .claude/ is one.
+for dirpath, dirnames, filenames in os.walk(ROOT):
+    dirnames[:] = [d for d in dirnames if d not in (".git", "node_modules")]
+    for name in filenames:
+        path = os.path.join(dirpath, name)
+        rel = os.path.relpath(path, ROOT)
+        if rel == "README.md" or not SCAN_EXT.search(name):
+            continue
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            for n, line in enumerate(fh, 1):
+                if EXTERNAL.search(line):
+                    bad(f"{rel}:{n}: external project name — credit belongs in README.md only")
+
+# --- the ladder: one ruleset, two copies (always-on rungs; on-demand depth) ---
+# The seven rungs are pinned by keyword because the copies differ in depth by design.
+LADDER = ("YAGNI", "codebase", "stdlib", "native", "installed", "one line", "minimum code")
+for rel in (".claude/rules/00-core.md", ".claude/skills/lean/SKILL.md"):
+    path = os.path.join(ROOT, rel)
+    if not os.path.isfile(path):
+        bad(f"ladder: missing {rel} (ADR-0008)")
+        continue
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    for rung in LADDER:
+        if rung not in text:
+            bad(f"{rel}: ladder rung '{rung}' missing — 00-core.md and the lean skill must agree (ADR-0008)")
+
+# --- debt gate wiring: /review gates the delta, /sync prints the ledger (ADR-0008) ---
+for cmd in ("review", "sync"):
+    cmd_path = f"{ROOT}/.claude/skills/{cmd}/SKILL.md"
+    try:
+        with open(cmd_path, encoding="utf-8") as fh:
+            if "check-debt.sh" not in fh.read():
+                bad(f"{cmd_path}: does not wire check-debt.sh (ADR-0008)")
+    except FileNotFoundError:
+        bad(f"debt gate wiring: missing {os.path.relpath(cmd_path, ROOT)}")
+
 # --- token budget: the always-on surface is gated, not aspirational ---
 # CLAUDE.md + rules/*.md are paid on every turn (token-economy.md). Budgets are
-# words (whitespace-split — deterministic, no tokenizer dependency); ~0.75
-# words/token puts the total near the README's ≈5k-token claim. Raising a
+# words (whitespace-split — deterministic, no tokenizer dependency). Raising a
 # budget is an explicit, reviewable act — that is the point.
-# Calibrated 2026-08-01: CLAUDE.md 836, largest rule 679 (dev-process.md), total
-# 4,252 by this metric (str.split() counts slightly above `wc -w`).
+# Calibrated 2026-09-23: CLAUDE.md 236, largest rule 517 (00-core.md), total
+# 3,690 by this metric (str.split() counts slightly above `wc -w`).
 MAX_CLAUDE_MD_WORDS = 300
 MAX_RULE_WORDS = 520
 MAX_ALWAYS_ON_WORDS = 3700

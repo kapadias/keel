@@ -43,7 +43,10 @@ diagnosis is a coin flip.
 
 ### 4. Fix minimally
 
-Fix the **cause, not the symptom**, with the **smallest diff** that removes it. Don't refactor
+Fix the **cause, not the symptom**, with the **smallest diff** that removes it. **A report names a
+symptom.** Before you edit, grep every caller of the function you are about to touch and fix the
+shared function once — one guard where all callers route through is a smaller diff than one per
+caller, and patching only the path the ticket names leaves a sibling caller still broken. Don't refactor
 surrounding code in the same change — a fix commit should be reviewable as exactly the fix. If the
 real fix is large, note it and do the surgical version now; schedule the rest.
 
@@ -65,6 +68,8 @@ and async Node.
 
 - **Symptom-patching.** Adding a null-check where it blew up instead of asking why the value was
   null. The cause moves downstream and returns.
+- **Patching the named path.** Guarding the one caller in the ticket while three siblings still hit
+  the bug. Fix it where all callers route through.
 - **Broadening a catch.** Wrapping a wider `try` to make an exception disappear hides the next bug
   too. Catch narrowly, at the layer that can actually handle it.
 - **Silencing what you don't understand.** Swallowing an error or downgrading a log to make red go

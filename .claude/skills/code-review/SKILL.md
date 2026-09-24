@@ -29,6 +29,12 @@ list, and how severity maps to the gate: [`references/severity-rubric.md`](refer
 - **Secrets & logging.** No keys/tokens/PII in code, logs, or traces. No secret in a fixture.
 - **Reproducibility.** No wall-clock or global RNG in decision logic; same inputs → same outputs.
 - **Style fit.** Matches the _local_ idiom. Consistency with the file beats your personal preference.
+- **Complexity.** The ladder (`.claude/rules/00-core.md`) applied to the diff: hand-rolled stdlib,
+  a new dependency for what the platform does, an abstraction with one implementation, a `debt:`
+  marker with no upgrade trigger. Tag the `issue` `delete:` / `stdlib:` / `native:` / `yagni:` /
+  `shrink:`, name the replacement in `fix`, `category: simplicity`, **MEDIUM at most** — size never
+  outranks correctness or security. When any exist, end the prose with `net: -N lines possible.`
+  Depth and examples: the `lean` skill.
 
 ## Reviewing as an adversary
 
@@ -46,11 +52,15 @@ One finding = **`path:line` + the problem in one sentence + a concrete fix.** Ma
 original_charge` at the handler edge and reject otherwise.
 
 Bad finding: "error handling could be improved here." No location, no defect, no fix — noise.
+A finding whose `fix` **adds** code states the failing input in `issue`; without one it is a
+question, not a MEDIUM.
 
 ## What NOT to flag
 
 Signal dies in a flood of nits. Skip subjective style a formatter/linter already owns, restyling that
-fights the local idiom, and speculative "what if we later need…" generality the change doesn't require.
+fights the local idiom, speculative hardening (RFC-grade validation, limits, i18n cases) on a
+surface the task did not make critical — and never ask for speculative "what if we later need…"
+generality; when the diff _adds_ it, that is a Complexity finding.
 Prefer **fewer, high-confidence findings**. If unsure it's a real defect, mark it as a _question_, not
 a blocker — ten weak findings bury the one that matters.
 

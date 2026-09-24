@@ -48,7 +48,7 @@ block is for the gate — keep them consistent. Use `"category": "security"` for
       "severity": "CRITICAL | HIGH | MEDIUM | LOW",
       "path": "relative/path/to/file",
       "line": 0,
-      "category": "correctness | security | tests | safety | performance | style",
+      "category": "correctness | security | tests | safety | performance | style | simplicity",
       "issue": "what is wrong and why it matters",
       "fix": "concrete recommended change"
     }

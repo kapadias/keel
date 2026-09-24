@@ -23,7 +23,8 @@ PR targets `develop`, not `main`.
 
 ## Remaining risk
 
-<!-- What is not covered: untested paths, deferred follow-ups, known limitations. -->
+<!-- What is not covered: untested paths, deferred follow-ups, known limitations — and what was
+     deliberately skipped, with the trigger to add it. -->
 
 ## Definition of Done
 

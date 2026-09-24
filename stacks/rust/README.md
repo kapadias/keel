@@ -6,8 +6,6 @@ Toolchain: **rustfmt** (format) · **clippy** (lint) · **cargo test** (tests) �
 
 ## Formatter — rustfmt
 
-`format.sh` should invoke:
-
 ```bash
 rustfmt "$FILE"
 ```

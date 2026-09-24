@@ -31,9 +31,14 @@ These are hard rules in core/decision logic:
 
 ## Simplicity
 
-- Write the **minimum code that solves the stated problem**. No speculative features, parameters,
-  config, or abstraction for futures nobody asked for — wait for the third concrete use before
-  abstracting. Every line is a liability; prefer deleting to adding.
+- The ladder ([00-core.md](./00-core.md)) sizes the solution — after you understand the problem:
+  deletion over addition, boring over clever, fewest files, shortest working diff; wait for the
+  third concrete use before abstracting.
+- **Never simplified away:** a test, a review verdict, a sync, validation at a trust boundary, error
+  handling that prevents data loss, security, accessibility, anything explicitly requested.
+- **Mark deliberate corners** (global lock, O(n²) scan, naive heuristic) with a
+  `debt: <ceiling>, <upgrade trigger>` comment; `check-debt.sh` fails a marker with no trigger.
+  Depth: the `lean` skill.
 
 ## Naming & structure
 
@@ -50,8 +55,3 @@ These are hard rules in core/decision logic:
 - **No secrets** — see [safety.md](./safety.md). `secret-scan.sh` blocks the write either way.
 - **No `print`/debug spew in shipped code** — use the project's structured logger. Never log secrets,
   tokens, or full payloads of user data.
-
-## Reuse over rewrite
-
-Prefer a maintained library over hand-rolled core logic (parsing, dates, crypto, auth). The ≥80%
-rule and how to apply it: [dev-process.md](./dev-process.md) §0.

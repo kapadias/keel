@@ -6,8 +6,6 @@ Toolchain: **gofmt + golangci-lint** (format + lint) · **go vet** (static analy
 
 ## Formatter — gofmt
 
-`format.sh` should invoke:
-
 ```bash
 gofmt -w "$FILE"
 ```

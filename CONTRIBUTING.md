@@ -17,8 +17,10 @@ Three principles govern everything here:
 
 - **`.claude/`** — the harness: `rules/` (always-on policy), `agents/`, `skills/` (playbooks + workflows),
   `hooks/`, and `settings.json`. This is the product.
-- **`docs/`** — `STATUS.md` (the living state) and `adr/` (numbered decisions).
-- **`.github/`** — CI (`workflows/ci.yml`) and the PR template.
+- **`docs/`** — `STATUS.md` (the living state), `INSTALL.md`, `OVERVIEW.md`, `benchmarks/`, and
+  `adr/` (numbered decisions). `CHANGELOG.md` lives at the repo root.
+- **`.github/`** — CI (`workflows/ci.yml`), `workflows/release.yml`, `scripts/` (release tooling),
+  and the PR template.
 
 ## How to add to the harness
 
@@ -64,7 +66,7 @@ model: <model id>
 name: <name>
 description: One line on what it does and when to invoke it.
 model: sonnet
-disable-model-invocation: true   # if it has side effects: human-triggered only
+disable-model-invocation: true # if it has side effects: human-triggered only
 ---
 ```
 
@@ -102,6 +104,6 @@ pushes that leave `docs/STATUS.md` stale — keep it current.
 - **Conventional commits** (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`).
 - Open a PR **to `develop`** (never `main`), linked to its tracker issue. Fill in the PR template
   including the Definition-of-Done checklist.
-- Address every review finding; CI (`shellcheck` + `harness-lint`) must be green.
+- Address every review finding; CI (`shellcheck` + `harness-lint` + `tests/run.sh`) must be green.
 
 Welcome aboard — bring rigor, keep it dense, and let the gates decide.
