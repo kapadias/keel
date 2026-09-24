@@ -33,6 +33,9 @@ Exercises each deterministic gate with fixed inputs and asserts the exit code:
 - **check-review** (review verdict gate): blocks on `request_changes`, any
   CRITICAL/HIGH, or an out-of-schema verdict/severity; extracts one fenced json
   block; fails closed on invalid JSON — same on the jq and no-jq paths.
+- **check-review, optional findings** (ADR-0009): an approving verdict lists each MEDIUM/LOW
+  finding whose fix adds code with no failing input as `optional:`; a named input or a
+  non-code fix is not listed; the exit code never changes.
 - **check-trivial** (fast-lane eligibility): qualifies a small reversible change;
   disqualifies over-budget, lockfile, critical-surface, and rename-into-critical
   changes; fails closed off a repo.

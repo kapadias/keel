@@ -35,7 +35,12 @@ a model deciding a gate by judgement.
 5. **Off the critical surface, one test is enough**: one that would have failed before the change.
    Golden plus property tests stay mandatory on the critical surface.
 
-`check-review.sh` is unchanged and still decides merge-readiness on every verdict. The linter blocks a
+6. **Review asks stop inflating code.** A finding may carry `adds_code` and `failing_input`. On an
+   approving verdict, `check-review.sh` lists each adds-code finding with no failing input as
+   `optional:`, and the implementer leaves it (a `debt:` marker, not code). This turns the
+   review-inflation rule from prose into script output.
+
+`check-review.sh`'s exit codes are unchanged and still decide merge-readiness on every verdict. The linter blocks a
 `/review` that stops invoking `review-lanes.sh`.
 
 ## Consequences

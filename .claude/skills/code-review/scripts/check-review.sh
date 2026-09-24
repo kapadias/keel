@@ -134,5 +134,15 @@ if [ "${blocking:-0}" -gt 0 ]; then
   exit 1
 fi
 
+# Review inflation (ADR-0009): a non-blocking finding whose fix only adds code, and that names no
+# failing input, is optional. Listing it here lets the implementer leave it without arguing; the
+# exit code is unchanged. jq path only — the fallback lists nothing, which costs code, never safety.
+if command -v jq >/dev/null 2>&1; then
+  printf '%s' "$review" | jq -r '.findings[]?
+    | select(.adds_code == true)
+    | select(((.failing_input // "") | tostring | gsub("\\s";"")) == "")
+    | "↷ check-review: optional: \(.path // "?"):\(.line // "?") — adds code with no failing input; leave it or mark it debt:."' >&2 || true
+fi
+
 echo "✓ check-review: no blocking findings; verdict approves." >&2
 exit 0

@@ -13,6 +13,9 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
   risky surface. It fails closed to full review with security. `/review` itself and `/fix`'s single
   reviewer move to the cheaper tier. Small changes start in `/fix`; off the critical surface, one
   test that would have failed before is enough.
+- **Optional findings are named by the gate.** A verdict finding may carry `adds_code` and
+  `failing_input`. On approve, `check-review.sh` lists each adds-code finding with no failing input
+  as `optional:`, and the implementer leaves it. Exit codes unchanged.
 
 - **The decision ladder** (ADR-0008). `rules/00-core.md` now says, in seven rungs, how much code
   to write: YAGNI, already in this codebase, stdlib, native platform, installed dependency, one

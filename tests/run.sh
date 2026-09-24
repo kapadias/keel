@@ -424,6 +424,17 @@ if [ -x "$CR" ] || [ -f "$CR" ]; then
   printf 'Prose before.\n```json\n{"verdict":"approve","summary":"x","findings":[]}\n```\nProse after.\n' | bash "$CR"; check "fenced approve block extracted and passes" 0 "$?"
   printf '```json\n{"verdict":"approve","summary":"x","findings":[]}\n```\n```json\n{"verdict":"approve","summary":"y","findings":[]}\n```\n' | bash "$CR"; check "two fenced blocks is ambiguous, fails closed" 2 "$?"
   printf '%s' '{"verdict":"approve","summary":"x","findings":[{"severity":123,"path":"a","line":1,"category":"x","issue":"i","fix":"f"}]}' | bash "$CR"; check "non-string severity fails closed, not a jq crash" 1 "$?"
+  # Review inflation: a non-blocking finding whose fix only adds code, with no failing input named,
+  # is listed as optional so the implementer leaves it. The exit code never changes.
+  out="$(printf '%s' '{"verdict":"approve","summary":"x","findings":[{"severity":"MEDIUM","path":"src/a.py","line":7,"category":"correctness","issue":"no guard","fix":"add a guard","adds_code":true}]}' | bash "$CR" 2>&1)"; rc=$?
+  check "adds-code MEDIUM with no failing input still approves" 0 "$rc"
+  contains "adds-code MEDIUM with no failing input is listed as optional" "optional: src/a.py:7" "$out"
+  out="$(printf '%s' '{"verdict":"approve","summary":"x","findings":[{"severity":"LOW","path":"src/a.py","line":9,"category":"correctness","issue":"i","fix":"f","adds_code":true,"failing_input":"parse(\"\") returns 0, not ValueError"}]}' | bash "$CR" 2>&1)"
+  case "$out" in *"optional:"*) r=1 ;; *) r=0 ;; esac; check "a finding that names a failing input is not marked optional" 0 "$r"
+  out="$(printf '%s' '{"verdict":"approve","summary":"x","findings":[{"severity":"MEDIUM","path":"src/b.py","line":3,"category":"tests","issue":"i","fix":"f","adds_code":true,"failing_input":"  "}]}' | bash "$CR" 2>&1)"
+  contains "a blank failing input counts as none" "optional: src/b.py:3" "$out"
+  out="$(printf '%s' '{"verdict":"approve","summary":"x","findings":[{"severity":"MEDIUM","path":"src/c.py","line":1,"category":"style","issue":"i","fix":"f"}]}' | bash "$CR" 2>&1)"
+  case "$out" in *"optional:"*) r=1 ;; *) r=0 ;; esac; check "a finding that does not add code is not marked optional" 0 "$r"
   # jq-absent fallback must be as strict as the jq path — including case.
   NOJQ="$(mktemp -d)"
   for b in bash sh env cat grep sed head tr printf awk dirname; do

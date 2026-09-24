@@ -54,7 +54,8 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
 - **2026-09-24** — Proportional review (ADR-0009): `review-lanes.sh` sizes `/review` by script, so a
   small diff pays for one cheaper reviewer and the security reviewer runs on evidence in the diff.
   `/review` and `/fix`'s reviewer move to the cheaper tier; small changes start in `/fix`; off the
-  critical surface one test is enough. The verdict-gate fix from `develop` is merged in.
+  critical surface one test is enough. `check-review.sh` lists adds-code findings with no
+  failing input as `optional:`. The verdict-gate fix from `develop` is merged in.
 
 ## Next / open
 

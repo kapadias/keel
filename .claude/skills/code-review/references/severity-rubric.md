@@ -43,7 +43,8 @@ Severity is a function of **blast radius × reachability × reversibility**:
   whose fix _adds_ code (a bound, a branch, a type, a wrapper) must name the concrete input or
   caller that reaches the bad path today. Hardening against inputs
   nobody sends is a `simplicity` question, not a MEDIUM — the ladder applies to the reviewer's ask
-  as much as to the author's diff.
+  as much as to the author's diff. Record it in the verdict: `"adds_code": true` and the input in
+  `"failing_input"`. `check-review.sh` lists an adds-code finding with no failing input as optional.
 
 When genuinely unsure whether something is a real defect, **do not pad the count** — mark it as a
 question, not a blocker. Ten weak HIGHs bury the one that matters and train authors to ignore the gate.
