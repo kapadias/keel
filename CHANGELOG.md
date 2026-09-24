@@ -11,11 +11,18 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
   16 bare runs and most harnessed ones: nothing deterministic ran the tests. Now the Stop hook and
   the pre-push hook run the project's own test command (pytest, npm, go or cargo, detected; or
   `NONNA_TEST_CMD`) whenever code changed, and refuse on red. `hooks/lib/tests.sh` holds it.
+  Detection runs only in a copy-in install; under the plugin the gate waits for an explicit
+  `NONNA_TEST_CMD`. A green tree is not re-tested at every turn end, a Stop-time timeout does not
+  block, and the pre-push gate reads the pushed range from git, so a branch's first push is gated.
 - **One-command install** (`install.sh`, `--host` for eight agent hosts), host rules generated from
   `00-core.md` (`hosts/build.py`, drift-linted), and a git `pre-commit` hook every host gets.
 
 ### Changed
 
+- **Security review of the installer and the new hooks.** `install.sh` merges into an existing
+  `.claude/`, never writes through a symlink, chmods only what it copied, and exits non-zero rather
+  than linking a git hook to a missing script. `pre-commit` reads staged file names literally and
+  binary-safe, and fails closed when git cannot diff. The Stop hook's no-jq output is valid JSON.
 - **Keel is now Nonna** (ADR-0010). The plugin id is `nonna@nonna`, environment variables are
   `NONNA_*` (for example `NONNA_CRITICAL_PATHS`), and gate messages open with a line in her voice
   before the technical reason. Reinstall the plugin under the new id.

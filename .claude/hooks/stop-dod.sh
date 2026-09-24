@@ -39,15 +39,35 @@ reason=""
 
 # "Done" means the suite passes. Run the project's own tests when code changed; block once on red.
 # On the second stop (stop_hook_active) let it through: an agent that cannot fix it must say so,
-# not loop. No detectable test command, or NONNA_TEST_CMD="", means this check does not apply.
+# not loop. No test command (see lib/tests.sh: plugin installs need NONNA_TEST_CMD) means this check
+# does not apply. A green run is remembered per tree and command, so an idle turn end costs nothing;
+# a suite slower than the Stop budget is not red, and the pre-push gate still runs it in full.
 if ! printf '%s' "$payload" | grep -qE '"stop_hook_active"[[:space:]]*:[[:space:]]*true' \
   && [ -f "$here/lib/tests.sh" ]; then
   # shellcheck source=/dev/null
   . "$here/lib/tests.sh"
   cmd="$(nonna_test_cmd)"
-  if [ -n "$cmd" ] && ! nonna_run_tests "$cmd"; then
-    tail_line="$(printf '%s' "${NONNA_TEST_TAIL:-}" | tr '\n"' '| ' | tr -d "\\\\" | cut -c1-600)"
-    reason="Nonna: you said done; the tests say no. \`$cmd\` failed: ${tail_line} Fix it and run the full suite, or tell the user plainly that it is not done and why. "
+  if [ -n "$cmd" ]; then
+    green_file="$(git rev-parse --git-path nonna-green 2>/dev/null || true)"
+    idx="$(mktemp 2>/dev/null || true)"
+    key=""
+    if [ -n "$idx" ] && cp "$(git rev-parse --git-path index)" "$idx" 2>/dev/null \
+      && tree="$(GIT_INDEX_FILE="$idx" git add -A . >/dev/null 2>&1 && GIT_INDEX_FILE="$idx" git write-tree 2>/dev/null)"; then
+      key="$(printf '%s\n%s' "$tree" "$cmd" | git hash-object --stdin 2>/dev/null || true)"
+    fi
+    [ -n "$idx" ] && rm -f "$idx"
+    if [ -n "$key" ] && [ -n "$green_file" ] && [ "$(cat "$green_file" 2>/dev/null)" = "$key" ]; then
+      : # this exact tree already passed this exact command
+    else
+      NONNA_TEST_TIMEOUT="${NONNA_TEST_TIMEOUT:-240}" nonna_run_tests "$cmd"
+      rc=$?
+      if [ "$rc" = 0 ]; then
+        [ -n "$key" ] && [ -n "$green_file" ] && printf '%s\n' "$key" > "$green_file" 2>/dev/null
+      elif [ "$rc" != 124 ]; then
+        tail_line="$(printf '%s' "${NONNA_TEST_TAIL:-}" | tr '\n' '|' | cut -c1-600)"
+        reason="Nonna: you said done; the tests say no. \`$cmd\` failed: ${tail_line} Fix it and run the full suite, or tell the user plainly that it is not done and why. "
+      fi
+    fi
   fi
 fi
 
@@ -61,6 +81,8 @@ fi
 if command -v jq >/dev/null 2>&1; then
   jq -cn --arg r "$reason" '{decision: "block", reason: $r}'
 else
+  # No jq: printable ASCII only, then escape the two characters JSON strings cannot hold raw.
+  reason="$(printf '%s' "$reason" | LC_ALL=C tr -c '[:print:]' ' ' | sed 's/\\/\\\\/g; s/"/\\"/g')"
   printf '{"decision":"block","reason":"%s"}\n' "$reason"
 fi
 exit 0

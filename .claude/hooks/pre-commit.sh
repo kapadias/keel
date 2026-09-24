@@ -7,6 +7,7 @@
 #   • no staged line that looks like a live credential — no fixture exemption, same as pre-push
 #
 # Installed by install.sh as .git/hooks/pre-commit. Bypass, knowingly: git commit --no-verify
+# That includes the very first commit of a repo born on main: make it with --no-verify, then branch.
 set -uo pipefail
 self="${BASH_SOURCE[0]}"
 while [ -L "$self" ]; do
@@ -43,12 +44,19 @@ while IFS= read -r -d '' f; do
       continue
       ;;
   esac
-  added="$(git -c core.quotePath=false diff --cached --no-color --no-ext-diff --no-textconv -U0 --end-of-options -- "$f" 2>/dev/null | grep -aE '^\+' | grep -avE '^\+\+\+ ' || true)"
+  # A file name is never pathspec magic, a NUL byte never makes a file "binary", and a diff that
+  # cannot be read is a stop, not a clean bill.
+  if ! diff="$(git --literal-pathspecs -c core.quotePath=false diff --cached --text --no-color --no-ext-diff --no-textconv -U0 -- "$f")"; then
+    echo "✗ Nonna: I could not read what you staged in '$f', so I cannot vouch for it. (pre-commit: git diff failed.)" >&2
+    fail=1
+    continue
+  fi
+  added="$(printf '%s\n' "$diff" | grep -aE '^\+' | grep -avE '^\+\+\+ ' || true)"
   [ -n "$added" ] || continue
   if class="$(printf '%s' "$added" | nonna_scan_secrets)"; then
     echo "✗ Nonna: you don't leave the house key under the mat. (pre-commit: '$f' stages what looks like a ${class} — remove it and rotate it.)" >&2
     fail=1
   fi
-done < <(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR -z 2>/dev/null)
+done < <(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR -z)
 
 exit "$fail"

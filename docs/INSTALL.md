@@ -26,11 +26,14 @@ Every host gets the same thing:
   rules under `.claude/rules/` for depth.
 - **Git hooks that enforce them for any agent**: `pre-commit` refuses a commit on `main`, `master` or
   `develop`, a staged secret file, and a staged credential; `pre-push` refuses a code push that leaves
-  `docs/STATUS.md` stale, and any secret.
+  `docs/STATUS.md` stale, any secret, and a red test suite. A repo born on `main` makes its very
+  first commit with `git commit --no-verify`, then branches.
 - **A blank `docs/STATUS.md`** and, if it finds `pyproject.toml`, `package.json`, `go.mod` or
   `Cargo.toml`, that stack's test-gate permissions.
 
-It never overwrites a file or a git hook that already exists; it lists what it left alone. If you
+It never overwrites a file or a git hook that already exists, and never writes through a symlink; it
+merges into an existing `.claude/` file by file and lists what it left alone. If a gate could not be
+installed it says so and exits non-zero. If you
 use a hook manager (a custom `core.hooksPath`), it tells you which scripts to point it at. Pin a
 release with `curl … | NONNA_REF=<tag> bash`. Prefer to read before you pipe? `curl -fsSLO …/install.sh`, read it,
 then `bash install.sh`.
@@ -114,6 +117,9 @@ Nonna's deny-list to your own project settings. This step is manual and mechanic
 - The **Definition-of-Done pre-push hook self-installs** from `${CLAUDE_PLUGIN_ROOT}` at
   `SessionStart` — no manual symlink. If it cannot be located, the session says so rather than
   going quiet.
+- **The test gate is opt-in.** A copy-in install detects your test command. A plugin install does
+  not: nobody agreed to have each repo's own code run at every turn end, so the Stop and pre-push
+  test gates run only once you set `NONNA_TEST_CMD` (for example in `.claude/settings.json` `env`).
 - **Gate scripts stay reachable.** `SessionStart` announces the resolved harness root, so
   `/review`, `/ship` and `/fix` can invoke `check-review.sh` and `check-trivial.sh` wherever the
   plugin is installed. Their first run may prompt for approval, because the absolute plugin path

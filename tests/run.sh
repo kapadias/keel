@@ -10,6 +10,8 @@
 # SC2016: single-quoted printf payloads (JSON fixtures with backtick fences) are literal on purpose.
 # shellcheck disable=SC1090,SC1091,SC2016
 set -uo pipefail
+# Non-interactive: the pre-push hook reads git's ref lines from stdin, so nothing may inherit an open one.
+exec </dev/null
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 HOOKS="$ROOT/.claude/hooks"
@@ -97,6 +99,24 @@ mkdir -p "$TMP/docs"; echo 'changed' > "$TMP/docs/STATUS.md"
 out="$(cd "$TMP" && NONNA_TEST_CMD=false "$RS" 2>&1)"; check "pre-push: a red test suite blocks the push" 1 "$?"
 contains "pre-push: names the failing command" "NONNA_TEST_CMD" "$out"
 ( cd "$TMP" && NONNA_TEST_CMD=true "$RS" ); check "pre-push: a green test suite lets it through" 0 "$?"
+# The pushed range comes from git's pre-push stdin, so a branch's first push is gated too.
+"${GIT[@]}" -C "$TMP" checkout -q -b feature/new
+echo 'def g(): return 2' >> "$TMP/src/app.py"; echo 'again' >> "$TMP/docs/STATUS.md"
+"${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m "new branch"
+ZERO=0000000000000000000000000000000000000000; NEWSHA="$("${GIT[@]}" -C "$TMP" rev-parse HEAD)"
+printf 'refs/heads/feature/new %s refs/heads/feature/new %s\n' "$NEWSHA" "$ZERO" > "$TMP/.push-stdin"
+( cd "$TMP" && NONNA_TEST_CMD='exit 1' "$RS" < .push-stdin ) 2>/dev/null; check "pre-push: a branch's first push runs the test gate" 1 "$?"
+( cd "$TMP" && NONNA_TEST_CMD='exit 1' "$RS" < /dev/null ) 2>/dev/null; check "pre-push: no stdin, no upstream: the range falls back to the base branch" 1 "$?"
+( cd "$TMP" && NONNA_TEST_CMD=true "$RS" < .push-stdin ); check "pre-push: a green first push goes through" 0 "$?"
+# The suite must taste what is pushed, not an uncommitted fix sitting on top of it.
+echo '# uncommitted' >> "$TMP/src/app.py"
+out="$(cd "$TMP" && NONNA_TEST_CMD=true "$RS" < .push-stdin 2>&1)"; check "pre-push: refuses to vouch for a push from a dirty tree" 1 "$?"
+contains "pre-push: says to commit or stash first" "commit or stash" "$out"
+"${GIT[@]}" -C "$TMP" checkout -q -- src/app.py
+out="$(cd "$TMP" && NONNA_TEST_TIMEOUT=1 NONNA_TEST_CMD='sleep 5' "$RS" < .push-stdin 2>&1)"; check "pre-push: a suite that times out blocks the push" 1 "$?"
+contains "pre-push: says the suite timed out" "timed out" "$out"
+rm -f "$TMP/.push-stdin"
+"${GIT[@]}" -C "$TMP" checkout -q feature/y
 echo 'KEY = "'"$FAKE_AWS"'"' > "$TMP/src/leak.py"
 echo 'more' >> "$TMP/docs/STATUS.md"
 "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m "leak with status"
@@ -169,6 +189,14 @@ printf 'a\n' > "$TMP/src/deleted.pem"; "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}"
 "${GIT[@]}" -C "$TMP" checkout -q --detach
 echo c >> "$TMP/src/a.py"; "${GIT[@]}" -C "$TMP" add -A
 "${GIT[@]}" -C "$TMP" commit -q -m detached 2>/dev/null; check "pre-commit: a detached HEAD is not a protected branch" 0 "$?"
+# A file name is a file name: pathspec magic in it must not exclude the file from the scan.
+printf 'K = "%s"\n' "$FAKE_AWS" > "$TMP/:(exclude)*"; "${GIT[@]}" -C "$TMP" add -- ':(literal):(exclude)*'
+"${GIT[@]}" -C "$TMP" commit -q -m magic 2>/dev/null; check "pre-commit: a pathspec-magic file name does not hide a secret" 1 "$?"
+"${GIT[@]}" -C "$TMP" reset -q; rm -f "$TMP/:(exclude)*"
+# A NUL byte makes git call the file binary; the scan must still read its lines.
+printf 'K = "%s"\n\0\n' "$FAKE_AWS" > "$TMP/src/bin.py"; "${GIT[@]}" -C "$TMP" add -A
+"${GIT[@]}" -C "$TMP" commit -q -m nul 2>/dev/null; check "pre-commit: a NUL byte does not hide a secret" 1 "$?"
+"${GIT[@]}" -C "$TMP" reset -q; rm -f "$TMP/src/bin.py"
 rm -rf "$TMP"
 
 echo "== install.sh (one command, any host) =="
@@ -177,12 +205,12 @@ echo "== install.sh (one command, any host) =="
 IN="$ROOT/install.sh"
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; echo '[project]' > "$TMP/pyproject.toml"
 out="$(cd "$TMP" && NONNA_SRC="$ROOT" bash "$IN" 2>&1)"; check "install: default install succeeds" 0 "$?"
-[ -f "$TMP/.claude/rules/00-core.md" ] && [ -f "$TMP/CLAUDE.md" ]; check "install: brings the harness and CLAUDE.md" 0 "$?"
+rc=0; [ -f "$TMP/.claude/rules/00-core.md" ] && [ -f "$TMP/CLAUDE.md" ] || rc=1; check "install: brings the harness and CLAUDE.md" 0 "$rc"
 [ -f "$TMP/docs/STATUS.md" ] && ! grep -q 'Current state' /dev/null; check "install: seeds a docs/STATUS.md" 0 "$?"
 grep -q 'nonna' "$TMP/docs/STATUS.md"; check "install: the seeded STATUS is a blank template, not this repo's status" 1 "$?"
-[ -x "$TMP/.git/hooks/pre-commit" ] && [ -x "$TMP/.git/hooks/pre-push" ]; check "install: wires the git pre-commit and pre-push hooks" 0 "$?"
+rc=0; [ -x "$TMP/.git/hooks/pre-commit" ] && [ -x "$TMP/.git/hooks/pre-push" ] || rc=1; check "install: wires the git pre-commit and pre-push hooks" 0 "$rc"
 [ -f "$TMP/.claude/settings.local.json" ] && grep -q 'pytest' "$TMP/.claude/settings.local.json"; check "install: picks the python stack pack from pyproject.toml" 0 "$?"
-[ ! -e "$TMP/.claude/reviews" ] && [ ! -e "$TMP/AGENTS.md" ]; check "install: copies no review verdicts and no other host's files" 0 "$?"
+rc=0; [ ! -e "$TMP/.claude/reviews" ] && [ ! -e "$TMP/AGENTS.md" ] || rc=1; check "install: copies no review verdicts and no other host's files" 0 "$rc"
 contains "install: says what it did, in Nonna's voice" "Nonna" "$out"
 "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m first 2>/dev/null; check "install: the installed pre-commit hook refuses a commit on main" 1 "$?"
 echo 'my own rules' > "$TMP/CLAUDE.md"
@@ -191,8 +219,8 @@ grep -q 'my own rules' "$TMP/CLAUDE.md"; check "install: never overwrites an exi
 rm -rf "$TMP"
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 ( cd "$TMP" && NONNA_SRC="$ROOT" bash "$IN" --host cursor,agents >/dev/null 2>&1 ); check "install: --host cursor,agents succeeds" 0 "$?"
-[ -f "$TMP/.cursor/rules/nonna.mdc" ] && [ -f "$TMP/AGENTS.md" ] && [ ! -e "$TMP/CLAUDE.md" ]; check "install: writes only the chosen hosts' files" 0 "$?"
-[ -f "$TMP/.claude/rules/testing.md" ] && [ -x "$TMP/.git/hooks/pre-commit" ]; check "install: every host gets the full rules and the git hooks" 0 "$?"
+rc=0; [ -f "$TMP/.cursor/rules/nonna.mdc" ] && [ -f "$TMP/AGENTS.md" ] && [ ! -e "$TMP/CLAUDE.md" ] || rc=1; check "install: writes only the chosen hosts' files" 0 "$rc"
+rc=0; [ -f "$TMP/.claude/rules/testing.md" ] && [ -x "$TMP/.git/hooks/pre-commit" ] || rc=1; check "install: every host gets the full rules and the git hooks" 0 "$rc"
 rm -rf "$TMP"
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 ( cd "$TMP" && NONNA_SRC="$ROOT" bash "$IN" --host all >/dev/null 2>&1 ); check "install: --host all succeeds" 0 "$?"
@@ -207,7 +235,25 @@ rm -rf "$TMP"
 TMP="$(mktemp -d)"
 ( cd "$TMP" && NONNA_SRC="$ROOT" bash "$IN" >/dev/null 2>&1 ); check "install: refuses outside a git repository" 1 "$?"
 ( cd "$TMP" && NONNA_SRC="$ROOT" bash "$IN" --host nosuchhost >/dev/null 2>&1 ); check "install: an unknown host is a usage error" 2 "$?"
+( cd "$TMP" && NONNA_SRC="$ROOT" timeout 10 bash "$IN" --host >/dev/null 2>&1 ); check "install: --host with no value is a usage error, not a hang" 2 "$?"
+out="$(bash -s -- --help < "$IN" 2>&1)"; contains "install: --help works when piped (curl | bash)" "--host" "$out"
 rm -rf "$TMP"
+# A .claude/ that already exists (say, only your settings.local.json) is merged into, file by file.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; mkdir -p "$TMP/.claude/hooks"
+echo '{"mine":true}' > "$TMP/.claude/settings.local.json"; echo 'echo mine' > "$TMP/.claude/hooks/mine.sh"
+( cd "$TMP" && NONNA_SRC="$ROOT" bash "$IN" >/dev/null 2>&1 ); check "install: merges into an existing .claude/" 0 "$?"
+rc=0; [ -x "$TMP/.claude/hooks/pre-commit.sh" ] && [ -f "$TMP/.claude/rules/00-core.md" ] && [ -f "$TMP/.claude/hooks/lib/secret-patterns.sh" ] || rc=1
+check "install: the merge brings every harness file the hooks need" 0 "$rc"
+grep -q mine "$TMP/.claude/settings.local.json" && [ ! -x "$TMP/.claude/hooks/mine.sh" ]; check "install: your files are untouched, not even chmod-ed" 0 "$?"
+rm -rf "$TMP"
+# Never write through a symlink, and never claim success with a git hook pointing at nothing.
+TMP="$(mktemp -d)"; OUT="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+ln -s "$OUT/elsewhere" "$TMP/.claude"; mkdir -p "$TMP/docs"; ln -s "$OUT/status" "$TMP/docs/STATUS.md"
+out="$(cd "$TMP" && NONNA_SRC="$ROOT" bash "$IN" 2>&1)"; check "install: a missing harness is a failure, not a success" 1 "$?"
+rc=0; [ ! -e "$OUT/elsewhere" ] && [ ! -e "$OUT/status" ] || rc=1; check "install: never writes through a symlink out of the repo" 0 "$rc"
+rc=0; [ ! -e "$TMP/.git/hooks/pre-commit" ] && [ ! -L "$TMP/.git/hooks/pre-commit" ] || rc=1; check "install: links no git hook to a script that is not there" 0 "$rc"
+contains "install: says the gates are not running" "not running" "$out"
+rm -rf "$TMP" "$OUT"
 
 echo "== check-trivial.sh (fast-lane eligibility gate) =="
 CT="$SKILLS/fast-lane/scripts/check-trivial.sh"
@@ -649,6 +695,7 @@ TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 mkdir -p "$TMP/docs" "$TMP/tests"; printf 'S\n' > "$TMP/docs/STATUS.md"; printf '[project]\nname = "x"\n' > "$TMP/pyproject.toml"
 printf 'def f():\n    return 1\n' > "$TMP/app.py"; printf 'from app import f\n\ndef test_f():\n    assert f() == 1\n' > "$TMP/tests/test_app.py"
 "${GIT[@]}" -C "$TMP" add -A >/dev/null; "${GIT[@]}" -C "$TMP" commit -qm init
+mkdir -p "$TMP/.claude/hooks/lib"; cp "$HOOKS/lib/tests.sh" "$TMP/.claude/hooks/lib/"  # a copy-in install, untracked
 printf 'def f():\n    return 2\n' > "$TMP/app.py"; printf 'S2\n' > "$TMP/docs/STATUS.md"
 out="$(printf '{"stop_hook_active":false}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"
 contains "stop: a red suite blocks the turn even with STATUS updated" '"decision":"block"' "$out"
@@ -661,7 +708,48 @@ out="$(printf '{"stop_hook_active":false}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"
 printf '%s' "$out" | grep -q '"decision"'; check "stop: a green suite with STATUS updated ends freely" 1 "$?"
 out="$(printf '{}' | NONNA_TEST_CMD=false CLAUDE_PROJECT_DIR="$TMP" "$SD")"
 contains "stop: NONNA_TEST_CMD overrides detection" "the tests say no" "$out"
+# A green run is remembered: the same tree and command are not re-run at every turn end.
+CNT="$(mktemp)"; printf 'def f():\n    return 4\n' > "$TMP/app.py"
+printf '{}' | NONNA_TEST_CMD="echo x >> $CNT" CLAUDE_PROJECT_DIR="$TMP" "$SD" >/dev/null
+printf '{}' | NONNA_TEST_CMD="echo x >> $CNT" CLAUDE_PROJECT_DIR="$TMP" "$SD" >/dev/null
+check "stop: an unchanged green tree is not re-tested" 1 "$(grep -c x "$CNT")"
+printf 'def f():\n    return 5\n' > "$TMP/app.py"
+printf '{}' | NONNA_TEST_CMD="echo x >> $CNT" CLAUDE_PROJECT_DIR="$TMP" "$SD" >/dev/null
+check "stop: a changed tree is re-tested" 2 "$(grep -c x "$CNT")"
+rm -f "$CNT"  # kept outside the repo: a counter inside it would change the tree it counts
+# A suite slower than the Stop budget is not "red": the turn ends, the pre-push gate still runs it.
+out="$(printf '{}' | NONNA_TEST_TIMEOUT=1 NONNA_TEST_CMD='sleep 5' CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+printf '%s' "$out" | grep -q '"decision"'; check "stop: a timed-out suite does not block the turn" 1 "$?"
+# Without jq the block must still be valid JSON, whatever the command and its output contain.
+NOJQ="$(mktemp -d)"
+for b in bash sh env cat grep sed head tail tr cut awk dirname git timeout printf mktemp cp rm; do
+  p="$(command -v "$b" 2>/dev/null || true)"
+  if [ -n "$p" ] && [ "${p#/}" != "$p" ]; then ln -s "$p" "$NOJQ/$b" 2>/dev/null || true; fi
+done
+out="$(printf '{}' | PATH="$NOJQ" NONNA_TEST_CMD='printf "a\\b \"q\"\t\033[31mred\n"; false' CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+printf '%s' "$out" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d["decision"]=="block" else 1)'
+check "stop: the no-jq block is valid JSON with quotes, backslashes and control bytes" 0 "$?"
+rm -rf "$NOJQ"
 rm -rf "$TMP"
+# Plugin install: the harness is not in the repo, so nobody agreed to have the repo's own code run at
+# every turn end. The auto-detected suite runs only with a copy-in install or an explicit NONNA_TEST_CMD.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+mkdir -p "$TMP/docs" "$TMP/tests"; printf 'S\n' > "$TMP/docs/STATUS.md"
+printf 'def f():\n    return 1\n' > "$TMP/app.py"; printf 'from app import f\n\ndef test_f():\n    assert f() == 1\n' > "$TMP/tests/test_app.py"
+"${GIT[@]}" -C "$TMP" add -A >/dev/null; "${GIT[@]}" -C "$TMP" commit -qm init
+printf 'def f():\n    return 2\n' > "$TMP/app.py"; printf 'S2\n' > "$TMP/docs/STATUS.md"
+out="$(printf '{}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+printf '%s' "$out" | grep -q '"decision"'; check "stop: plugin install never auto-runs the repo's tests" 1 "$?"
+out="$(printf '{}' | NONNA_TEST_CMD='python3 -m pytest -q' CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+contains "stop: plugin install runs the suite once NONNA_TEST_CMD opts in" "the tests say no" "$out"
+rm -rf "$TMP"
+# Detection claims pytest only when pytest is there; a false red would block every push.
+TMP="$(mktemp -d)"; STUB="$(mktemp -d)"; mkdir -p "$TMP/tests" "$TMP/.claude/hooks/lib"; : > "$TMP/.claude/hooks/lib/tests.sh"
+printf 'def test_x():\n    pass\n' > "$TMP/tests/test_x.py"
+printf '#!/bin/sh\nexit 1\n' > "$STUB/python3"; chmod +x "$STUB/python3"
+got="$(cd "$TMP" && unset NONNA_TEST_CMD && . "$HOOKS/lib/tests.sh" && nonna_test_cmd)"; contains "tests.sh: detects pytest in a copy-in install" "pytest" "$got"
+got="$(cd "$TMP" && unset NONNA_TEST_CMD && PATH="$STUB:$PATH" && . "$HOOKS/lib/tests.sh" && nonna_test_cmd)"; check "tests.sh: no pytest installed, no pytest command" 0 "${#got}"
+rm -rf "$TMP" "$STUB"
 
 echo "== subagent-start.sh (SubagentStart: the constitution reaches subagents) =="
 # SessionStart additionalContext is parent-only, so under a plugin install every
