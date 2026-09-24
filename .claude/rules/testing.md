@@ -1,13 +1,13 @@
 # Rule: Testing
 
 Tests are the deterministic gate that decides whether a change is real. A failing test is a stop, never
-a footnote. The LLM proposes a change; **the test suite decides** whether it is correct.
+a footnote: the LLM proposes; **the test suite decides**.
 
 ## TDD cycle
 
 Write tests first. **RED** (a failing test pins the behavior) → **GREEN** (minimal code passes) →
 **REFACTOR** (clean up with tests green). No production logic lands without a test that would have
-failed before it. This is not ceremony — it is how you know the code does what you think.
+failed before it.
 
 ## Two kinds of test, both required on the critical surface
 

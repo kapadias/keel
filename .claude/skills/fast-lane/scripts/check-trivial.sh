@@ -26,6 +26,9 @@ fail() {
 }
 
 git rev-parse --git-dir >/dev/null 2>&1 || fail "not a git repository"
+if [ -n "${KEEL_CRITICAL_PATHS:-}" ] && [ -z "${NONNA_CRITICAL_PATHS:-}" ]; then
+  fail "KEEL_CRITICAL_PATHS is set but the harness reads NONNA_CRITICAL_PATHS now (ADR-0010)"
+fi
 
 base="${1:-}"
 if [ -z "$base" ]; then

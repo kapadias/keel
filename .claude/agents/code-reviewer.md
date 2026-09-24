@@ -56,7 +56,9 @@ block is for the gate — keep them consistent.
       "line": 0,
       "category": "correctness | security | tests | safety | performance | style | simplicity",
       "issue": "what is wrong and why it matters",
-      "fix": "concrete recommended change"
+      "fix": "concrete recommended change",
+      "adds_code": false,
+      "failing_input": "the input or caller that reaches the bad path today (required when adds_code)"
     }
   ]
 }

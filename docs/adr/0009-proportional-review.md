@@ -23,10 +23,14 @@ a model deciding a gate by judgement.
    `security=yes|no`.
    - `lane=light` iff `check-trivial.sh` qualifies the delta: one `code-reviewer` on the cheaper
      tier.
-   - `security=yes` iff a changed path or an added line matches a risky pattern: auth, secrets,
-     money, migrations, deploy, shell/exec, SQL, deserialization, outward network calls, env reads,
-     or `NONNA_CRITICAL_PATHS`. Test-only and markdown lines alone do not trigger it.
-   - Any ambiguity (no repo, bad base, missing classifier) answers `full` and `yes`.
+   - `security=no` only when every changed path is ordinary and no added **or removed** line
+     matches a risky pattern. Risky paths include auth, secrets, money, migrations, deploy, CI,
+     the harness itself, dependency manifests, lockfiles, submodules and `NONNA_CRITICAL_PATHS`.
+     Risky lines include shell and exec calls in Python, Go, Rust, Java and Node, SQL,
+     deserialization, network calls, env reads, crypto and authorization words. Lines in real
+     test directories and plain markdown do not trigger it on their own.
+   - Any ambiguity answers `full` and `yes`: no repo, no `develop` or `main` base, a bad base, a
+     missing classifier, an unreadable or non-regular file, or a legacy `KEEL_CRITICAL_PATHS` alone.
 2. **`/review` runs on the cheaper tier.** It dispatches; the reviewers keep their own tiers.
 3. **`/fix` runs its single reviewer on the cheaper tier.** A diff the fast-lane classifier accepts
    does not need the deep one.

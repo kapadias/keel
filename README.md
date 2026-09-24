@@ -11,7 +11,7 @@
 
 <p align="center">
   <strong>Your agent says "done". Nonna asks who tasted it.</strong><br>
-  <sub>A drop-in <code>.claude/</code> harness for Claude Code. Hooks and scripts, not polite requests: 259 golden tests prove every gate blocks what it should and lets through what it should.</sub>
+  <sub>A drop-in <code>.claude/</code> harness for Claude Code. Hooks and scripts, not polite requests: 272 golden tests prove every gate blocks what it should and lets through what it should.</sub>
 </p>
 
 <p align="center">

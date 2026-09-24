@@ -16,7 +16,9 @@ Review: **$ARGUMENTS** (if empty, review the current branch's diff vs `develop`)
 
 1. **Size it — the script decides.** Run `bash $NONNA/skills/review/scripts/review-lanes.sh`
    (`$NONNA` as in step 4). It prints `lane=light|full` and `security=yes|no`, and fails closed to
-   `full` / `yes`. Do not re-classify by judgement, up or down (ADR-0009).
+   `full` / `yes`. Anything but exactly `lane=light` means full; anything but exactly
+   `security=no` means yes — including a run that fails or prints nothing. Never re-classify by
+   judgement, up or down (ADR-0009).
 2. **Launch reviewers in PARALLEL** (independent — do not serialize):
    - **Always:** `code-reviewer` — correctness, broken contracts, missing/weak tests, silent failures,
      reproducibility, style fit. On `lane=light`, launch it with `model: sonnet`: a diff the

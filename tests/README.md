@@ -39,10 +39,12 @@ Exercises each deterministic gate with fixed inputs and asserts the exit code:
 - **check-trivial** (fast-lane eligibility): qualifies a small reversible change;
   disqualifies over-budget, lockfile, critical-surface, and rename-into-critical
   changes; fails closed off a repo.
-- **review-lanes** (review proportionality, ADR-0009): a fast-lane-sized diff takes the light
-  lane; a risky path, risky added code, or a `NONNA_CRITICAL_PATHS` match adds the security
-  reviewer; risky words in tests alone do not. A bad base, no repo, or a missing classifier fails
-  closed to the full lane with security review.
+- **review-lanes** (review proportionality, ADR-0009): a fast-lane-sized, ordinary diff takes the
+  light lane with no security review. Risky added **or removed** code (Python, Go, Node shell calls,
+  a deleted auth check), a deleted risky file, a dependency manifest, harness markdown, a
+  `NONNA_CRITICAL_PATHS` match, a non-ASCII file name, a subdirectory cwd and an untracked symlink
+  all end in security review. No `develop`/`main` base, a bad base, no repo, a missing classifier
+  or a legacy `KEEL_CRITICAL_PATHS` alone fail closed.
 - **dep-audit** (supply-chain): exits non-zero when a required scanner is missing
   (a skipped scan is not a pass).
 - **stop-dod** (Stop): blocks a turn ending with tracked code changed and
