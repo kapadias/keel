@@ -149,7 +149,9 @@ for cmd in ("review", "ship"):
 # any "N-gate" / "N golden" number in the living docs must equal it. Historical
 # entries under STATUS.md's "Recently changed" are records, not claims — skipped.
 with open(f"{ROOT}/tests/run.sh", encoding="utf-8") as fh:
-    ACTUAL_GATES = len(re.findall(r'\b(?:check|contains|sv_blocks|sv_allows) "', fh.read()))
+    ACTUAL_GATES = len(
+        re.findall(r'\b(?:check|contains|sv_blocks|sv_allows) "', fh.read())
+    )
 COUNT = re.compile(r"\b(\d+)[- ](?:gate|golden)\b", re.IGNORECASE)
 for rel in (
     "CLAUDE.md",
@@ -321,13 +323,18 @@ for md in glob.glob(f"{ROOT}/.claude/**/*.md", recursive=True):
 # was built. dev-process §4 and the rubric carry the rule; pin the load-bearing phrases.
 for rel, phrase in (
     (".claude/rules/dev-process.md", "names a failing case"),
-    (".claude/skills/code-review/references/severity-rubric.md", "Does the fix add code?"),
+    (
+        ".claude/skills/code-review/references/severity-rubric.md",
+        "Does the fix add code?",
+    ),
 ):
     path = os.path.join(ROOT, rel)
     try:
         with open(path, encoding="utf-8") as fh:
             if phrase not in fh.read():
-                bad(f"{rel}: missing '{phrase}' — a review ask that adds code must name a failing input (ADR-0008)")
+                bad(
+                    f"{rel}: missing '{phrase}' — a review ask that adds code must name a failing input (ADR-0008)"
+                )
     except FileNotFoundError:
         bad(f"review-inflation rule: missing {rel}")
 
@@ -349,11 +356,21 @@ for dirpath, dirnames, filenames in os.walk(ROOT):
         with open(path, encoding="utf-8", errors="replace") as fh:
             for n, line in enumerate(fh, 1):
                 if EXTERNAL.search(line):
-                    bad(f"{rel}:{n}: external project name — credit belongs in README.md only")
+                    bad(
+                        f"{rel}:{n}: external project name — credit belongs in README.md only"
+                    )
 
 # --- the ladder: one ruleset, two copies (always-on rungs; on-demand depth) ---
 # The seven rungs are pinned by keyword because the copies differ in depth by design.
-LADDER = ("YAGNI", "codebase", "stdlib", "native", "installed", "one line", "minimum code")
+LADDER = (
+    "YAGNI",
+    "codebase",
+    "stdlib",
+    "native",
+    "installed",
+    "one line",
+    "minimum code",
+)
 for rel in (".claude/rules/00-core.md", ".claude/skills/lean/SKILL.md"):
     path = os.path.join(ROOT, rel)
     if not os.path.isfile(path):
@@ -363,7 +380,9 @@ for rel in (".claude/rules/00-core.md", ".claude/skills/lean/SKILL.md"):
         text = fh.read()
     for rung in LADDER:
         if rung not in text:
-            bad(f"{rel}: ladder rung '{rung}' missing — 00-core.md and the lean skill must agree (ADR-0008)")
+            bad(
+                f"{rel}: ladder rung '{rung}' missing — 00-core.md and the lean skill must agree (ADR-0008)"
+            )
 
 # --- debt gate wiring: /review gates the delta, /sync prints the ledger (ADR-0008) ---
 for cmd in ("review", "sync"):
@@ -374,6 +393,15 @@ for cmd in ("review", "sync"):
                 bad(f"{cmd_path}: does not wire check-debt.sh (ADR-0008)")
     except FileNotFoundError:
         bad(f"debt gate wiring: missing {os.path.relpath(cmd_path, ROOT)}")
+
+# --- review lanes: /review sizes itself by script, never by the model's judgement (ADR-0009) ---
+review_path = f"{ROOT}/.claude/skills/review/SKILL.md"
+try:
+    with open(review_path, encoding="utf-8") as fh:
+        if "review-lanes.sh" not in fh.read():
+            bad(f"{review_path}: does not wire review-lanes.sh (ADR-0009)")
+except FileNotFoundError:
+    bad("review lanes wiring: missing .claude/skills/review/SKILL.md")
 
 # --- token budget: the always-on surface is gated, not aspirational ---
 # CLAUDE.md + rules/*.md are paid on every turn (token-economy.md). Budgets are

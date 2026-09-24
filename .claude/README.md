@@ -28,7 +28,8 @@ discipline is **enforced by code, not prose**. Start with [`../CLAUDE.md`](../CL
     `concurrency-performance`, `supply-chain`, `fast-lane` (bundles `check-trivial.sh`), `lean`
     (the decision ladder in depth; bundles `check-debt.sh`, the debt-marker gate and ledger).
   - **15 pipeline workflows** — `/plan`, `/tdd`, `/implement`, `/review`, `/audit`, `/test`,
-    `/coverage`, `/debug`, `/fix`, `/ship`, `/release`, `/rollback`, `/sync`, `/adr`, `/intake`. Each declares its
+    `/coverage`, `/debug`, `/fix`, `/ship`, `/release`, `/rollback`, `/sync`, `/adr`, `/intake`. `/review` bundles
+    `review-lanes.sh`, which sizes the review (ADR-0009). Each declares its
     model tier; several use `!` bash injection / `@` refs to act on real repo state. The six with
     side effects — `/ship`, `/release`, `/rollback`, `/adr`, `/sync`, `/intake` — set
     **`disable-model-invocation: true`**: only a human can trigger them, and their descriptions stay

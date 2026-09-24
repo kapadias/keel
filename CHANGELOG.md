@@ -7,6 +7,13 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Proportional review** (ADR-0009). `skills/review/scripts/review-lanes.sh` decides how much
+  review a diff buys: a diff the fast-lane classifier accepts gets one `code-reviewer` on the
+  cheaper tier, and the security reviewer runs only when a changed path or added line touches a
+  risky surface. It fails closed to full review with security. `/review` itself and `/fix`'s single
+  reviewer move to the cheaper tier. Small changes start in `/fix`; off the critical surface, one
+  test that would have failed before is enough.
+
 - **The decision ladder** (ADR-0008). `rules/00-core.md` now says, in seven rungs, how much code
   to write: YAGNI, already in this codebase, stdlib, native platform, installed dependency, one
   line, only then the minimum that works. It lives in the constitution because that is the one rule

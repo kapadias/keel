@@ -171,6 +171,59 @@ NOREPO="$(mktemp -d)"
 ( cd "$NOREPO" && bash "$CT" ); check "not a git repo fails closed" 1 "$?"
 rm -rf "$TMP" "$NOREPO"
 
+echo "== review-lanes.sh (review proportionality: lane + security trigger) =="
+# The script, not the model, decides how much review a diff buys: a fast-lane-sized diff gets one
+# reviewer on the cheaper tier; a risky path or risky added code always adds the security reviewer.
+# Every ambiguity answers lane=full, security=yes.
+RL="$SKILLS/review/scripts/review-lanes.sh"
+TMP="$(mktemp -d)"
+"${GIT[@]}" -C "$TMP" init -q
+mkdir -p "$TMP/src"
+seq 1 50 | sed 's/^/line /' > "$TMP/src/app.py"
+"${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m base
+"${GIT[@]}" -C "$TMP" branch -M main
+"${GIT[@]}" -C "$TMP" checkout -q -b feat/x
+sed -i '1,3s/line/edited/' "$TMP/src/app.py"
+out="$(cd "$TMP" && bash "$RL" main 2>/dev/null)"
+contains "review-lanes: small plain diff takes the light lane" "lane=light" "$out"
+contains "review-lanes: small plain diff needs no security review" "security=no" "$out"
+sed -i 's/^line/edited/' "$TMP/src/app.py"
+out="$(cd "$TMP" && bash "$RL" main 2>/dev/null)"
+contains "review-lanes: over-budget diff takes the full lane" "lane=full" "$out"
+contains "review-lanes: over-budget plain diff still needs no security review" "security=no" "$out"
+"${GIT[@]}" -C "$TMP" checkout -q -- src/app.py
+sed -i '1s/.*/subprocess.run(cmd, shell=True)/' "$TMP/src/app.py"
+out="$(cd "$TMP" && bash "$RL" main 2>/dev/null)"
+contains "review-lanes: risky added code triggers security review" "security=yes" "$out"
+"${GIT[@]}" -C "$TMP" checkout -q -- src/app.py
+mkdir -p "$TMP/src/auth"; echo 'x = 1' > "$TMP/src/auth/login.py"
+out="$(cd "$TMP" && bash "$RL" main 2>/dev/null)"
+contains "review-lanes: an auth path triggers security review" "security=yes" "$out"
+rm -rf "$TMP/src/auth"
+echo 'r = requests.get(url, timeout=5)' > "$TMP/src/client.py"
+out="$(cd "$TMP" && bash "$RL" main 2>/dev/null)"
+contains "review-lanes: an outward call in an untracked file triggers security review" "security=yes" "$out"
+rm -f "$TMP/src/client.py"
+mkdir -p "$TMP/tests"; echo 'token = "fixture"' > "$TMP/tests/test_app.py"
+out="$(cd "$TMP" && bash "$RL" main 2>/dev/null)"
+contains "review-lanes: risky words in tests alone do not trigger security review" "security=no" "$out"
+rm -rf "$TMP/tests"
+mkdir -p "$TMP/src/ledger"; echo 'x = 1' > "$TMP/src/ledger/post.py"
+out="$(cd "$TMP" && KEEL_CRITICAL_PATHS='src/ledger/*' bash "$RL" main 2>/dev/null)"
+contains "review-lanes: KEEL_CRITICAL_PATHS forces security review" "security=yes" "$out"
+contains "review-lanes: KEEL_CRITICAL_PATHS forces the full lane" "lane=full" "$out"
+rm -rf "$TMP/src/ledger"
+out="$(cd "$TMP" && bash "$RL" nosuchref 2>/dev/null)"
+contains "review-lanes: unresolvable base fails closed to the full lane" "lane=full" "$out"
+contains "review-lanes: unresolvable base fails closed to security review" "security=yes" "$out"
+LONE="$(mktemp -d)"; cp "$RL" "$LONE/review-lanes.sh"
+out="$(cd "$TMP" && bash "$LONE/review-lanes.sh" main 2>/dev/null)"
+contains "review-lanes: missing fast-lane classifier fails closed to the full lane" "lane=full" "$out"
+NOREPO="$(mktemp -d)"
+out="$(cd "$NOREPO" && bash "$RL" 2>/dev/null)"
+contains "review-lanes: not a git repo fails closed" "security=yes" "$out"
+rm -rf "$TMP" "$NOREPO" "$LONE"
+
 echo "== check-debt.sh (debt-marker gate + ledger) =="
 # A deliberate corner is only tracked if its marker names the trigger to revisit it.
 # The script decides well-formedness; prose cannot. Fixtures build the marker from a
@@ -769,6 +822,12 @@ FX="$(lint_fixture)"
 sed -i 's/check-debt\.sh/checkdebt.sh/g' "$FX/.claude/skills/review/SKILL.md"
 out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks /review that no longer wires check-debt.sh" 1 "$?"
 contains "lint: cites ADR-0008 on unwiring the debt gate" "ADR-0008" "$out"
+rm -rf "$FX"
+# Proportional review is only proportional if /review asks the script, not the model.
+FX="$(lint_fixture)"
+sed -i 's/review-lanes\.sh/reviewlanes.sh/g' "$FX/.claude/skills/review/SKILL.md"
+out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks /review that no longer wires review-lanes.sh" 1 "$?"
+contains "lint: cites ADR-0009 on unwiring the review lanes" "ADR-0009" "$out"
 rm -rf "$FX"
 # Ideas borrowed from another project are credited in README.md and nowhere else; the
 # harness carries no external brand. The term is split so this file cannot trip the check.

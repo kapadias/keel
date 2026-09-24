@@ -34,15 +34,13 @@ edit tools already report success.
 
 ## Match the model to the work
 
-Route by depth, not habit (see `CLAUDE.md` → Model-tier policy). High-volume mechanical work goes to
-the cheapest capable model; deep reasoning goes to the strongest. Burning a frontier model on a
-bulk-rename is waste; using a small model for an architecture decision is a different, worse waste.
+Route by depth, not habit (`CLAUDE.md` → Model-tier policy): the cheapest capable model for
+mechanical work, the strongest for deep reasoning. Review depth follows `review-lanes.sh`.
 
 ## Be concise on the wire
 
-Prefer the smallest tool output that answers the question — line ranges over whole files, counts over
-full listings, targeted greps over recursive dumps. Concise final answers, too: say what matters, link
-the rest.
+Prefer the smallest output that answers: line ranges, counts, targeted greps. Final answers too — say
+what matters, link the rest.
 
 ## The one hard line
 

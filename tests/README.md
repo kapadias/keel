@@ -36,6 +36,10 @@ Exercises each deterministic gate with fixed inputs and asserts the exit code:
 - **check-trivial** (fast-lane eligibility): qualifies a small reversible change;
   disqualifies over-budget, lockfile, critical-surface, and rename-into-critical
   changes; fails closed off a repo.
+- **review-lanes** (review proportionality, ADR-0009): a fast-lane-sized diff takes the light
+  lane; a risky path, risky added code, or a `KEEL_CRITICAL_PATHS` match adds the security
+  reviewer; risky words in tests alone do not. A bad base, no repo, or a missing classifier fails
+  closed to the full lane with security review.
 - **dep-audit** (supply-chain): exits non-zero when a required scanner is missing
   (a skipped scan is not a pass).
 - **stop-dod** (Stop): blocks a turn ending with tracked code changed and

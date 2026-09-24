@@ -14,6 +14,7 @@ rather than edit.
 | 0006 | [Distribute Keel as a plugin (zero-duplication)](0006-distribute-keel-as-plugin.md)                 | Accepted; component claim superseded by 0007 | 2026-06-23 |
 | 0007 | [A plugin install is not equivalent to a copy-in install](0007-plugin-install-is-not-equivalent.md) | Accepted                                     | 2026-08-01 |
 | 0008 | [A decision ladder for solution size](0008-decision-ladder-for-solution-size.md)                    | Accepted                                     | 2026-09-22 |
+| 0009 | [Proportional review, sized by script](0009-proportional-review.md)                                 | Accepted                                     | 2026-09-24 |
 
 New ADRs are added with the **`/adr`** skill, which scaffolds the next number from the Keel template
 and updates this index.

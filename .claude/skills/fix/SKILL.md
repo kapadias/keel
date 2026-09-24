@@ -29,7 +29,8 @@ full loop.
    argue with the classifier.
 5. **Full local gate** (`/test`): lint + type-check + tests + coverage. Never skipped, never
    reported green unless observed green.
-6. **Single review — machine-checked.** Dispatch `code-reviewer`; write its fenced JSON verdict
+6. **Single review — machine-checked.** Dispatch `code-reviewer` with `model: sonnet` (a fast-lane
+   diff does not need the deep tier); write its fenced JSON verdict
    verbatim to `.claude/reviews/<sha>-code.json` (`git rev-parse --short HEAD`) and run
    `bash $KEEL/skills/code-review/scripts/check-review.sh` on it. Non-zero blocks the ship.
 7. **Ship.** One-line `docs/STATUS.md` entry, conventional commit, `git push -u origin <branch>`,

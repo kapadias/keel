@@ -25,7 +25,8 @@ Worked examples and per-language templates: the `tdd-workflow` skill, preloaded 
 Set a coverage floor in CI and **fail the build below it** — line and branch. Hold the highest bar on
 the **survival-critical surface**: anything touching money, auth, data integrity, persistence, or
 irreversible/outward-facing actions. New code in those areas requires both a golden and a property test
-before merge. The rest aims high; the critical surface is a hard gate.
+before merge. Off it, one test that would have failed before the change is enough — no new fixture
+layer or framework for one case. The critical surface is a hard gate.
 
 ## Testing agents and LLM-driven components
 

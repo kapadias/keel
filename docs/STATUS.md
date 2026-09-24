@@ -51,9 +51,10 @@ descriptions (5,600-char budget), both enforced by the linter.
 
 History lives in `CHANGELOG.md` and `git log`. Entries here describe the current unit of work.
 
-- **2026-09-23** — Public docs describe Keel as it is: release-note framing removed from this
-  file and from the benchmark write-ups; the bare-agent eval leads with bare agent vs Keel.
-  CI shellcheck note (SC1003) in `tests/run.sh` cleared; PR to `main` open.
+- **2026-09-24** — Proportional review (ADR-0009): `review-lanes.sh` sizes `/review` by script, so a
+  small diff pays for one cheaper reviewer and the security reviewer runs on evidence in the diff.
+  `/review` and `/fix`'s reviewer move to the cheaper tier; small changes start in `/fix`; off the
+  critical surface one test is enough. The verdict-gate fix from `develop` is merged in.
 
 ## Next / open
 

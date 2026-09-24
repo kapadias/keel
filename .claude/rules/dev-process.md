@@ -5,8 +5,9 @@ each stage well once, not from skipping the ones that catch mistakes.
 
 **Proportionality — classify before you loop.** A trivial, reversible fix (≤15 lines, ≤3 files, no
 new deps, off the critical surface — `check-trivial.sh` decides, fail-closed) may take the bounded
-fast lane (`/fix`): regression test → gate → single machine-checked reviewer → ship. Everything else
-takes the full loop below; when in doubt, the full loop (see the `fast-lane` skill).
+fast lane (`/fix`): regression test → gate → single machine-checked reviewer → ship. **Start small:**
+a change that looks small begins in `/fix`, and the classifier moves it to the full loop the moment
+it outgrows the lane — the script resolves doubt, not a guess (see the `fast-lane` skill).
 
 ## 0. Research & Reuse — before writing new code
 
