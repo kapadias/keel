@@ -56,7 +56,7 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
   banner and README in her voice; the failure-mode and re-run benchmarks are in progress.
 - **2026-09-24** — Reproducible benchmark in `bench/` (8 trap tasks, n=4, Claude Sonnet and Haiku): bare
   agent cut a corner in 23 of 64 runs, Nonna in 0 of 64. README rewritten around that number, one
-  before/after and one-command install; workflows table moved to `docs/OVERVIEW.md`.
+  before/after and one-command install; workflows table moved to `docs/OVERVIEW.md`; banner says "for AI coding agents".
 - **2026-09-24** — "Done" means the suite passes: the Stop and pre-push hooks run the project's
   test command when code changed and refuse on red (`hooks/lib/tests.sh`). The benchmark showed
   agents claiming done on a broken suite; nothing had checked.
