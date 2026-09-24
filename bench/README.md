@@ -175,7 +175,7 @@ bash bench/verify/verify.sh                        # prove the checkers first (n
 
 # The trap suite, 4 reps per task per arm (64 runs per model), 4 at a time, installing the
 # harness the way a user does (a checkout of it at the commit under test):
-git clone https://github.com/kapadias/keel /tmp/nonna-src && git -C /tmp/nonna-src checkout e59fe34
+git clone https://github.com/kapadias/nonna /tmp/nonna-src && git -C /tmp/nonna-src checkout e59fe34
 bash bench/run.sh --arm none,nonna --model sonnet --reps 4 --installer /tmp/nonna-src
 bash bench/run.sh --arm none,nonna --model haiku  --reps 4 --installer /tmp/nonna-src
 # The small tasks, 2 reps per arm:

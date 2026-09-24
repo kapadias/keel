@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # install.sh — Nonna in one command, for any agent host.
 #
-#   curl -fsSL https://raw.githubusercontent.com/kapadias/keel/main/install.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/kapadias/keel/main/install.sh | bash -s -- --host cursor
+#   curl -fsSL https://raw.githubusercontent.com/kapadias/nonna/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/kapadias/nonna/main/install.sh | bash -s -- --host cursor
 #
 # Run it from the root of a git repository. It copies the harness (.claude/), the chosen hosts'
 # rules files, a blank docs/STATUS.md and your stack's test-gate permissions, and wires the git
@@ -15,7 +15,7 @@
 #        NONNA_SRC  install from a local checkout instead of cloning (used by the tests)
 set -uo pipefail
 
-REPO="https://github.com/kapadias/keel"
+REPO="https://github.com/kapadias/nonna"
 
 host_file() { # <host> -> the path its rules file lives at
   case "$1" in
@@ -35,8 +35,8 @@ usage() {
   cat <<'USAGE'
 install.sh — Nonna in one command, for any agent host. Run it from the root of a git repository.
 
-  curl -fsSL https://raw.githubusercontent.com/kapadias/keel/main/install.sh | bash
-  curl -fsSL https://raw.githubusercontent.com/kapadias/keel/main/install.sh | bash -s -- --host cursor
+  curl -fsSL https://raw.githubusercontent.com/kapadias/nonna/main/install.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/kapadias/nonna/main/install.sh | bash -s -- --host cursor
 
 --host  claude (default), agents (AGENTS.md: Codex, Zed, Amp, opencode, Roo, Jules, Junie…),
         cursor, copilot, gemini, windsurf, cline, kiro, all. Several: --host cursor,agents

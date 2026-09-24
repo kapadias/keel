@@ -3,7 +3,7 @@
 One command, from the root of a git repository:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kapadias/keel/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/kapadias/nonna/main/install.sh | bash
 ```
 
 That installs for Claude Code. For another agent, name it (several at once: `--host cursor,agents`):
@@ -46,7 +46,7 @@ benchmark showed the rules are what kept agents off `main` and away from secrets
 ## Option B — install as a plugin (versioned, shareable)
 
 ```
-/plugin marketplace add kapadias/keel
+/plugin marketplace add kapadias/nonna
 /plugin install nonna@nonna
 ```
 
@@ -67,7 +67,7 @@ that tells the agent _how to work_ does not.
 Until that is closed, copy the discipline in alongside the plugin:
 
 ```bash
-git clone --depth 1 https://github.com/kapadias/keel /tmp/nonna
+git clone --depth 1 https://github.com/kapadias/nonna /tmp/nonna
 mkdir -p .claude/rules && cp -r /tmp/nonna/.claude/rules/. .claude/rules/
 cp /tmp/nonna/CLAUDE.md CLAUDE.md
 ```

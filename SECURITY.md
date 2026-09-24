@@ -8,7 +8,7 @@ respond quickly.
 **Do not open a public issue for a security problem.** Report it privately:
 
 - Use GitHub's private vulnerability reporting:
-  <https://github.com/kapadias/keel/security/advisories/new>.
+  <https://github.com/kapadias/nonna/security/advisories/new>.
 - Do not contact the maintainer through a public issue or PR.
 
 Please include what you found, how to reproduce it, and the impact you see. We will acknowledge the

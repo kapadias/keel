@@ -32,6 +32,10 @@ remote="${1:-}"
 remote_refs=()
 if [ -n "$remote" ] && git config --get "remote.$remote.url" >/dev/null 2>&1; then
   remote_refs=("--remotes=$remote")
+  # --remotes=origin also matches refs/remotes/origin/fork/*: a remote NAMED origin/fork is not origin.
+  while IFS= read -r r; do
+    case "$r" in "$remote"/*) remote_refs=("--exclude=$r/*" "${remote_refs[@]}") ;; esac # relative to refs/remotes/
+  done < <(git remote)
 fi
 tips=()        # pushed commits (tags peeled)
 branch_tips=() # pushed branch commits: what the test gate must vouch for
@@ -42,7 +46,10 @@ if [ ! -t 0 ]; then
     [ -n "${lsha:-}" ] || continue
     saw_line=1
     [ "$lsha" != "$ZERO" ] || continue # a delete pushes no code
-    c="$(git rev-parse --verify --quiet "$lsha^{commit}")" || continue # a tag on a tree or blob
+    c="$(git rev-parse --verify --quiet "$lsha^{commit}")" || {
+      echo "✗ Nonna: I cannot taste that. (pre-push: $lref points at a $(git cat-file -t "$lsha" 2>/dev/null || echo "missing object"), not a commit, so its content cannot be scanned.)" >&2
+      exit 1
+    }
     tips+=("$c")
     case "$lref" in refs/tags/*) ;; *) branch_tips+=("$c") ;; esac
     if [ "${rsha:-$ZERO}" != "$ZERO" ] && git cat-file -e "$rsha^{commit}" 2>/dev/null; then
@@ -57,11 +64,6 @@ if [ -z "$saw_line" ]; then
   [ "${#remote_refs[@]}" -gt 0 ] || remote_refs=(--remotes)
 fi
 [ "${#tips[@]}" -gt 0 ] || exit 0 # deletes only
-# A shallow clone's grafted boundary is history the remote has, not a whole tree this push adds.
-shallow="$(git rev-parse --git-path shallow)"
-if [ -f "$shallow" ]; then
-  while read -r g; do [ -n "$g" ] && excl+=("^$g"); done < "$shallow"
-fi
 revs=("${tips[@]}" ${excl[@]+"${excl[@]}"})
 [ "${#remote_refs[@]}" -eq 0 ] || revs+=(--not "${remote_refs[@]}")
 new_commits="$(git rev-list "${revs[@]}" 2>/dev/null)" || {
@@ -69,11 +71,19 @@ new_commits="$(git rev-list "${revs[@]}" 2>/dev/null)" || {
   exit 1
 }
 [ -n "$new_commits" ] || exit 0
+# A shallow clone's boundary commits have no history here to scan. One the destination is known to
+# have is already outside the range (--not); one still inside it (say, a shallow fetch of a fork's
+# tip) is a stop, not a skip.
+shallow="$(git rev-parse --git-path shallow)"
+if [ -s "$shallow" ] && printf '%s\n' "$new_commits" | grep -qFxf "$shallow"; then
+  echo "✗ Nonna: I only have the top of this pot. (pre-push: this push includes a shallow-clone boundary commit, so its history cannot be scanned.) Fetch the full history (git fetch --unshallow) and push again." >&2
+  exit 1
+fi
 
 # Every commit's own diff, so a key added then removed inside the push is still seen; --cc shows
 # what a merge's resolution adds. Flags keep user config (colour, external diff, textconv, quoted
 # names) from hiding a line. Output goes to files so a failing git log is a stop, never "clean".
-LOG=(git --literal-pathspecs -c core.quotePath=false log --format= --no-color --no-ext-diff --no-textconv --text --no-renames --cc)
+LOG=(git --literal-pathspecs -c core.quotePath=false log --format= --no-color --no-ext-diff --no-textconv --text --no-renames --cc --root)
 tmp="$(mktemp -d)" || exit 1
 trap 'rm -rf "$tmp"' EXIT
 unreadable() {
@@ -113,14 +123,16 @@ fi
 # realistic-looking credential under tests/ leaks exactly like one under src/. Fixtures must use
 # placeholder-classed values (AKIAIOSFODNN7EXAMPLE, XXXX, CHANGEME, …) — those are value-exempt in
 # lib/secret-patterns.sh.
-added_lines() { grep -aE '^\+' "$1" | grep -avE '^\+\+\+ ' || true; }
+# Added lines, with file headers dropped by position (between "diff " and the first "@@"), never by
+# text: an octopus merge prints a line added over all parents as "+++", and content can start "++ ".
+added_lines() { LC_ALL=C awk '/^diff /{h=1} h && /^@@/{h=0; next} !h && /^\+/' "$1"; }
 "${LOG[@]}" -p -U0 "${revs[@]}" > "$tmp/patch" || unreadable
 if class="$(added_lines "$tmp/patch" | nonna_scan_secrets)"; then
   fail=1
   named=""
   "${LOG[@]}" --name-only -z --diff-filter=ACMRT "${revs[@]}" > "$tmp/files" || unreadable
   while IFS= read -r -d '' f; do
-    "${LOG[@]}" -p -U0 "${revs[@]}" -- "$f" > "$tmp/one" || unreadable
+    "${LOG[@]}" -p -U0 --full-history "${revs[@]}" -- "$f" > "$tmp/one" || unreadable
     if c="$(added_lines "$tmp/one" | nonna_scan_secrets)"; then
       echo "✗ Push blocked: ${f} introduces what looks like a ${c}." >&2
       named=1

@@ -18,7 +18,10 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
   base commit, or one added and removed inside the push, is caught; colour, external-diff config and
   non-ASCII names no longer hide a line. Merge resolutions are scanned too, a URL push is judged
   against that URL, a failed `git log` blocks, a shallow clone's graft is excluded, and the scan is
-  one pass over the push rather than one history walk per file.
+  one pass over the push rather than one history walk per file. Added lines are found by position,
+  not text (octopus merges, content starting `++ `), `log.showRoot=false` cannot hide a root commit,
+  and a shallow boundary the destination may lack blocks the push. A remote named `origin/fork` no
+  longer counts as `origin`, and a tag on a blob or tree is refused rather than pushed unscanned.
 - **One-command install** (`install.sh`, `--host` for eight agent hosts), host rules generated from
   `00-core.md` (`hosts/build.py`, drift-linted), and a git `pre-commit` hook every host gets.
 
@@ -208,5 +211,5 @@ lane, stack packs for python/typescript/go/rust, and plugin distribution (ADR-00
 Initial harness: rules, agents, skills, commands, and the development loop — described, not yet
 enforced.
 
-[1.0.0]: https://github.com/kapadias/keel/releases/tag/v1.0.0
-[0.1.0]: https://github.com/kapadias/keel/releases/tag/v0.1.0
+[1.0.0]: https://github.com/kapadias/nonna/releases/tag/v1.0.0
+[0.1.0]: https://github.com/kapadias/nonna/releases/tag/v0.1.0
