@@ -16,7 +16,9 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
   block, and the pre-push gate reads the pushed range from git, so a branch's first push is gated.
   The push scan covers every commit the remote lacks, one diff per commit, so a key in a local-only
   base commit, or one added and removed inside the push, is caught; colour, external-diff config and
-  non-ASCII names no longer hide a line.
+  non-ASCII names no longer hide a line. Merge resolutions are scanned too, a URL push is judged
+  against that URL, a failed `git log` blocks, a shallow clone's graft is excluded, and the scan is
+  one pass over the push rather than one history walk per file.
 - **One-command install** (`install.sh`, `--host` for eight agent hosts), host rules generated from
   `00-core.md` (`hosts/build.py`, drift-linted), and a git `pre-commit` hook every host gets.
 

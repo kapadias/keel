@@ -155,6 +155,67 @@ echo 'KEY = "'"$FAKE_AWS"'"' > "$T2/café.py"; echo t >> "$T2/docs/STATUS.md"
 ( cd "$T2" && "$RS" ) 2>/dev/null; check "pre-push: a non-ASCII file name does not hide a secret" 1 "$?"
 ( cd "$T2" && GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=color.ui GIT_CONFIG_VALUE_0=always GIT_CONFIG_KEY_1=diff.external GIT_CONFIG_VALUE_1=true "$RS" ) 2>/dev/null
 check "pre-push: color.ui=always and diff.external do not hide a secret" 1 "$?"
+rm -rf "$T2" "$B2"
+# A fresh repo with a pushed base, for the cases below: $1 = the dir, $2 = its bare remote.
+push_fixture() {
+  "${GIT[@]}" init -q --bare "$2"; "${GIT[@]}" -C "$1" init -q; "${GIT[@]}" -C "$1" remote add origin "$2"
+  mkdir -p "$1/docs" "$1/src"; echo s > "$1/docs/STATUS.md"; echo 'a = 1' > "$1/src/a.py"; echo 'b = 1' > "$1/src/b.py"
+  "${GIT[@]}" -C "$1" add -A; "${GIT[@]}" -C "$1" commit -q -m root; "${GIT[@]}" -C "$1" branch -M trunk
+  "${GIT[@]}" -C "$1" push -q origin trunk 2>/dev/null
+}
+# A merge commit is a commit: lines its resolution adds are scanned, and it runs the gates.
+T2="$(mktemp -d)"; B2="$(mktemp -d)"; push_fixture "$T2" "$B2"
+"${GIT[@]}" -C "$T2" checkout -q -b other; echo 'b = 2' > "$T2/src/b.py"; "${GIT[@]}" -C "$T2" commit -qam other
+"${GIT[@]}" -C "$T2" checkout -q -b feature/m trunk; echo 'a = 2' > "$T2/src/a.py"; echo t >> "$T2/docs/STATUS.md"
+"${GIT[@]}" -C "$T2" commit -qam feat; "${GIT[@]}" -C "$T2" push -q origin feature/m other 2>/dev/null
+OLDTIP="$("${GIT[@]}" -C "$T2" rev-parse HEAD)"
+"${GIT[@]}" -C "$T2" merge -q --no-commit other >/dev/null 2>&1; echo 'KEY = "'"$FAKE_AWS"'"' >> "$T2/src/a.py"; "${GIT[@]}" -C "$T2" add -A
+"${GIT[@]}" -C "$T2" commit -q --no-verify -m "merge other"
+printf 'refs/heads/feature/m %s refs/heads/feature/m %s\n' "$("${GIT[@]}" -C "$T2" rev-parse HEAD)" "$OLDTIP" > "$PS"
+( cd "$T2" && "$RS" origin "$B2" < "$PS" ) 2>/dev/null; check "pre-push: a key added in a merge resolution is caught" 1 "$?"
+rm -rf "$T2" "$B2"
+# Pushing to a URL: only the destination's own refs say what it already has, not other remotes'.
+T2="$(mktemp -d)"; B2="$(mktemp -d)"; PUB="$(mktemp -d)"; push_fixture "$T2" "$B2"; "${GIT[@]}" init -q --bare "$PUB"
+"${GIT[@]}" -C "$T2" checkout -q -b feature/k; echo 'KEY = "'"$FAKE_AWS"'"' > "$T2/src/k.py"; echo t >> "$T2/docs/STATUS.md"
+"${GIT[@]}" -C "$T2" add -A; "${GIT[@]}" -C "$T2" commit -q --no-verify -m k; "${GIT[@]}" -C "$T2" push -q --no-verify origin feature/k 2>/dev/null
+printf 'refs/heads/feature/k %s refs/heads/feature/k %s\n' "$("${GIT[@]}" -C "$T2" rev-parse HEAD)" "$ZERO" > "$PS"
+( cd "$T2" && "$RS" "$PUB" "$PUB" < "$PS" ) 2>/dev/null; check "pre-push: a push to a URL is scanned against that URL, not origin" 1 "$?"
+rm -rf "$T2" "$B2" "$PUB"
+# A git log that cannot read what is pushed is a stop, never a clean bill.
+T2="$(mktemp -d)"; B2="$(mktemp -d)"; push_fixture "$T2" "$B2"
+"${GIT[@]}" -C "$T2" checkout -q -b feature/c; echo 'c = 1' > "$T2/src/c.py"; "${GIT[@]}" -C "$T2" add -A; "${GIT[@]}" -C "$T2" commit -q -m c0
+echo 'KEY = "'"$FAKE_AWS"'"' > "$T2/src/c.py"; echo t >> "$T2/docs/STATUS.md"; "${GIT[@]}" -C "$T2" commit -q --no-verify -qam c1
+blob="$("${GIT[@]}" -C "$T2" rev-parse HEAD~1:src/c.py)"; rm -f "$T2/.git/objects/${blob:0:2}/${blob:2}"
+printf 'refs/heads/feature/c %s refs/heads/feature/c %s\n' "$("${GIT[@]}" -C "$T2" rev-parse HEAD)" "$ZERO" > "$PS"
+( cd "$T2" && "$RS" origin "$B2" < "$PS" ) 2>/dev/null; check "pre-push: an unreadable object fails closed" 1 "$?"
+rm -rf "$T2" "$B2"
+# A newline in a file name must not split it: a decoy cannot pose as docs/STATUS.md.
+T2="$(mktemp -d)"; B2="$(mktemp -d)"; push_fixture "$T2" "$B2"
+"${GIT[@]}" -C "$T2" checkout -q -b feature/n; echo 'd = 1' > "$T2/src/d.py"; mkdir -p "$T2/z"$'\n'"docs"; echo x > "$T2/z"$'\n'"docs/STATUS.md"
+"${GIT[@]}" -C "$T2" add -A; "${GIT[@]}" -C "$T2" commit -q --no-verify -m decoy
+printf 'refs/heads/feature/n %s refs/heads/feature/n %s\n' "$("${GIT[@]}" -C "$T2" rev-parse HEAD)" "$ZERO" > "$PS"
+( cd "$T2" && "$RS" origin "$B2" < "$PS" ) 2>/dev/null; check "pre-push: a newline-named decoy does not count as a STATUS update" 1 "$?"
+rm -rf "$T2" "$B2"
+# A shallow clone's grafted root is history the remote has, not a whole tree this push adds.
+T2="$(mktemp -d)"; B2="$(mktemp -d)"; SRC="$(mktemp -d)"; push_fixture "$SRC" "$B2"
+"${GIT[@]}" -C "$SRC" commit -q --allow-empty -m second; "${GIT[@]}" -C "$SRC" push -q origin trunk 2>/dev/null
+"${GIT[@]}" -C "$T2" init -q; "${GIT[@]}" -C "$T2" fetch -q --depth 1 "file://$B2" trunk; "${GIT[@]}" -C "$T2" checkout -q -b feature/s FETCH_HEAD
+"${GIT[@]}" -C "$T2" remote add origin "$B2"; echo 'n = 1' > "$T2/src/new.py"; "${GIT[@]}" -C "$T2" add -A; "${GIT[@]}" -C "$T2" commit -q -m new
+printf 'refs/heads/feature/s %s refs/heads/feature/s %s\n' "$("${GIT[@]}" -C "$T2" rev-parse HEAD)" "$ZERO" > "$PS"
+( cd "$T2" && "$RS" origin "$B2" < "$PS" ) 2>/dev/null; check "pre-push: a shallow clone's graft does not pass the STATUS check" 1 "$?"
+rm -rf "$T2" "$B2" "$SRC"
+# A first push of a long history is scanned in one pass, not one history walk per file.
+T2="$(mktemp -d)"; B2="$(mktemp -d)"; "${GIT[@]}" init -q --bare "$B2"; "${GIT[@]}" -C "$T2" init -q; "${GIT[@]}" -C "$T2" remote add origin "$B2"
+{ for i in $(seq 1 1000); do
+    printf 'commit refs/heads/big\ncommitter t <t@t> %s +0000\ndata 1\nc\nM 644 inline src/f%s.py\ndata 6\nx = 1\n\n' "$((1700000000 + i))" "$i"
+  done
+  printf 'commit refs/heads/big\ncommitter t <t@t> 1800000000 +0000\ndata 1\nc\nM 644 inline docs/STATUS.md\ndata 2\ns\n\n'
+} | "${GIT[@]}" -C "$T2" fast-import --quiet
+"${GIT[@]}" -C "$T2" checkout -q big
+printf 'refs/heads/big %s refs/heads/big %s\n' "$("${GIT[@]}" -C "$T2" rev-parse HEAD)" "$ZERO" > "$PS"
+start=$SECONDS; ( cd "$T2" && timeout 60 "$RS" origin "$B2" < "$PS" ) 2>/dev/null; rc=$?
+check "pre-push: a 1000-commit, 1000-file first push passes" 0 "$rc"
+check "pre-push: ...in one scan, well under 10s" 1 "$(( SECONDS - start < 10 ))"
 rm -rf "$T2" "$B2" "$PS"
 # Installed AS a symlink (the way session-start wires it): must still resolve lib/.
 mkdir -p "$TMP/.claude/hooks/lib"
@@ -235,6 +296,10 @@ ln -s a.py "$TMP/src/link.py"; "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TM
 rm "$TMP/src/link.py"; printf 'K = "%s"\n' "$FAKE_AWS" > "$TMP/src/link.py"; "${GIT[@]}" -C "$TMP" add -A
 "${GIT[@]}" -C "$TMP" commit -q -m typechange 2>/dev/null; check "pre-commit: a symlink turned file does not hide a secret" 1 "$?"
 "${GIT[@]}" -C "$TMP" reset -q --hard
+# A newline in a file name must not split it into fragments the scan never matches.
+printf 'K = "%s"\n' "$FAKE_AWS" > "$TMP/src/cfg"$'\n'".py"; "${GIT[@]}" -C "$TMP" add -A
+"${GIT[@]}" -C "$TMP" commit -q -m newline 2>/dev/null; check "pre-commit: a newline in a file name does not hide a secret" 1 "$?"
+"${GIT[@]}" -C "$TMP" reset -q; rm -f "$TMP/src/cfg"$'\n'".py"
 # A NUL byte makes git call the file binary; the scan must still read its lines.
 printf 'K = "%s"\n\0\n' "$FAKE_AWS" > "$TMP/src/bin.py"; "${GIT[@]}" -C "$TMP" add -A
 "${GIT[@]}" -C "$TMP" commit -q -m nul 2>/dev/null; check "pre-commit: a NUL byte does not hide a secret" 1 "$?"

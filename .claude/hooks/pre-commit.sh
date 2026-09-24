@@ -35,12 +35,14 @@ case "$branch" in
 esac
 
 # Added, modified or type-changed paths: deleting a secret file is the fix, not the leak.
-if ! staged="$(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMRT -z | tr '\0' '\n')"; then
+staged="$(mktemp)" || exit 1
+trap 'rm -f "$staged"' EXIT
+if ! git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMRT -z > "$staged"; then
   echo "✗ Nonna: I could not see what you staged, so I cannot vouch for it. (pre-commit: git diff failed.)" >&2
   exit 1
 fi
-while IFS= read -r f; do
-  [ -n "$f" ] || continue
+# NUL-separated all the way: a newline in a name must not split it into fragments nobody scans.
+while IFS= read -r -d '' f; do
   case "$(basename "$f")" in
     *.example | *.sample | *.template | *.dist) continue ;;
     .env | .env.* | *.pem | *.key | *.p12 | *.pfx | *.jks | *.p8 | id_rsa* | id_ed25519* | credentials | kubeconfig | .npmrc)
@@ -62,8 +64,6 @@ while IFS= read -r f; do
     echo "✗ Nonna: you don't leave the house key under the mat. (pre-commit: '$f' stages what looks like a ${class} — remove it and rotate it.)" >&2
     fail=1
   fi
-done <<EOF
-$staged
-EOF
+done < "$staged"
 
 exit "$fail"

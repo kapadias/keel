@@ -26,12 +26,16 @@ here="$(cd "$(dirname "$self")" && pwd)"
 # hand (no stdin): HEAD's commits that no remote has.
 ZERO=0000000000000000000000000000000000000000
 remote="${1:-}"
-not_remote=(--remotes)
+# What the destination already has: its remote-tracking refs when it is a configured remote; only
+# the remote shas git reports when it is a URL (another remote's refs say nothing about it); every
+# remote's when run by hand.
+remote_refs=()
 if [ -n "$remote" ] && git config --get "remote.$remote.url" >/dev/null 2>&1; then
-  not_remote=("--remotes=$remote")
+  remote_refs=("--remotes=$remote")
 fi
-tips=()      # pushed commits (tags peeled)
+tips=()        # pushed commits (tags peeled)
 branch_tips=() # pushed branch commits: what the test gate must vouch for
+excl=()        # ^commits the destination already has; kept BEFORE --not, which would flip them
 saw_line=""
 if [ ! -t 0 ]; then
   while read -r lref lsha _rref rsha; do
@@ -42,7 +46,7 @@ if [ ! -t 0 ]; then
     tips+=("$c")
     case "$lref" in refs/tags/*) ;; *) branch_tips+=("$c") ;; esac
     if [ "${rsha:-$ZERO}" != "$ZERO" ] && git cat-file -e "$rsha^{commit}" 2>/dev/null; then
-      not_remote+=("^$rsha")
+      excl+=("^$rsha")
     fi
   done
 fi
@@ -50,26 +54,50 @@ if [ -z "$saw_line" ]; then
   c="$(git rev-parse --verify --quiet HEAD)" || exit 0
   tips=("$c")
   branch_tips=("$c")
+  [ "${#remote_refs[@]}" -gt 0 ] || remote_refs=(--remotes)
 fi
 [ "${#tips[@]}" -gt 0 ] || exit 0 # deletes only
-revs=("${tips[@]}" --not "${not_remote[@]}")
+# A shallow clone's grafted boundary is history the remote has, not a whole tree this push adds.
+shallow="$(git rev-parse --git-path shallow)"
+if [ -f "$shallow" ]; then
+  while read -r g; do [ -n "$g" ] && excl+=("^$g"); done < "$shallow"
+fi
+revs=("${tips[@]}" ${excl[@]+"${excl[@]}"})
+[ "${#remote_refs[@]}" -eq 0 ] || revs+=(--not "${remote_refs[@]}")
 new_commits="$(git rev-list "${revs[@]}" 2>/dev/null)" || {
   echo "✗ Nonna: I could not tell what you are pushing, so I cannot vouch for it. (pre-push: git rev-list failed.)" >&2
   exit 1
 }
 [ -n "$new_commits" ] || exit 0
-# Every commit's own diff, so a key added then removed inside the push is still seen. Flags keep
-# user config (colour, external diff, textconv, quoted names) from hiding a line.
-LOG=(git --literal-pathspecs -c core.quotePath=false log --format= --no-color --no-ext-diff --no-textconv --text --no-renames)
 
-changed="$("${LOG[@]}" --name-only -z "${revs[@]}" | tr '\0' '\n' | sort -u)"
-[ -n "$changed" ] || exit 0
+# Every commit's own diff, so a key added then removed inside the push is still seen; --cc shows
+# what a merge's resolution adds. Flags keep user config (colour, external diff, textconv, quoted
+# names) from hiding a line. Output goes to files so a failing git log is a stop, never "clean".
+LOG=(git --literal-pathspecs -c core.quotePath=false log --format= --no-color --no-ext-diff --no-textconv --text --no-renames --cc)
+tmp="$(mktemp -d)" || exit 1
+trap 'rm -rf "$tmp"' EXIT
+unreadable() {
+  echo "✗ Nonna: I could not read what you are pushing, so I cannot vouch for it. (pre-push: git log failed.)" >&2
+  exit 1
+}
+"${LOG[@]}" --name-only -z "${revs[@]}" > "$tmp/names" || unreadable
+[ -s "$tmp/names" ] || exit 0
 
 # CODE = everything EXCEPT docs/ and a few top-level meta files. NOTE: .claude/**
 # IS code (the harness is a tracked mirror, rules/sync.md) even though it is
-# markdown — so harness changes also require a STATUS update.
-code_touched="$(printf '%s\n' "$changed" | grep -Ev '^(docs/|LICENSE$|\.gitignore$|[^/]*\.md$)' || true)"
-status_touched="$(printf '%s\n' "$changed" | grep -E '^docs/STATUS\.md$' || true)"
+# markdown — so harness changes also require a STATUS update. Names are read
+# NUL-separated: a newline in a name cannot forge a docs/STATUS.md.
+code_touched=""
+status_touched=""
+while IFS= read -r -d '' f; do
+  [ "$f" = docs/STATUS.md ] && status_touched=1
+  case "$f" in
+    docs/* | LICENSE | .gitignore) ;;
+    */*) code_touched=1 ;;
+    *.md) ;;
+    *) code_touched=1 ;;
+  esac
+done < "$tmp/names"
 
 fail=0
 if [ -n "$code_touched" ] && [ -z "$status_touched" ]; then
@@ -80,22 +108,27 @@ if [ -n "$code_touched" ] && [ -z "$status_touched" ]; then
   fail=1
 fi
 
-# Secret scan over added lines, per file. Unlike the write-time gate, there is
-# NO fixture-path exemption here: a push is outward-facing, and a realistic-
-# looking credential under tests/ leaks exactly like one under src/. Fixtures
-# must use placeholder-classed values (AKIAIOSFODNN7EXAMPLE, XXXX, CHANGEME, …)
-# — those are value-exempt in lib/secret-patterns.sh.
-while IFS= read -r -d '' f; do
-  added="$("${LOG[@]}" -p -U0 "${revs[@]}" -- "$f" 2>/dev/null | grep -aE '^\+' | grep -avE '^\+\+\+ ' || true)"
-  [ -n "$added" ] || continue
-  if class="$(printf '%s' "$added" | nonna_scan_secrets)"; then
-    {
-      echo "✗ Push blocked: ${f} introduces what looks like a ${class}."
-      echo "  Remove it and ROTATE the secret (rules/safety.md). Never push secrets."
-    } >&2
-    fail=1
-  fi
-done < <("${LOG[@]}" --name-only -z --diff-filter=ACMRT "${revs[@]}" | sort -zu)
+# Secret scan over added lines: one pass over the whole push, then per file only to name the culprit.
+# Unlike the write-time gate, there is NO fixture-path exemption here: a push is outward-facing, and a
+# realistic-looking credential under tests/ leaks exactly like one under src/. Fixtures must use
+# placeholder-classed values (AKIAIOSFODNN7EXAMPLE, XXXX, CHANGEME, …) — those are value-exempt in
+# lib/secret-patterns.sh.
+added_lines() { grep -aE '^\+' "$1" | grep -avE '^\+\+\+ ' || true; }
+"${LOG[@]}" -p -U0 "${revs[@]}" > "$tmp/patch" || unreadable
+if class="$(added_lines "$tmp/patch" | nonna_scan_secrets)"; then
+  fail=1
+  named=""
+  "${LOG[@]}" --name-only -z --diff-filter=ACMRT "${revs[@]}" > "$tmp/files" || unreadable
+  while IFS= read -r -d '' f; do
+    "${LOG[@]}" -p -U0 "${revs[@]}" -- "$f" > "$tmp/one" || unreadable
+    if c="$(added_lines "$tmp/one" | nonna_scan_secrets)"; then
+      echo "✗ Push blocked: ${f} introduces what looks like a ${c}." >&2
+      named=1
+    fi
+  done < <(sort -zu "$tmp/files")
+  [ -n "$named" ] || echo "✗ Push blocked: this push introduces what looks like a ${class}." >&2
+  echo "  Remove it and ROTATE the secret (rules/safety.md). Never push secrets." >&2
+fi
 
 # "Done" means the suite passes: a code push runs the project's own tests (lib/tests.sh). No test
 # command (plugin installs need NONNA_TEST_CMD, or NONNA_TEST_CMD="") means this check does not
