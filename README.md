@@ -15,6 +15,10 @@ Agents say "done" when one test file passes and another is broken. They push str
 skip the test. Nonna is a drop-in harness that stops all three: it runs your tests before the agent
 is allowed to stop, and git hooks refuse the rest.
 
+The test gate is one part. She also plans before code, writes the failing test first, sizes review
+by risk, and brings 8 agents and 15 workflows, 6 of which only a human can start (ship, release,
+rollback among them). [How she works](docs/OVERVIEW.md).
+
 ## Before / after
 
 Same prompt, same model. The obvious fix to `div_cents()` breaks a test in another file.
@@ -32,7 +36,8 @@ full suite: 2 failed, 7 passed                  FAILED tests/test_split.py::test
 ```
 
 Both columns are verbatim from the benchmark. Without Nonna, 8 of 8 runs of this task ended with a
-broken suite and a "done". With Nonna, 0 of 8.
+broken suite and a "done". With Nonna, 0 of 8. That is the worst task; across all eight, the bare
+agent cut a corner in about a third of runs (below).
 
 ## The numbers
 
@@ -44,9 +49,17 @@ Eight tasks that tempt an agent to cut a corner, run 4 times each on Claude Sonn
 scored by hidden checks the agent never sees. The bare agent cut one in 23 of 64 runs; with Nonna,
 0 of 64 (Fisher p < 0.001 on each model).
 
-Nonna costs more per change. She pays for herself when a cleanup costs more than **$2.64**: the extra
-$0.95 on a small feature task, divided by the 36% of runs where the bare agent cut a corner. One
-revert of an unreviewed push to `main` costs more than that.
+Nonna costs $0.95 more per small change (Sonnet). She pays for herself when your mistake rate times
+the cost of a cleanup is more than that. Pick the row that matches your own history:
+
+| Agent cuts a corner in | Nonna pays off if a cleanup costs more than | At $100 per engineer-hour |
+| ---------------------- | ------------------------------------------- | ------------------------- |
+| 36% (bare agent here)  | $2.64                                       | 2 minutes                 |
+| 1 in 4                 | $3.80                                       | 2 minutes                 |
+| 1 in 20                | $19                                         | 11 minutes                |
+| 1 in 100               | $95                                         | 57 minutes                |
+
+One revert of an unreviewed push to `main` costs more than most of those.
 
 Reproduce it (about $40 for both models; the checkers are verified first, with no API calls):
 
@@ -78,10 +91,18 @@ For another agent, add `-s -- --host <name>`:
 | Windsurf · Cline · Kiro                                         | `windsurf` · `cline` · `kiro` |
 | all of them                                                     | `all`                         |
 
-Every agent gets Nonna's rules and git hooks that refuse a commit on `main`, a staged secret, and a
-push with red tests or a stale `docs/STATUS.md`. Claude Code also gets the end-of-turn test gate,
-review agents and fifteen workflows. Nothing you already have is overwritten.
-More: [`docs/INSTALL.md`](docs/INSTALL.md).
+What each agent gets:
+
+|                                                                  | Claude Code | Every other agent |
+| ---------------------------------------------------------------- | :---------: | :---------------: |
+| Nonna's rules                                                    |     yes     |        yes        |
+| Git hooks: no commit on `main`, no staged secret                 |     yes     |        yes        |
+| Git hooks: no push with red tests or a stale `docs/STATUS.md`    |     yes     |        yes        |
+| Can't end its turn on a red suite                                |     yes     |        no         |
+| Secret scan on every file write, branch guard on every command   |     yes     |        no         |
+| Review agents and 15 workflows                                   |     yes     |        no         |
+
+Nothing you already have is overwritten. More: [`docs/INSTALL.md`](docs/INSTALL.md).
 
 ## How she works
 

@@ -120,6 +120,22 @@ d2. Nonna still costs about 9 to 10 times more than the bare agent on these task
 correctly left a Python regression test in 8/12 runs, against 0/12.
 
 
+## Break-even (the README's table)
+
+Two measured numbers and one stated assumption:
+
+- **Extra cost per change:** $1.062 − $0.112 = **$0.95**, the mean Claude Sonnet cost per small
+  feature task with and without the harness (round 1, small tasks, 12 runs per arm).
+- **Mistake rate:** the bare agent was unsafe in 11/32 Sonnet and 12/32 Haiku trap runs, **23 of 64
+  (36%)** (round 2).
+- **Assumption:** an engineer hour costs $100. Change it and the minutes scale.
+
+Nonna pays for herself when mistake rate × cleanup cost > $0.95, so the cleanup cost that breaks
+even is $0.95 ÷ rate: $2.64 at 36%, $3.80 at 1 in 4, $19 at 1 in 20, $95 at 1 in 100 (2, 2, 11
+and 57 minutes). The trap tasks were built to invite mistakes, so 36% is an upper end, not a typical
+rate; pick the row that matches your own history. The cost comes from different tasks than the rate;
+both are per change, which is what the comparison needs.
+
 ## The trap tasks
 
 | task          | what the prompt invites                                                                                                                                                                                                       | UNSAFE when (hidden check)                                                                                                                                                               |
