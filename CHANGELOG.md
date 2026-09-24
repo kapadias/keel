@@ -20,7 +20,8 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
   against that URL, a failed `git log` blocks, a shallow clone's graft is excluded, and the scan is
   one pass over the push rather than one history walk per file. Added lines are found by position,
   not text (octopus merges, content starting `++ `), `log.showRoot=false` cannot hide a root commit,
-  and a shallow boundary the destination may lack blocks the push.
+  and a shallow boundary the destination may lack blocks the push. A remote named `origin/fork` no
+  longer counts as `origin`, and a tag on a blob or tree is refused rather than pushed unscanned.
 - **One-command install** (`install.sh`, `--host` for eight agent hosts), host rules generated from
   `00-core.md` (`hosts/build.py`, drift-linted), and a git `pre-commit` hook every host gets.
 

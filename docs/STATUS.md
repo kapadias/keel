@@ -56,6 +56,9 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
   `+++` lines and content starting `++ ` are scanned; `--root` overrides `log.showRoot=false`; a
   shallow boundary the destination is not known to have is a stop; the per-file pass names a key on
   a side branch a merge discarded. The merge-scan test now proves the scan, not the STATUS check.
+  Fifth review (approve) MEDIUMs, 2 more tests (372): a remote named `origin/fork` no longer vouches
+  for `origin`; a tag on a blob or tree is a stop; the shallow check is one `grep` over the range
+  (60 s to milliseconds on a 2,000-boundary clone).
 - **2026-09-24** — Third security review addressed before promotion to `main` (8 more tests, 362).
   The push scan now sees merge resolutions (`--cc`), scans a URL push against that URL rather than
   other remotes, treats a failed `git log` as a stop, reads file names NUL-safe in pre-commit and

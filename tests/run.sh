@@ -241,6 +241,20 @@ printf 'refs/heads/fk %s refs/heads/fk %s\n' "$("${GIT[@]}" -C "$T3" rev-parse H
 out="$(cd "$T3" && "$RS" origin "$B2" < "$PS" 2>&1)"; check "pre-push: a shallow fork tip the remote lacks is not skipped" 1 "$?"
 contains "pre-push: ...and says why" "shallow" "$out"
 rm -rf "$FORK" "$T3"
+# A remote named origin/fork is not origin: its refs must not count as what origin already has.
+FORK="$(mktemp -d)"; T3="$(mktemp -d)"; "${GIT[@]}" clone -q -b trunk "$B2" "$FORK/w" 2>/dev/null
+"${GIT[@]}" -C "$FORK/w" checkout -q -b fk; echo 'KEY = "'"$FAKE_AWS"'"' > "$FORK/w/src/k.py"; echo f >> "$FORK/w/docs/STATUS.md"
+"${GIT[@]}" -C "$FORK/w" add -A; "${GIT[@]}" -C "$FORK/w" commit -q --no-verify -m fork
+"${GIT[@]}" -C "$T3" init -q; "${GIT[@]}" -C "$T3" remote add origin "$B2"; "${GIT[@]}" -C "$T3" remote add origin/fork "$FORK/w"
+"${GIT[@]}" -C "$T3" fetch -q origin 2>/dev/null; "${GIT[@]}" -C "$T3" fetch -q origin/fork 2>/dev/null
+"${GIT[@]}" -C "$T3" checkout -q --no-track -b fk origin/fork/fk
+printf 'refs/heads/fk %s refs/heads/fk %s\n' "$("${GIT[@]}" -C "$T3" rev-parse HEAD)" "$ZERO" > "$PS"
+( cd "$T3" && "$RS" origin "$B2" < "$PS" ) 2>/dev/null; check "pre-push: a remote named origin/fork does not vouch for origin" 1 "$?"
+# A tag on a blob or a tree carries content too: it is never pushed unscanned.
+BLOB="$(printf 'k = "%s"\n' "$FAKE_AWS" | "${GIT[@]}" -C "$T3" hash-object -w --stdin)"
+printf 'refs/tags/leak %s refs/tags/leak %s\n' "$BLOB" "$ZERO" > "$PS"
+( cd "$T3" && "$RS" origin "$B2" < "$PS" ) 2>/dev/null; check "pre-push: a tag on a blob is not pushed unscanned" 1 "$?"
+rm -rf "$FORK" "$T3"
 rm -rf "$T2" "$B2" "$SRC"
 # A first push of a long history is scanned in one pass, not one history walk per file.
 T2="$(mktemp -d)"; B2="$(mktemp -d)"; "${GIT[@]}" init -q --bare "$B2"; "${GIT[@]}" -C "$T2" init -q; "${GIT[@]}" -C "$T2" remote add origin "$B2"

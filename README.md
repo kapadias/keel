@@ -110,7 +110,7 @@ will add it. She will remember.
 ## Development
 
 ```bash
-bash tests/run.sh              # every gate proven to block and to allow (370 golden tests)
+bash tests/run.sh              # every gate proven to block and to allow (372 golden tests)
 python3 tests/harness_lint.py  # word budgets, host files in sync, hook wiring
 ```
 
