@@ -16,6 +16,8 @@ HOOKS="$ROOT/.claude/hooks"
 SKILLS="$ROOT/.claude/skills"
 PASS=0
 FAIL=0
+# A fake AWS key id, split so this file never holds a key-shaped literal (the push gate scans it).
+FAKE_AWS="AKIA""1234567890ABCDEF"
 GIT=(git -c user.email=nonna@test -c user.name=nonna-test -c init.defaultBranch=main -c commit.gpgsign=false)
 
 check() { # <desc> <expected_exit> <actual_exit>
@@ -33,10 +35,10 @@ contains() { # <desc> <needle> <haystack>
 }
 
 echo "== secret-patterns lib =="
-out="$( . "$HOOKS/lib/secret-patterns.sh"; printf 'aws = "AKIA1234567890ABCDEF"' | nonna_scan_secrets )"; rc=$?
+out="$( . "$HOOKS/lib/secret-patterns.sh"; printf 'aws = "%s"' "$FAKE_AWS" | nonna_scan_secrets )"; rc=$?
 check "detects AWS access key id" 0 "$rc"
 contains "names the matched class, not the value" "AWS access key id" "$out"
-( . "$HOOKS/lib/secret-patterns.sh"; printf 'ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' | nonna_scan_secrets ) >/dev/null; check "detects GitHub token" 0 "$?"
+( . "$HOOKS/lib/secret-patterns.sh"; printf 'ghp_%s' 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' | nonna_scan_secrets ) >/dev/null; check "detects GitHub token" 0 "$?"
 ( . "$HOOKS/lib/secret-patterns.sh"; printf 'let total = price * quantity' | nonna_scan_secrets ) >/dev/null; check "clean code passes" 1 "$?"
 ( . "$HOOKS/lib/secret-patterns.sh"; printf 'api_key = "your-key-here-placeholder"' | nonna_scan_secrets ) >/dev/null; check "ignores obvious placeholder" 1 "$?"
 ( . "$HOOKS/lib/secret-patterns.sh"; printf 'token = os.environ["TOKEN"]' | nonna_scan_secrets ) >/dev/null; check "ignores env-var reference" 1 "$?"
@@ -46,7 +48,7 @@ SS="$HOOKS/secret-scan.sh"
 printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"config.py","content":"TOKEN = \"ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\""}}' | "$SS"; check "blocks secret in Write content" 2 "$?"
 printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"config.py","content":"x = 1"}}' | "$SS"; check "allows clean Write" 0 "$?"
 printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"tests/fixtures/keys.py","content":"TOKEN = \"ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\""}}' | "$SS"; check "allows secret under a test/fixture path" 0 "$?"
-printf '%s' '{"tool_name":"Edit","tool_input":{"file_path":"app.js","old_string":"a","new_string":"const k = \"AKIA1234567890ABCDEF\""}}' | "$SS"; check "blocks secret in Edit new_string" 2 "$?"
+printf '%s' '{"tool_name":"Edit","tool_input":{"file_path":"app.js","old_string":"a","new_string":"const k = \"'"$FAKE_AWS"'\""}}' | "$SS"; check "blocks secret in Edit new_string" 2 "$?"
 printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"a.py"}}' | "$SS"; check "no content -> allow (fail safe)" 0 "$?"
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"cat .env"}}' | "$SS"; check "blocks Bash read of .env" 2 "$?"
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"head -5 secrets/creds.pem"}}' | "$SS"; check "blocks Bash read of a .pem" 2 "$?"
@@ -92,7 +94,7 @@ mkdir -p "$TMP/src"; echo 'def f(): return 1' > "$TMP/src/app.py"
 mkdir -p "$TMP/docs"; echo 'changed' > "$TMP/docs/STATUS.md"
 "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m "update STATUS"
 ( cd "$TMP" && "$RS" ); check "allows code push with STATUS update" 0 "$?"
-echo 'KEY = "AKIA1234567890ABCDEF"' > "$TMP/src/leak.py"
+echo 'KEY = "'"$FAKE_AWS"'"' > "$TMP/src/leak.py"
 echo 'more' >> "$TMP/docs/STATUS.md"
 "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m "leak with status"
 ( cd "$TMP" && "$RS" ); check "blocks push that introduces a secret" 1 "$?"
@@ -458,21 +460,21 @@ fi
 echo "== bypass-resistance (review-finding regressions) =="
 SP="$HOOKS/lib/secret-patterns.sh"
 # A trailing placeholder word must NOT smuggle a real key (value-level, not line-level).
-(. "$SP" && printf 'AWS=AKIA1234567890ABCDEF # example' | nonna_scan_secrets) >/dev/null; check "secret: trailing '# example' does not evade a real key" 0 "$?"
+(. "$SP" && printf 'AWS=%s # example' "$FAKE_AWS" | nonna_scan_secrets) >/dev/null; check "secret: trailing '# example' does not evade a real key" 0 "$?"
 # AWS's own EXAMPLE key (the value itself is a placeholder) IS exempt.
 (. "$SP" && printf 'key=AKIAIOSFODNN7EXAMPLE' | nonna_scan_secrets) >/dev/null; check "secret: placeholder value (…EXAMPLE) is exempt" 1 "$?"
 # New high-confidence classes.
-(. "$SP" && printf 'k = "sk_live_0123456789abcdefABCD"' | nonna_scan_secrets) >/dev/null; check "secret: detects Stripe sk_live_ key" 0 "$?"
+(. "$SP" && printf 'k = "sk_live_%s"' '0123456789abcdefABCD' | nonna_scan_secrets) >/dev/null; check "secret: detects Stripe sk_live_ key" 0 "$?"
 # Path allowlist is anchored to segments: an ordinary file with a 'test' substring is NOT exempt.
-printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"src/latest_config.py","content":"K=\"AKIA1234567890ABCDEF\""}}' | "$SS"; check "secret-scan: 'latest_config.py' is NOT allowlisted" 2 "$?"
-printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"src/app/tests/k.py","content":"K=\"AKIA1234567890ABCDEF\""}}' | "$SS"; check "secret-scan: a real tests/ segment IS allowlisted" 0 "$?"
+printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"src/latest_config.py","content":"K=\"'"$FAKE_AWS"'\""}}' | "$SS"; check "secret-scan: 'latest_config.py' is NOT allowlisted" 2 "$?"
+printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"src/app/tests/k.py","content":"K=\"'"$FAKE_AWS"'\""}}' | "$SS"; check "secret-scan: a real tests/ segment IS allowlisted" 0 "$?"
 # Secret gate must fail CLOSED when jq is absent (raw-payload scan).
 NOJQ="$(mktemp -d)"
 for b in bash sh env cat grep sed head tr dirname; do
   p="$(command -v "$b" 2>/dev/null || true)"
   if [ -n "$p" ]; then ln -s "$p" "$NOJQ/$b" 2>/dev/null || true; fi
 done
-printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"c.py","content":"K = \"AKIA1234567890ABCDEF\""}}' | PATH="$NOJQ" "$SS"; check "secret-scan: blocks a secret when jq is absent" 2 "$?"
+printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"c.py","content":"K = \"'"$FAKE_AWS"'\""}}' | PATH="$NOJQ" "$SS"; check "secret-scan: blocks a secret when jq is absent" 2 "$?"
 rm -rf "$NOJQ"
 # Branch guard tolerates global options and blocks wide pushes.
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; "${GIT[@]}" -C "$TMP" commit -q --allow-empty -m init; "${GIT[@]}" -C "$TMP" branch -M main
