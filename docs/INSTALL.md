@@ -1,24 +1,44 @@
 # Installing Nonna
 
-Nonna is files, not a dependency. Two supported paths. **They are not equivalent** — a plugin install
-carries only `rules/00-core.md`, not the other eight rules, `CLAUDE.md`, or the permission posture
-(see the limitations below). Option A is the complete harness; Option B trades completeness for
-versioned, shareable distribution.
-
-## Option A — copy it in (standalone)
+One command, from the root of a git repository:
 
 ```bash
-# From the root of your repository:
-git clone https://github.com/kapadias/keel /tmp/nonna
-cp -r /tmp/nonna/.claude .claude
-cp /tmp/nonna/CLAUDE.md CLAUDE.md
-mkdir -p docs && cp /tmp/nonna/docs/STATUS.md docs/STATUS.md
-chmod +x .claude/hooks/*.sh
+curl -fsSL https://raw.githubusercontent.com/kapadias/keel/main/install.sh | bash
 ```
 
-The pre-push Definition-of-Done gate self-installs at `SessionStart` (see
-[ADR 0004](adr/0004-gates-as-code.md)). If your repo already has a `pre-push` hook, Nonna warns
-instead of overwriting it — chain `.claude/hooks/require-status-sync.sh` from your hook manually.
+That installs for Claude Code. For another agent, name it (several at once: `--host cursor,agents`):
+
+| Host                                                                      | Command                           | Rules file written                |
+| ------------------------------------------------------------------------- | --------------------------------- | --------------------------------- |
+| Claude Code                                                               | `… \| bash`                       | `CLAUDE.md` + `.claude/`          |
+| Codex, Zed, Amp, opencode, Roo Code, Jules, Junie, any `AGENTS.md` reader | `… \| bash -s -- --host agents`   | `AGENTS.md`                       |
+| Cursor                                                                    | `… \| bash -s -- --host cursor`   | `.cursor/rules/nonna.mdc`         |
+| GitHub Copilot                                                            | `… \| bash -s -- --host copilot`  | `.github/copilot-instructions.md` |
+| Gemini CLI                                                                | `… \| bash -s -- --host gemini`   | `GEMINI.md`                       |
+| Windsurf                                                                  | `… \| bash -s -- --host windsurf` | `.windsurf/rules/nonna.md`        |
+| Cline                                                                     | `… \| bash -s -- --host cline`    | `.clinerules/nonna.md`            |
+| Kiro                                                                      | `… \| bash -s -- --host kiro`     | `.kiro/steering/nonna.md`         |
+| All of them                                                               | `… \| bash -s -- --host all`      | all of the above                  |
+
+Every host gets the same thing:
+
+- **The house rules**, generated from `.claude/rules/00-core.md` by `hosts/build.py`, plus the full
+  rules under `.claude/rules/` for depth.
+- **Git hooks that enforce them for any agent**: `pre-commit` refuses a commit on `main`, `master` or
+  `develop`, a staged secret file, and a staged credential; `pre-push` refuses a code push that leaves
+  `docs/STATUS.md` stale, and any secret.
+- **A blank `docs/STATUS.md`** and, if it finds `pyproject.toml`, `package.json`, `go.mod` or
+  `Cargo.toml`, that stack's test-gate permissions.
+
+It never overwrites a file or a git hook that already exists; it lists what it left alone. If you
+use a hook manager (a custom `core.hooksPath`), it tells you which scripts to point it at. Pin a
+release with `curl … | NONNA_REF=<tag> bash`. Prefer to read before you pipe? `curl -fsSLO …/install.sh`, read it,
+then `bash install.sh`.
+
+Claude Code gets more than the other hosts: the tool-level hooks (a write is scanned before it
+lands, a turn cannot end with the status doc stale, a reviewer's verdict is machine-checked), the
+agents, and the fifteen workflows. On other hosts the rules and the git hooks do the work; the
+benchmark showed the rules are what kept agents off `main` and away from secrets.
 
 ## Option B — install as a plugin (versioned, shareable)
 
