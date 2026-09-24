@@ -75,22 +75,29 @@ Remaining risk: token refresh path has no property test yet (debt: tracked)
 
 ## The numbers
 
-Same model, same six small tasks, with no harness and with Nonna, twelve runs each, scored on hidden
-checks the agent never saw:
+Same model, same tasks, with no harness and with Nonna. Every run scored by a hidden check the agent
+never saw:
 
 <p align="center">
-  <img src="assets/benchmark-bare-vs-nonna.svg" width="860" alt="Nonna versus a bare agent on six small tasks: both 12 of 12 correct; runs that left a test behind 0 versus 12; dependency files 0 and 0; median source lines 6.5 versus 16.5; cost per run $0.13 versus $2.82.">
+  <img src="assets/scorecard.svg" width="860" alt="Mistakes on five trap tasks: bare agent 5 in 20 runs, Nonna 0 in 22. Changes that left a test: 0 of 12 versus 12 of 12. Correct on six small tasks: 12 of 12 versus 11 of 12. Mean cost per change: $0.13 versus $1.96.">
 </p>
 
-| Claude Sonnet, six small tasks, n = 12 per arm | correct | left a test behind | added a dependency | src LOC (median) |  cost |
-| ---------------------------------------------- | ------: | -----------------: | -----------------: | ---------------: | ----: |
-| **bare agent** (no harness)                    |   12/12 |               0/12 |                  0 |              6.5 | $0.13 |
-| **Nonna**                                      |   12/12 |              12/12 |                  0 |             16.5 | $2.82 |
+**Where she earns it.** Five tasks where the easy path is the mistake: a pasted live key, "commit
+and push", a crash to silence, a red CI before a deadline, a function to simplify. With Claude
+Sonnet and Claude Haiku, the bare agent pushed straight to `main` four times and wrote a live Stripe
+key into source once, 5 mistakes in 20 runs. With Nonna: none in 22. And on small feature tasks,
+every Nonna change left a test behind; no bare one did.
 
-On tasks this small a good model does not over-build, so Nonna does not win on lines or price. What
-she buys, on every run and on none of the bare agent's: a failing test first, an independent review,
-a verdict a script decided, and a status doc that agrees with the code. Method and raw rows:
-[`docs/benchmarks/`](docs/benchmarks/).
+**What it costs.** About fifteen times the bare agent per change, mostly review. Tests and review
+also add lines: a median of 22 against 6.5 on the small tasks, and some of those lines are fixes the
+reviewers found, like a date check that let users west of UTC pick tomorrow.
+
+**What the numbers don't say.** The mistakes were avoided because the rules steered the model; the
+hooks never had to block, because nothing reached them. They are the backstop for the day the rules
+don't hold, and `tests/run.sh` proves each one fires. Three of the five traps caught no one, harness
+or not. Two runs per task: directions, not rates. Method, raw rows and caveats:
+[failure modes](docs/benchmarks/2026-09-24-failure-modes.md),
+[small tasks and cost](docs/benchmarks/2026-09-24-proportional-review.md).
 
 ## Her kitchen rules
 

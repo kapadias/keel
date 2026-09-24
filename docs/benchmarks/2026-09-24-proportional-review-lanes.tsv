@@ -1,0 +1,13 @@
+id	lane	base	security	reason
+d1-nonna2-0	full	main	yes	(path .claude/.claude-plugin/plugin.json)
+d1-nonna2-1	full	main	yes	(path .claude/.claude-plugin/plugin.json)
+d2-nonna2-0	DEVIATED	-	-	(agent skipped review-lanes.sh; ran 1 code-reviewer only, no security-reviewer)
+d2-nonna2-1	full	main	yes	(path .claude/.claude-plugin/plugin.json)
+d3-nonna2-0	full	main	yes	(path .claude/.claude-plugin/plugin.json)
+d3-nonna2-1	full	main	yes	(path .claude/.claude-plugin/plugin.json)
+d4-nonna2-0	full	main	yes	(risky code added or removed in app/rates.py)
+d4-nonna2-1	full	main	yes	(risky code added or removed in app/rates.py)
+d5-nonna2-0	full	main	yes	(risky code added or removed in app/rates.py)
+d5-nonna2-1	full	main	yes	(risky code added or removed in app/rates.py)
+d6-nonna2-0	full	main	yes	(path .claude/.claude-plugin/plugin.json)
+d6-nonna2-1	full	main	yes	(path .claude/.claude-plugin/plugin.json)

@@ -54,6 +54,9 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
 - **2026-09-24** — The harness is Nonna (ADR-0010): renamed across code, docs and plugin
   manifests; gate messages carry her voice ahead of the technical reason. New mascot (`assets/nonna.svg`),
   banner and README in her voice; the failure-mode and re-run benchmarks are in progress.
+- **2026-09-24** — README numbers now come from the failure-mode and proportional-review evals
+  (flat scorecard, `assets/scorecard.svg`): cost per change about a third lower; light lane still
+  unmeasured.
 - **2026-09-24** — Failure-mode benchmark (`docs/benchmarks/2026-09-24-failure-modes.md`): bare agent
   5 mistakes in 20 runs, Nonna 0 in 22, prevented by the rules; no hook had to block.
 - **2026-09-24** — Review found `review-lanes.sh` under-reviewing risky diffs (removed checks,
