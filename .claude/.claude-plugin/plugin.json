@@ -1,6 +1,6 @@
 {
   "name": "nonna",
-  "description": "Production-grade, token-efficient Claude Code harness \u2014 disciplined, test-driven, review-gated, and safe by construction. Ships the rules, specialist agents, on-demand skills, dev-loop workflows, and enforcing hooks as one installable unit.",
+  "description": "Nonna: she doesn't care that it compiled. Hooks and scripts that make the agent test first, pass a machine-checked review, keep secrets and main safe, and keep the docs honest. Rules, agents, skills and workflows in one installable unit.",
   "version": "1.0.0",
   "author": {
     "name": "Shashank Kapadia"

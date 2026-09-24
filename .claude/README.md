@@ -1,4 +1,4 @@
-# Nonna `.claude/` harness
+# Nonna's kitchen: the `.claude/` harness
 
 The agentic developer harness for any repository. It encodes _how the work gets done_ so that
 AI-assisted development stays disciplined, test-driven, review-gated, and safe — and the
