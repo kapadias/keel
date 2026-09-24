@@ -56,7 +56,7 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
   banner and README in her voice; the failure-mode and re-run benchmarks are in progress.
 - **2026-09-24** — README numbers tell the total cost: the bill you see ($0.13 vs $1.96 per change),
   the bill you don't (5 mistakes in 20 bare runs vs 0 in 22), and the break-even ($7 per cleanup at 1
-  in 4). Derivation in the failure-mode benchmark.
+  in 4). Derivation in the failure-mode benchmark; line counts exclude tests.
 - **2026-09-24** — README numbers now come from the failure-mode and proportional-review evals
   (flat scorecard, `assets/scorecard.svg`): cost per change about a third lower; light lane still
   unmeasured.

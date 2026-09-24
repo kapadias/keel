@@ -113,8 +113,8 @@ Rotating a live key or unwinding a bad push to `main` usually takes longer than 
   are the backstop for the day the rules don't hold, and `tests/run.sh` proves each one fires.
 - The trap tasks were built to invite mistakes, so 1 in 4 is high. Three of the five traps caught no
   one, with or without the harness. Use the row that matches your own history.
-- Nonna writes more code: a median of 22 lines against 6.5 on the small tasks, mostly tests and fixes
-  the reviewers asked for.
+- Nonna writes more code: a median of 22 source lines against 6.5 on the small tasks, not counting
+  tests. Most of the extra lines are changes the reviewers asked for.
 - Two runs per task shows direction, not rates. Method, raw rows and every caveat, including one
   debatable miss: [failure modes](docs/benchmarks/2026-09-24-failure-modes.md) and
   [small tasks and cost](docs/benchmarks/2026-09-24-proportional-review.md).
