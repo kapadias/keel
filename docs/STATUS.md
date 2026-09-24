@@ -55,6 +55,7 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
   every commit the remote lacks, per commit, whatever the git config; tags and deletes are not
   refused; untracked files make the tree dirty for the test gate; the macOS timeout kills the
   process group; a kept `settings.json` without Nonna's hooks is reported.
+  The pytest-detection tests carry a stand-in pytest, so they pass whether or not the machine has it.
 - **2026-09-24** — Security review of `install.sh` and the new hooks addressed, with 26 new golden
   tests (342): installer merge, symlink and failure handling; the test gate is opt-in under a plugin
   install; a cached green tree and a timeout budget for the Stop hook; the pre-push range comes from

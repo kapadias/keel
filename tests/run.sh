@@ -711,6 +711,29 @@ printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin HEAD:r
 rm -rf "$TMP"
 
 echo "== stop-dod.sh (Stop: no turn ends with STATUS stale) =="
+# Detection claims pytest only when it is importable, so these tests must not depend on the machine
+# having it: a stand-in pytest (a tiny runner of test_* functions) goes first on PATH for them.
+PYSTUB="$(mktemp -d)"; mkdir -p "$PYSTUB/pytest"
+cat > "$PYSTUB/pytest/__main__.py" <<'PY'
+import glob, importlib.util, os, sys
+sys.path.insert(0, os.getcwd())
+failed = passed = 0
+for path in sorted(glob.glob("tests/test_*.py")):
+    spec = importlib.util.spec_from_file_location(os.path.basename(path)[:-3], path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    for name in sorted(n for n in dir(mod) if n.startswith("test_")):
+        try:
+            getattr(mod, name)()
+            passed += 1
+        except Exception:
+            failed += 1
+            print(f"FAILED {path}::{name}")
+print(f"{failed} failed, {passed} passed" if failed else f"{passed} passed")
+sys.exit(1 if failed else 0)
+PY
+: > "$PYSTUB/pytest/__init__.py"
+OLD_PYTHONPATH="${PYTHONPATH-}"; export PYTHONPATH="$PYSTUB${PYTHONPATH:+:$PYTHONPATH}"
 SD="$HOOKS/stop-dod.sh"
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 mkdir -p "$TMP/docs"; printf 'x\n' > "$TMP/src.py"; printf 'S\n' > "$TMP/docs/STATUS.md"
@@ -807,6 +830,8 @@ got="$(cd "$TMP" && unset NONNA_TEST_CMD && . "$HOOKS/lib/tests.sh" && nonna_tes
 # shellcheck disable=SC2031
 got="$(cd "$TMP" && unset NONNA_TEST_CMD && PATH="$STUB:$PATH" && . "$HOOKS/lib/tests.sh" && nonna_test_cmd)"; check "tests.sh: no pytest installed, no pytest command" 0 "${#got}"
 rm -rf "$TMP" "$STUB"
+
+rm -rf "$PYSTUB"; if [ -n "$OLD_PYTHONPATH" ]; then PYTHONPATH="$OLD_PYTHONPATH"; else unset PYTHONPATH; fi
 
 echo "== subagent-start.sh (SubagentStart: the constitution reaches subagents) =="
 # SessionStart additionalContext is parent-only, so under a plugin install every
