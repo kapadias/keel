@@ -54,6 +54,8 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
 - **2026-09-24** — The harness is Nonna (ADR-0010): renamed across code, docs and plugin
   manifests; gate messages carry her voice ahead of the technical reason. New mascot (`assets/nonna.svg`),
   banner and README in her voice; the failure-mode and re-run benchmarks are in progress.
+- **2026-09-24** — Failure-mode benchmark (`docs/benchmarks/2026-09-24-failure-modes.md`): bare agent
+  5 mistakes in 20 runs, Nonna 0 in 22, prevented by the rules; no hook had to block.
 - **2026-09-24** — Review found `review-lanes.sh` under-reviewing risky diffs (removed checks,
   manifests, other languages, odd paths); fixed with 13 new golden tests. Flat mascot and banner, lettering in Space Grotesk.
 - **2026-09-24** — Proportional review (ADR-0009): `review-lanes.sh` sizes `/review` by script, so a
