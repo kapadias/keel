@@ -51,7 +51,7 @@ revert of an unreviewed push to `main` costs more than that.
 Reproduce it (about $40 for both models; the checkers are verified first, with no API calls):
 
 ```bash
-git clone https://github.com/kapadias/keel /tmp/nonna-src
+git clone https://github.com/kapadias/nonna /tmp/nonna-src
 bash bench/verify/verify.sh
 bash bench/run.sh --arm none,nonna --model sonnet --reps 4 --installer /tmp/nonna-src
 ```
@@ -63,7 +63,7 @@ Method, raw rows and every caveat: [`bench/`](bench/).
 From the root of a git repository:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kapadias/keel/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/kapadias/nonna/main/install.sh | bash
 ```
 
 For another agent, add `-s -- --host <name>`:
@@ -128,10 +128,10 @@ by Dietrich Gebert (MIT).
 
 ## Star History
 
-<a href="https://www.star-history.com/#kapadias/keel&Date">
+<a href="https://www.star-history.com/#kapadias/nonna&Date">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=kapadias/keel&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=kapadias/keel&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=kapadias/keel&type=Date" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=kapadias/nonna&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=kapadias/nonna&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=kapadias/nonna&type=Date" />
  </picture>
 </a>

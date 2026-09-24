@@ -211,5 +211,5 @@ lane, stack packs for python/typescript/go/rust, and plugin distribution (ADR-00
 Initial harness: rules, agents, skills, commands, and the development loop — described, not yet
 enforced.
 
-[1.0.0]: https://github.com/kapadias/keel/releases/tag/v1.0.0
-[0.1.0]: https://github.com/kapadias/keel/releases/tag/v0.1.0
+[1.0.0]: https://github.com/kapadias/nonna/releases/tag/v1.0.0
+[0.1.0]: https://github.com/kapadias/nonna/releases/tag/v0.1.0
