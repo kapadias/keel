@@ -1,6 +1,6 @@
-# Installing Keel
+# Installing Nonna
 
-Keel is files, not a dependency. Two supported paths. **They are not equivalent** — a plugin install
+Nonna is files, not a dependency. Two supported paths. **They are not equivalent** — a plugin install
 carries only `rules/00-core.md`, not the other eight rules, `CLAUDE.md`, or the permission posture
 (see the limitations below). Option A is the complete harness; Option B trades completeness for
 versioned, shareable distribution.
@@ -9,26 +9,26 @@ versioned, shareable distribution.
 
 ```bash
 # From the root of your repository:
-git clone https://github.com/kapadias/keel /tmp/keel
-cp -r /tmp/keel/.claude .claude
-cp /tmp/keel/CLAUDE.md CLAUDE.md
-mkdir -p docs && cp /tmp/keel/docs/STATUS.md docs/STATUS.md
+git clone https://github.com/kapadias/keel /tmp/nonna
+cp -r /tmp/nonna/.claude .claude
+cp /tmp/nonna/CLAUDE.md CLAUDE.md
+mkdir -p docs && cp /tmp/nonna/docs/STATUS.md docs/STATUS.md
 chmod +x .claude/hooks/*.sh
 ```
 
 The pre-push Definition-of-Done gate self-installs at `SessionStart` (see
-[ADR 0004](adr/0004-gates-as-code.md)). If your repo already has a `pre-push` hook, Keel warns
+[ADR 0004](adr/0004-gates-as-code.md)). If your repo already has a `pre-push` hook, Nonna warns
 instead of overwriting it — chain `.claude/hooks/require-status-sync.sh` from your hook manually.
 
 ## Option B — install as a plugin (versioned, shareable)
 
 ```
 /plugin marketplace add kapadias/keel
-/plugin install keel@keel
+/plugin install nonna@nonna
 ```
 
 A plugin install brings the agents, skills, and hooks
-(see [ADR 0006](adr/0006-distribute-keel-as-plugin.md) and
+(see [ADR 0006](adr/0006-distribute-as-plugin.md) and
 [ADR 0007](adr/0007-plugin-install-is-not-equivalent.md)).
 
 ### Known limitation 1 — only `00-core.md` rides along
@@ -44,16 +44,16 @@ that tells the agent _how to work_ does not.
 Until that is closed, copy the discipline in alongside the plugin:
 
 ```bash
-git clone --depth 1 https://github.com/kapadias/keel /tmp/keel
-mkdir -p .claude/rules && cp -r /tmp/keel/.claude/rules/. .claude/rules/
-cp /tmp/keel/CLAUDE.md CLAUDE.md
+git clone --depth 1 https://github.com/kapadias/keel /tmp/nonna
+mkdir -p .claude/rules && cp -r /tmp/nonna/.claude/rules/. .claude/rules/
+cp /tmp/nonna/CLAUDE.md CLAUDE.md
 ```
 
 ### Known limitation 2 — the permission posture is NOT injected
 
 The plugin mechanism does not propagate `settings.json` permissions to the host project. A fresh
 plugin install therefore has **weaker secret protection** than a standalone copy until you add
-Keel's deny-list to your own project settings. This step is manual and mechanical — copy the
+Nonna's deny-list to your own project settings. This step is manual and mechanical — copy the
 `permissions.deny` block below (kept in sync with
 [`.claude/settings.json`](../.claude/settings.json)) into your project's
 `.claude/settings.json`:

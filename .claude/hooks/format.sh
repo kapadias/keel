@@ -10,7 +10,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # The edited file path comes from the hook JSON on stdin (.tool_input.file_path),
 # with an optional env override.
 file="${CLAUDE_FILE_PATH:-}"
-[ -n "$file" ] || file="$(keel_json_field '.tool_input.file_path')"
+[ -n "$file" ] || file="$(nonna_json_field '.tool_input.file_path')"
 [ -n "$file" ] && [ -f "$file" ] || exit 0
 
 have() { command -v "$1" >/dev/null 2>&1; }

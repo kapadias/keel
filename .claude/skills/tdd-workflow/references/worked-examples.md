@@ -42,7 +42,7 @@ import base64
 
 def test_base64_matches_stdlib_oracle():
     # Don't trust our encoder against itself; pin it to the stdlib's battle-tested result.
-    payload = b"keel:golden-oracle"
+    payload = b"nonna:golden-oracle"
     assert my_b64encode(payload) == base64.b64encode(payload).decode()
 ```
 

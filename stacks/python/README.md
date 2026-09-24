@@ -1,4 +1,4 @@
-# Keel Stack Pack — Python
+# Nonna Stack Pack — Python
 
 Toolchain: **ruff** (lint + format) · **mypy** or **pyright** (types) · **pytest + pytest-cov** (tests + coverage) · **hypothesis** (property tests).
 
@@ -52,7 +52,7 @@ strict = true
 pytest --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=80
 ```
 
-- `--cov-branch` enables branch coverage (required by Keel's testing rules).
+- `--cov-branch` enables branch coverage (required by Nonna's testing rules).
 - `--cov-fail-under=80` makes the test run exit non-zero when coverage falls below 80 %. Set this floor in `pyproject.toml` so it applies in CI automatically:
 
 ```toml

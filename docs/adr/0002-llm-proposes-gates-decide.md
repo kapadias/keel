@@ -1,6 +1,6 @@
 # 0002 — The LLM proposes; deterministic gates decide
 
-Keel's load-bearing principle, recorded. This is the line the whole harness is built to defend.
+Nonna's load-bearing principle, recorded. This is the line the whole harness is built to defend.
 
 ## Status
 
@@ -12,7 +12,7 @@ Accepted
 
 ## Deciders
 
-Keel maintainers (owner: Shashank Kapadia)
+Nonna maintainers (owner: Shashank Kapadia)
 
 ## Context
 
@@ -45,7 +45,7 @@ deterministic being able to say **no**.
 
 ## Decision
 
-Keel adopts the principle **"The LLM proposes; deterministic gates decide,"** encoded in
+Nonna adopts the principle **"The LLM proposes; deterministic gates decide,"** encoded in
 [`.claude/rules/boundaries.md`](../../.claude/rules/boundaries.md). Every artifact an agent produces is
 a *proposal*. Admission across a consequential boundary — merge, release, anything touching production
 or irreversible state — is granted only by **deterministic deciders**: tests, types, linters, the

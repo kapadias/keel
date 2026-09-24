@@ -1,6 +1,6 @@
 # 0001 — Record architecture decisions
 
-The first decision: to record decisions. After Michael Nygard, adapted to Keel.
+The first decision: to record decisions. After Michael Nygard, adapted to Nonna.
 
 ## Status
 
@@ -12,11 +12,11 @@ Accepted
 
 ## Deciders
 
-Keel maintainers (owner: Shashank Kapadia)
+Nonna maintainers (owner: Shashank Kapadia)
 
 ## Context
 
-Keel is a harness whose value is its discipline. The reasoning behind a rule, an agent boundary, or a
+Nonna is a harness whose value is its discipline. The reasoning behind a rule, an agent boundary, or a
 hook is often more load-bearing than the artifact itself — and that reasoning evaporates from chat
 logs, commit messages, and memory. Without a durable record we re-litigate settled questions, and new
 contributors (human or agent) cannot tell an intentional constraint from an accident.
@@ -40,7 +40,7 @@ code they govern.
 ## Decision
 
 We will record significant architectural decisions as numbered ADRs under `docs/adr/`, created with
-the **`/adr`** command from the Keel template. Each ADR carries: **Status**, **Date**, **Deciders**,
+the **`/adr`** command from the Nonna template. Each ADR carries: **Status**, **Date**, **Deciders**,
 **Context**, **Options considered** (≥3, including "do nothing"), **Decision**, and **Consequences**.
 ADRs are immutable once accepted — a later decision supersedes an earlier one by reference rather than
 by editing it. The index in `docs/adr/README.md` lists them all.

@@ -4,7 +4,7 @@
 # Compaction preserves the narrative and drops the bookkeeping. What reliably
 # survives is "we were working on X"; what reliably dies is the loop state — the
 # branch, whether a review verdict exists for THIS commit, whether STATUS has
-# moved. That is exactly the state Keel's gates key on, so after a compaction the
+# moved. That is exactly the state Nonna's gates key on, so after a compaction the
 # agent tends to re-review code it already reviewed, or believe it already
 # shipped something it did not.
 #
@@ -31,7 +31,7 @@ for f in ".claude/reviews/${sha}-"*.json; do
 done
 [ -n "$found" ] && verdicts="$found"
 
-msg="Keel loop state after compaction — branch: ${branch} · HEAD: ${sha} · uncommitted files: ${changed} · docs/STATUS.md: ${status_state} · review verdicts: ${verdicts}. Gates are unchanged and still blocking; re-derive anything else from the repo rather than from memory of the summarized conversation."
+msg="Nonna loop state after compaction — branch: ${branch} · HEAD: ${sha} · uncommitted files: ${changed} · docs/STATUS.md: ${status_state} · review verdicts: ${verdicts}. Gates are unchanged and still blocking; re-derive anything else from the repo rather than from memory of the summarized conversation."
 
 if command -v jq >/dev/null 2>&1; then
   jq -cn --arg c "$msg" '{hookSpecificOutput: {hookEventName: "PostCompact", additionalContext: $c}}'

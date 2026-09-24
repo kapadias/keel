@@ -6,7 +6,7 @@
 #                       one code reviewer on the cheaper tier. Anything else: the full review.
 #   security=yes|no     yes iff a changed path or an added line touches a risky surface
 #                       (auth, secrets, money, migrations, deploy, shell/exec, SQL, deserialization,
-#                       outward network calls, env reads, KEEL_CRITICAL_PATHS). Test-only and
+#                       outward network calls, env reads, NONNA_CRITICAL_PATHS). Test-only and
 #                       markdown lines never trigger it on their own; test and markdown PATHS still do.
 #
 # Fails closed: not a repo, an unresolvable base, or a missing classifier answers
@@ -63,10 +63,10 @@ why=""
 path_is_risky() {
   local f="$1" g
   printf '%s' "$f" | grep -qiE "$RISKY_PATH" && return 0
-  if [ -n "${KEEL_CRITICAL_PATHS:-}" ]; then
+  if [ -n "${NONNA_CRITICAL_PATHS:-}" ]; then
     local IFS=':'
     set -f
-    for g in $KEEL_CRITICAL_PATHS; do
+    for g in $NONNA_CRITICAL_PATHS; do
       # shellcheck disable=SC2254
       case "$f" in $g)
         set +f

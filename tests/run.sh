@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Keel harness self-tests — the harness held to its own bar (rules/testing.md).
+# Nonna harness self-tests — the harness held to its own bar (rules/testing.md).
 # Golden tests that exercise every deterministic GATE and assert it blocks vs.
 # allows correctly: secret detection, the branch guard, the Definition-of-Done
 # pre-push, the review verdict gate, and the dependency audit. This is
-# boundaries.md applied to Keel itself: if a gate is silently wrong, this fails.
+# boundaries.md applied to Nonna itself: if a gate is silently wrong, this fails.
 #
 # Run:  bash tests/run.sh      (exits non-zero if any gate misbehaves)
 # Deliberately NOT `set -e`: gates are EXPECTED to return non-zero.
@@ -16,7 +16,7 @@ HOOKS="$ROOT/.claude/hooks"
 SKILLS="$ROOT/.claude/skills"
 PASS=0
 FAIL=0
-GIT=(git -c user.email=keel@test -c user.name=keel-test -c init.defaultBranch=main -c commit.gpgsign=false)
+GIT=(git -c user.email=nonna@test -c user.name=nonna-test -c init.defaultBranch=main -c commit.gpgsign=false)
 
 check() { # <desc> <expected_exit> <actual_exit>
   if [ "$2" = "$3" ]; then
@@ -33,13 +33,13 @@ contains() { # <desc> <needle> <haystack>
 }
 
 echo "== secret-patterns lib =="
-out="$( . "$HOOKS/lib/secret-patterns.sh"; printf 'aws = "AKIA1234567890ABCDEF"' | keel_scan_secrets )"; rc=$?
+out="$( . "$HOOKS/lib/secret-patterns.sh"; printf 'aws = "AKIA1234567890ABCDEF"' | nonna_scan_secrets )"; rc=$?
 check "detects AWS access key id" 0 "$rc"
 contains "names the matched class, not the value" "AWS access key id" "$out"
-( . "$HOOKS/lib/secret-patterns.sh"; printf 'ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' | keel_scan_secrets ) >/dev/null; check "detects GitHub token" 0 "$?"
-( . "$HOOKS/lib/secret-patterns.sh"; printf 'let total = price * quantity' | keel_scan_secrets ) >/dev/null; check "clean code passes" 1 "$?"
-( . "$HOOKS/lib/secret-patterns.sh"; printf 'api_key = "your-key-here-placeholder"' | keel_scan_secrets ) >/dev/null; check "ignores obvious placeholder" 1 "$?"
-( . "$HOOKS/lib/secret-patterns.sh"; printf 'token = os.environ["TOKEN"]' | keel_scan_secrets ) >/dev/null; check "ignores env-var reference" 1 "$?"
+( . "$HOOKS/lib/secret-patterns.sh"; printf 'ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' | nonna_scan_secrets ) >/dev/null; check "detects GitHub token" 0 "$?"
+( . "$HOOKS/lib/secret-patterns.sh"; printf 'let total = price * quantity' | nonna_scan_secrets ) >/dev/null; check "clean code passes" 1 "$?"
+( . "$HOOKS/lib/secret-patterns.sh"; printf 'api_key = "your-key-here-placeholder"' | nonna_scan_secrets ) >/dev/null; check "ignores obvious placeholder" 1 "$?"
+( . "$HOOKS/lib/secret-patterns.sh"; printf 'token = os.environ["TOKEN"]' | nonna_scan_secrets ) >/dev/null; check "ignores env-var reference" 1 "$?"
 
 echo "== secret-scan.sh (PreToolUse write gate) =="
 SS="$HOOKS/secret-scan.sh"
@@ -157,7 +157,7 @@ rm -f "$TMP/package-lock.json"
 mkdir -p "$TMP/migrations"; "${GIT[@]}" -C "$TMP" mv src/app.py migrations/001_app.py
 ( cd "$TMP" && bash "$CT" main ); check "rename into a critical path disqualifies" 1 "$?"
 "${GIT[@]}" -C "$TMP" checkout -q main; "${GIT[@]}" -C "$TMP" branch -qD rename/crit
-# KEEL_CRITICAL_PATHS glob must match nested paths even when the dir exists (no pathname expansion).
+# NONNA_CRITICAL_PATHS glob must match nested paths even when the dir exists (no pathname expansion).
 # existing.py lives in the BASE (main) so it is NOT in the diff — only the nested untracked file is,
 # which the buggy pathname-expanding loop would miss exactly because src/billing/ exists.
 "${GIT[@]}" -C "$TMP" checkout -q main
@@ -165,7 +165,7 @@ mkdir -p "$TMP/src/billing/deep"; echo 'existing' > "$TMP/src/billing/existing.p
 "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m "billing dir exists on main"
 "${GIT[@]}" -C "$TMP" checkout -q -b crit/env
 printf 'a\nb\n' > "$TMP/src/billing/deep/rates.py"
-( cd "$TMP" && KEEL_CRITICAL_PATHS='src/billing/*' bash "$CT" main ); check "KEEL_CRITICAL_PATHS glob catches nested path when dir exists" 1 "$?"
+( cd "$TMP" && NONNA_CRITICAL_PATHS='src/billing/*' bash "$CT" main ); check "NONNA_CRITICAL_PATHS glob catches nested path when dir exists" 1 "$?"
 "${GIT[@]}" -C "$TMP" checkout -q main; "${GIT[@]}" -C "$TMP" branch -qD crit/env
 NOREPO="$(mktemp -d)"
 ( cd "$NOREPO" && bash "$CT" ); check "not a git repo fails closed" 1 "$?"
@@ -209,9 +209,9 @@ out="$(cd "$TMP" && bash "$RL" main 2>/dev/null)"
 contains "review-lanes: risky words in tests alone do not trigger security review" "security=no" "$out"
 rm -rf "$TMP/tests"
 mkdir -p "$TMP/src/ledger"; echo 'x = 1' > "$TMP/src/ledger/post.py"
-out="$(cd "$TMP" && KEEL_CRITICAL_PATHS='src/ledger/*' bash "$RL" main 2>/dev/null)"
-contains "review-lanes: KEEL_CRITICAL_PATHS forces security review" "security=yes" "$out"
-contains "review-lanes: KEEL_CRITICAL_PATHS forces the full lane" "lane=full" "$out"
+out="$(cd "$TMP" && NONNA_CRITICAL_PATHS='src/ledger/*' bash "$RL" main 2>/dev/null)"
+contains "review-lanes: NONNA_CRITICAL_PATHS forces security review" "security=yes" "$out"
+contains "review-lanes: NONNA_CRITICAL_PATHS forces the full lane" "lane=full" "$out"
 rm -rf "$TMP/src/ledger"
 out="$(cd "$TMP" && bash "$RL" nosuchref 2>/dev/null)"
 contains "review-lanes: unresolvable base fails closed to the full lane" "lane=full" "$out"
@@ -338,7 +338,7 @@ rm -f "$TMP/src/single.py"
 printf 'u = 1  # %s dash file\n' "$M" > "$TMP/-"
 ( cd "$TMP" && bash "$CD" -- - 2>/dev/null ); check "check-debt: a path named '-' is scanned as a file" 1 "$?"
 rm -f "$TMP/-"
-( cd "$ROOT" && bash "$CD" 2>/dev/null ); check "check-debt: Keel's own tree carries no untriggered marker" 0 "$?"
+( cd "$ROOT" && bash "$CD" 2>/dev/null ); check "check-debt: Nonna's own tree carries no untriggered marker" 0 "$?"
 rm -rf "$TMP" "$EMPTY"
 
 echo "== format.sh (PostToolUse, best-effort) =="
@@ -353,7 +353,7 @@ out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"; check "exits 0" 0 
 contains "emits additionalContext" "additionalContext" "$out"
 if [ -e "$TMP/.git/hooks/pre-push" ]; then rc=0; else rc=1; fi; check "auto-installs the pre-push DoD hook" 0 "$rc"
 out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"
-printf '%s' "$out" | grep -q "not Keel's DoD hook"; check "no warning when Keel's own hook is installed" 1 "$?"
+printf '%s' "$out" | grep -q "not Nonna's DoD hook"; check "no warning when Nonna's own hook is installed" 1 "$?"
 rm -rf "$TMP"
 # A pre-existing foreign pre-push hook must never be overwritten — but going
 # silent about it means the DoD gate is off without anyone knowing. Warn.
@@ -361,7 +361,7 @@ TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 mkdir -p "$TMP/.claude/hooks"; cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"
 printf '#!/bin/sh\nexit 0\n' > "$TMP/.git/hooks/pre-push"; chmod +x "$TMP/.git/hooks/pre-push"
 out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"; check "exits 0 with a foreign pre-push hook" 0 "$?"
-contains "warns that DoD is not enforced" "not Keel's DoD hook" "$out"
+contains "warns that DoD is not enforced" "not Nonna's DoD hook" "$out"
 grep -q 'exit 0' "$TMP/.git/hooks/pre-push"; check "does not overwrite the foreign hook" 0 "$?"
 rm -rf "$TMP"
 # Plugin install: the repo has no .claude/ at all — the harness lives at
@@ -458,11 +458,11 @@ fi
 echo "== bypass-resistance (review-finding regressions) =="
 SP="$HOOKS/lib/secret-patterns.sh"
 # A trailing placeholder word must NOT smuggle a real key (value-level, not line-level).
-(. "$SP" && printf 'AWS=AKIA1234567890ABCDEF # example' | keel_scan_secrets) >/dev/null; check "secret: trailing '# example' does not evade a real key" 0 "$?"
+(. "$SP" && printf 'AWS=AKIA1234567890ABCDEF # example' | nonna_scan_secrets) >/dev/null; check "secret: trailing '# example' does not evade a real key" 0 "$?"
 # AWS's own EXAMPLE key (the value itself is a placeholder) IS exempt.
-(. "$SP" && printf 'key=AKIAIOSFODNN7EXAMPLE' | keel_scan_secrets) >/dev/null; check "secret: placeholder value (…EXAMPLE) is exempt" 1 "$?"
+(. "$SP" && printf 'key=AKIAIOSFODNN7EXAMPLE' | nonna_scan_secrets) >/dev/null; check "secret: placeholder value (…EXAMPLE) is exempt" 1 "$?"
 # New high-confidence classes.
-(. "$SP" && printf 'k = "sk_live_0123456789abcdefABCD"' | keel_scan_secrets) >/dev/null; check "secret: detects Stripe sk_live_ key" 0 "$?"
+(. "$SP" && printf 'k = "sk_live_0123456789abcdefABCD"' | nonna_scan_secrets) >/dev/null; check "secret: detects Stripe sk_live_ key" 0 "$?"
 # Path allowlist is anchored to segments: an ordinary file with a 'test' substring is NOT exempt.
 printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"src/latest_config.py","content":"K=\"AKIA1234567890ABCDEF\""}}' | "$SS"; check "secret-scan: 'latest_config.py' is NOT allowlisted" 2 "$?"
 printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"src/app/tests/k.py","content":"K=\"AKIA1234567890ABCDEF\""}}' | "$SS"; check "secret-scan: a real tests/ segment IS allowlisted" 0 "$?"
@@ -691,7 +691,7 @@ rm -rf "$TMP"
 echo "== harness_lint.py (the linter is itself a gate) =="
 # A linter with no failing-case test is an unverified gate: it would still print
 # "OK" if a check silently stopped firing. Each case copies the real tree, breaks
-# exactly one thing, and asserts the linter catches it (KEEL_LINT_ROOT retargets).
+# exactly one thing, and asserts the linter catches it (NONNA_LINT_ROOT retargets).
 LINT="$ROOT/tests/harness_lint.py"
 lint_fixture() { # -> echoes a fresh copy of the harness
   local d; d="$(mktemp -d)"
@@ -701,29 +701,29 @@ lint_fixture() { # -> echoes a fresh copy of the harness
   printf '%s' "$d"
 }
 FX="$(lint_fixture)"
-KEEL_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: an unmodified copy passes (fixture is faithful)" 0 "$?"
+NONNA_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: an unmodified copy passes (fixture is faithful)" 0 "$?"
 rm -rf "$FX"
 
 # model tier: fable is a real Claude Code model and must be accepted; junk must not.
 FX="$(lint_fixture)"
 sed -i 's/^model: haiku$/model: fable/' "$FX/.claude/agents/explorer.md"
-KEEL_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: accepts model 'fable'" 0 "$?"
+NONNA_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: accepts model 'fable'" 0 "$?"
 sed -i 's/^model: fable$/model: gpt-4/' "$FX/.claude/agents/explorer.md"
-out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: rejects an unknown model tier" 1 "$?"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: rejects an unknown model tier" 1 "$?"
 contains "lint: names the offending model" "gpt-4" "$out"
 rm -rf "$FX"
 
 # slash references: a routing pointer to a command that does not exist is a dead end.
 FX="$(lint_fixture)"
 printf '\nSee `/nonexistent-command` for details.\n' >> "$FX/.claude/rules/dev-process.md"
-out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a slash ref that is not a command or skill" 1 "$?"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a slash ref that is not a command or skill" 1 "$?"
 contains "lint: names the unresolved slash reference" "/nonexistent-command" "$out"
 rm -rf "$FX"
 
 # skills are invocable as /name, so a skill reference must NOT be reported dead.
 FX="$(lint_fixture)"
 printf '\nSee `/security-review` and `/tdd-workflow` for details.\n' >> "$FX/.claude/rules/testing.md"
-KEEL_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: a skill name IS a valid slash reference" 0 "$?"
+NONNA_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: a skill name IS a valid slash reference" 0 "$?"
 rm -rf "$FX"
 
 # the token budget must actually bite (it is the mechanism locking the compression in).
@@ -731,7 +731,7 @@ FX="$(lint_fixture)"
 python3 -c "
 import sys; p=sys.argv[1]
 open(p,'a').write('\n' + ('filler ' * 5000) + '\n')" "$FX/.claude/rules/sync.md"
-out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: always-on word budget blocks bloat" 1 "$?"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: always-on word budget blocks bloat" 1 "$?"
 contains "lint: names the rule budget" "word budget" "$out"
 rm -rf "$FX"
 
@@ -739,13 +739,13 @@ rm -rf "$FX"
 # while its own step said "Push the tag" — a command that cannot run its own steps.
 FX="$(lint_fixture)"
 sed -i 's/, Bash(git push origin v:\*)//' "$FX/.claude/skills/release/SKILL.md"
-out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a command that cannot run its own git step" 1 "$?"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a command that cannot run its own git step" 1 "$?"
 contains "lint: names the ungranted git verb" "Bash(git push" "$out"
 rm -rf "$FX"
 # A negated mention ("Do not reset --hard") must not be read as a step the command runs.
 FX="$(lint_fixture)"
 printf '\nDo not use `git reset --hard` here.\n' >> "$FX/.claude/skills/rollback/SKILL.md"
-KEEL_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: a negated git mention is not an under-grant" 0 "$?"
+NONNA_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: a negated git mention is not an under-grant" 0 "$?"
 rm -rf "$FX"
 
 # Hook wiring equivalence: settings.json and hooks.json register the same gates
@@ -758,7 +758,7 @@ p = sys.argv[1]; cfg = json.load(open(p))
 cfg["hooks"]["PreToolUse"][0]["hooks"].pop()          # drop secret-scan from the plugin wiring only
 json.dump(cfg, open(p, "w"), indent=2)
 PY
-out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a gate wired in settings.json but not hooks.json" 1 "$?"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a gate wired in settings.json but not hooks.json" 1 "$?"
 contains "lint: names the desynced event" "PreToolUse" "$out"
 rm -rf "$FX"
 FX="$(lint_fixture)"
@@ -768,7 +768,7 @@ p = sys.argv[1]; cfg = json.load(open(p))
 cfg["hooks"]["SessionEnd"] = [{"hooks": [{"type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/x.sh"}]}]
 json.dump(cfg, open(p, "w"), indent=2)
 PY
-out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks an event present in only one wiring" 1 "$?"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks an event present in only one wiring" 1 "$?"
 contains "lint: names the one-sided event" "SessionEnd" "$out"
 rm -rf "$FX"
 
@@ -777,26 +777,26 @@ FX="$(lint_fixture)"
 python3 -c "
 import sys,re; p=sys.argv[1]; t=open(p).read()
 open(p,'w').write(re.sub(r'^description: .*\$', 'description: ' + 'x'*4000, t, count=1, flags=re.M))" "$FX/.claude/skills/refactoring/SKILL.md"
-out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: description budget blocks metadata creep" 1 "$?"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: description budget blocks metadata creep" 1 "$?"
 contains "lint: says descriptions load every turn" "every turn" "$out"
 rm -rf "$FX"
 # skills: preload is what makes depth outside an always-on rule deterministic --
 # a name that does not resolve silently removes the depth it was trusted to carry.
 FX="$(lint_fixture)"
 sed -i 's/^skills: tdd-workflow$/skills: no-such-skill/' "$FX/.claude/agents/test-engineer.md"
-out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks an agent preloading a nonexistent skill" 1 "$?"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks an agent preloading a nonexistent skill" 1 "$?"
 contains "lint: names the unresolved skill" "no-such-skill" "$out"
 rm -rf "$FX"
 FX="$(lint_fixture)"
 sed -i 's/^effort: low$/effort: turbo/' "$FX/.claude/agents/explorer.md"
-out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks an invalid effort level" 1 "$?"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks an invalid effort level" 1 "$?"
 rm -rf "$FX"
 # 00-core.md rides SessionStart additionalContext, which TRUNCATES at 10k rather
 # than erroring -- an overrun would silently drop the tail for plugin installs.
 FX="$(lint_fixture)"
 python3 -c "
 import sys; open(sys.argv[1],'a').write('\n' + ('padding ' * 1500))" "$FX/.claude/rules/00-core.md"
-out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a 00-core.md too big for the SessionStart channel" 1 "$?"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a 00-core.md too big for the SessionStart channel" 1 "$?"
 contains "lint: cites the truncation risk" "truncates" "$out"
 rm -rf "$FX"
 
@@ -805,14 +805,14 @@ rm -rf "$FX"
 # which rules/safety.md reserves for a human.
 FX="$(lint_fixture)"
 sed -i '/^disable-model-invocation: true$/d' "$FX/.claude/skills/release/SKILL.md"
-out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks /release the model could self-invoke" 1 "$?"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks /release the model could self-invoke" 1 "$?"
 contains "lint: ties it to the human-approval rule" "safety.md" "$out"
 rm -rf "$FX"
 
 # review-gate wiring (ADR-0005) must stay pinned: unwiring it is the defect it guards.
 FX="$(lint_fixture)"
 sed -i 's/check-review\.sh/checkreview.sh/g' "$FX/.claude/skills/ship/SKILL.md"
-out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks /ship that no longer wires check-review.sh" 1 "$?"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks /ship that no longer wires check-review.sh" 1 "$?"
 contains "lint: cites ADR-0005 on unwiring" "ADR-0005" "$out"
 rm -rf "$FX"
 
@@ -820,49 +820,49 @@ rm -rf "$FX"
 # the lean skill — so the seven rung keywords are pinned in both copies (ADR-0008).
 FX="$(lint_fixture)"
 sed -i 's/\*\*stdlib\*\*/standard library/' "$FX/.claude/rules/00-core.md"
-out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a rung dropped from the always-on ladder" 1 "$?"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a rung dropped from the always-on ladder" 1 "$?"
 contains "lint: names the missing rung" "stdlib" "$out"
 rm -rf "$FX"
 FX="$(lint_fixture)"
 sed -i 's/YAGNI/you are not going to need it/g' "$FX/.claude/skills/lean/SKILL.md"
-out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a rung dropped from the lean skill" 1 "$?"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a rung dropped from the lean skill" 1 "$?"
 contains "lint: names the drifted copy" "skills/lean/SKILL.md" "$out"
 rm -rf "$FX"
 # The debt gate is only a gate if /review runs it — ADR-0005's wiring lesson, applied again.
 FX="$(lint_fixture)"
 sed -i 's/check-debt\.sh/checkdebt.sh/g' "$FX/.claude/skills/review/SKILL.md"
-out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks /review that no longer wires check-debt.sh" 1 "$?"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks /review that no longer wires check-debt.sh" 1 "$?"
 contains "lint: cites ADR-0008 on unwiring the debt gate" "ADR-0008" "$out"
 rm -rf "$FX"
 # Proportional review is only proportional if /review asks the script, not the model.
 FX="$(lint_fixture)"
 sed -i 's/review-lanes\.sh/reviewlanes.sh/g' "$FX/.claude/skills/review/SKILL.md"
-out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks /review that no longer wires review-lanes.sh" 1 "$?"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks /review that no longer wires review-lanes.sh" 1 "$?"
 contains "lint: cites ADR-0009 on unwiring the review lanes" "ADR-0009" "$out"
 rm -rf "$FX"
 # Ideas borrowed from another project are credited in README.md and nowhere else; the
 # harness carries no external brand. The term is split so this file cannot trip the check.
 FX="$(lint_fixture)"
 printf '\nSee also pony%s.\n' 'tail' >> "$FX/.claude/skills/lean/SKILL.md"
-out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks an external project name outside README.md" 1 "$?"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks an external project name outside README.md" 1 "$?"
 contains "lint: names the file carrying the external name" "skills/lean/SKILL.md" "$out"
 contains "lint: says where credit belongs" "README.md" "$out"
 rm -rf "$FX"
 FX="$(lint_fixture)"
 printf '\nCredit: pony%s.\n' 'tail' >> "$FX/README.md"
-KEEL_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: README.md may credit the external project" 0 "$?"
+NONNA_LINT_ROOT="$FX" python3 "$LINT" >/dev/null 2>&1; check "lint: README.md may credit the external project" 0 "$?"
 rm -rf "$FX"
 
 # The review loop must not un-size what the ladder sized: a MEDIUM that only adds code is
 # answered with a debt marker, and a finding whose fix adds code names a failing input.
 FX="$(lint_fixture)"
 sed -i 's/names a failing case/is convenient/' "$FX/.claude/rules/dev-process.md"
-out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks dev-process losing the MEDIUM-names-a-failing-case rule" 1 "$?"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks dev-process losing the MEDIUM-names-a-failing-case rule" 1 "$?"
 contains "lint: names dev-process for the review-inflation rule" "missing 'names a failing case'" "$out"
 rm -rf "$FX"
 FX="$(lint_fixture)"
 sed -i 's/Does the fix add code?/Is it nice?/' "$FX/.claude/skills/code-review/references/severity-rubric.md"
-out="$(KEEL_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks the rubric losing the adds-code calibration" 1 "$?"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks the rubric losing the adds-code calibration" 1 "$?"
 contains "lint: names the rubric for the review-inflation rule" "missing 'Does the fix add code?'" "$out"
 rm -rf "$FX"
 

@@ -1,6 +1,6 @@
 # 0003 — Progressive disclosure for the token economy
 
-How Keel spends context: a tiny always-on core, depth on demand. Recorded as a load-bearing design
+How Nonna spends context: a tiny always-on core, depth on demand. Recorded as a load-bearing design
 choice.
 
 ## Status
@@ -13,7 +13,7 @@ Accepted
 
 ## Deciders
 
-Keel maintainers (owner: Shashank Kapadia)
+Nonna maintainers (owner: Shashank Kapadia)
 
 ## Context
 
@@ -23,7 +23,7 @@ also degrades the work: as a session fills, the model attends less reliably to a
 guidance that matters most is diluted by the guidance that rarely applies. Long sessions get worse, not
 better, as the window crowds.
 
-Keel needs depth — full TDD workflow, review checklists, debugging method, API-design guidance — without
+Nonna needs depth — full TDD workflow, review checklists, debugging method, API-design guidance — without
 paying for all of it on every turn.
 
 ## Options considered
@@ -42,12 +42,12 @@ paying for all of it on every turn.
      cost is minimal, the relevant depth arrives exactly when needed, and the main window stays clear
      for the actual task.
 3. **Minimal harness, no standing guidance.** Rely on the model's defaults; load nothing.
-   - Cheapest in tokens, but throws away the discipline that is Keel's entire reason to exist —
+   - Cheapest in tokens, but throws away the discipline that is Nonna's entire reason to exist —
      determinism, gating, and the loop. Cheap and unmoored.
 
 ## Decision
 
-Keel uses **progressive disclosure**, encoded in
+Nonna uses **progressive disclosure**, encoded in
 [`.claude/rules/token-economy.md`](../../.claude/rules/token-economy.md):
 
 - The **always-on surface** (`CLAUDE.md` + rules) is kept small and dense — principles, the loop, the

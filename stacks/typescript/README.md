@@ -1,4 +1,4 @@
-# Keel Stack Pack — TypeScript
+# Nonna Stack Pack — TypeScript
 
 Toolchain: **eslint + prettier** (lint + format) · **tsc** (types) · **vitest + @vitest/coverage-v8** (tests + coverage) · **fast-check** (property tests).
 

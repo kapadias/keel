@@ -6,7 +6,7 @@
 #     (test/fixture/example paths and docs/STATUS.md do not count)
 #   • no dependency manifest or lockfile touched
 #   • no critical-surface path touched (built-ins below, extendable via
-#     KEEL_CRITICAL_PATHS — a colon-separated list of shell globs)
+#     NONNA_CRITICAL_PATHS — a colon-separated list of shell globs)
 #
 # Anything else — including ANY ambiguity (not a repo, unresolvable base,
 # binary change) — exits 1: the full loop applies. The script decides lane
@@ -21,7 +21,7 @@ MAX_LINES=15
 MAX_FILES=3
 
 fail() {
-  echo "✗ fast-lane: $1 — take the full loop (rules/dev-process.md)." >&2
+  echo "✗ Nonna: this is not a snack, it's a meal. (fast-lane: $1 — take the full loop, rules/dev-process.md.)" >&2
   exit 1
 }
 
@@ -62,13 +62,13 @@ is_critical() {
     .claude/hooks/* | .claude/settings.json | .claude/skills/*/scripts/* | \
       .github/workflows/* | */migrations/* | migrations/*) return 0 ;;
   esac
-  if [ -n "${KEEL_CRITICAL_PATHS:-}" ]; then
+  if [ -n "${NONNA_CRITICAL_PATHS:-}" ]; then
     local IFS=':' g rc=1
-    # noglob: split KEEL_CRITICAL_PATHS on ':' WITHOUT pathname expansion, so a glob like
+    # noglob: split NONNA_CRITICAL_PATHS on ':' WITHOUT pathname expansion, so a glob like
     # 'src/billing/*' stays a pattern instead of being replaced by the dir's current
     # children (which would fail open exactly when the protected directory exists).
     set -f
-    for g in $KEEL_CRITICAL_PATHS; do
+    for g in $NONNA_CRITICAL_PATHS; do
       # shellcheck disable=SC2254
       case "$1" in $g)
         rc=0

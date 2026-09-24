@@ -24,12 +24,12 @@ is_protected() { case "$1" in main | master | develop) return 0 ;; *) return 1 ;
 GIT='(^|[;&|]|[[:space:]])([^[:space:]]*/)?git([[:space:]]+(-C[[:space:]]+[^[:space:]]+|-c[[:space:]]+[^[:space:]]+|--git-dir(=[^[:space:]]+|[[:space:]]+[^[:space:]]+)|--[A-Za-z][A-Za-z-]*|-[A-Za-z]))*[[:space:]]+'
 
 payload="$(cat 2>/dev/null || true)"
-tool="$(printf '%s' "$payload" | keel_json_field '.tool_name')"
+tool="$(printf '%s' "$payload" | nonna_json_field '.tool_name')"
 
 case "$tool" in
   Edit | Write | MultiEdit)
     if is_protected "$branch"; then
-      marker="$root/.git/.keel-branch-warned-$branch"
+      marker="$root/.git/.nonna-branch-warned-$branch"
       if [ ! -f "$marker" ]; then
         touch "$marker" 2>/dev/null || true
         echo "⚠️  On protected branch '$branch'. Editing is fine, but do NOT commit here — branch first: git checkout -b feature/<id>-<slug>" >&2
@@ -38,12 +38,12 @@ case "$tool" in
     exit 0
     ;;
   Bash)
-    cmd="$(printf '%s' "$payload" | keel_json_field '.tool_input.command')"
+    cmd="$(printf '%s' "$payload" | nonna_json_field '.tool_input.command')"
     [ -n "$cmd" ] || exit 0
 
     # Commit/merge while sitting on a protected branch.
     if is_protected "$branch" && printf '%s' "$cmd" | grep -qE "$GIT"'(commit|merge)([[:space:]]|$)'; then
-      echo "✗ Keel branch guard: refusing to commit on protected branch '$branch'." >&2
+      echo "✗ Nonna: not in my kitchen, tesoro. Make a branch. (branch guard: refusing to commit on protected branch '$branch'.)" >&2
       echo "  Never commit to main/master/develop (rules/git-workflow.md). Branch first:" >&2
       echo "    git checkout -b feature/<id>-<slug>" >&2
       exit 2
@@ -53,7 +53,7 @@ case "$tool" in
     if printf '%s' "$cmd" | grep -qE "$GIT"'push([[:space:]]|$)'; then
       # --all / --mirror push (or delete) every local ref, incl. protected ones.
       if printf '%s' "$cmd" | grep -qE -e '[[:space:]]--(all|mirror)([[:space:]]|=|$)'; then
-        echo "✗ Keel branch guard: refusing 'git push --all/--mirror' — it pushes (or deletes) protected refs." >&2
+        echo "✗ Nonna: one pot at a time. (branch guard: refusing 'git push --all/--mirror' — it pushes (or deletes) protected refs.)" >&2
         echo "  Push one branch explicitly: git push origin <feature-branch> (rules/git-workflow.md)." >&2
         exit 2
       fi
@@ -63,13 +63,13 @@ case "$tool" in
       # command — a commit message, a chmod +x — cannot false-block a normal push; tolerate
       # an optional opening quote so `git push origin "+main"` is still caught.
       if printf '%s' "$cmd" | grep -qE "$GIT"'push[^;&|]*[[:space:]]'"[\"']"'?\+[^[:space:]]'; then
-        echo "✗ Keel branch guard: refusing 'git push' with a +refspec — that is a force push." >&2
+        echo "✗ Nonna: we don't force things in this house. (branch guard: refusing 'git push' with a +refspec — that is a force push.)" >&2
         echo "  Force-pushing is denied (settings.json, rules/git-workflow.md); push a new commit instead." >&2
         exit 2
       fi
       # On a protected branch, or naming a protected ref as the target.
       if is_protected "$branch" || printf '%s' "$cmd" | grep -qE '(:|/|[[:space:]])(main|master|develop)([[:space:]]|$)'; then
-        echo "✗ Keel branch guard: refusing to push to a protected branch." >&2
+        echo "✗ Nonna: nobody pushes to main in my house. Open a PR. (branch guard: refusing to push to a protected branch.)" >&2
         echo "  Promote via PR (feature -> develop -> main), not a direct push (rules/git-workflow.md)." >&2
         exit 2
       fi

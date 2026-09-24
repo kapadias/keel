@@ -1,6 +1,6 @@
-# CLAUDE.md — Keel
+# CLAUDE.md — Nonna
 
-Keel is a portable `.claude/` harness that keeps AI-assisted development disciplined, test-driven,
+Nonna is a portable `.claude/` harness that keeps AI-assisted development disciplined, test-driven,
 review-gated, and safe by construction. Language- and domain-agnostic: drop it into any repository
 and the same loop applies.
 
@@ -30,6 +30,6 @@ option that preserves correctness, safety, and reproducibility over cleverness o
 ## Where things live
 
 `.claude/README.md` maps the harness. Agent and skill descriptions are already in context —
-do not re-read an index to find them. Keel installs as a plugin
+do not re-read an index to find them. Nonna installs as a plugin
 (`/plugin marketplace add kapadias/keel`); a plugin install is **not** equivalent to a copy-in
 install — see [`docs/INSTALL.md`](docs/INSTALL.md) and [ADR 0007](docs/adr/0007-plugin-install-is-not-equivalent.md).

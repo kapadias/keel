@@ -1,6 +1,6 @@
 # 0004 — Gates as code, not prose
 
-A harness that preaches gates but enforces with paragraphs fails open. Keel's hooks are blocking,
+A harness that preaches gates but enforces with paragraphs fails open. Nonna's hooks are blocking,
 deterministic, and auto-wired — locally and in CI.
 
 ## Status
@@ -13,11 +13,11 @@ Accepted
 
 ## Deciders
 
-Keel maintainers (owner: Shashank Kapadia)
+Nonna maintainers (owner: Shashank Kapadia)
 
 ## Context
 
-Keel's headline principle is "the LLM proposes; deterministic gates decide" (see
+Nonna's headline principle is "the LLM proposes; deterministic gates decide" (see
 [ADR 0002](0002-llm-proposes-gates-decide.md)). In v0.1 the gap between the principle and the
 implementation was wide:
 
@@ -77,7 +77,7 @@ of how the session started.
 
 ## Decision
 
-Keel's gates are **code, not prose**: executable, blocking, and auto-wired from the first session.
+Nonna's gates are **code, not prose**: executable, blocking, and auto-wired from the first session.
 
 - **guard-branch** exits 2 on a `git commit`/`git merge` while on `main`/`master`/`develop`, and on a
   `git push` that is on, targets (including a `refs/heads/<branch>` refspec), or `--all`/`--mirror`-spans
@@ -98,7 +98,7 @@ Keel's gates are **code, not prose**: executable, blocking, and auto-wired from 
   deliberately is not a comprehensive blunt-deny of every dangerous Bash string.
 - **CI remains the backstop.** CI (`ci.yml`) runs shellcheck, `tests/harness_lint.py`, and
   `tests/run.sh` on every push. Branch protection and GitHub secret scanning are recommended
-  repository settings, not something Keel configures. Local hooks are the first gate; CI is the
+  repository settings, not something Nonna configures. Local hooks are the first gate; CI is the
   second. A change that slips past a misconfigured local environment is still caught before merge.
 
 The governing rule lives in [`.claude/rules/boundaries.md`](../../.claude/rules/boundaries.md): when

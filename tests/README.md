@@ -1,9 +1,9 @@
-# Keel self-tests — the harness held to its own bar
+# Nonna self-tests — the harness held to its own bar
 
-Keel's thesis is _deterministic gates decide_. A harness that preaches gates must
+Nonna's thesis is _deterministic gates decide_. A harness that preaches gates must
 **prove its own gates fire** — otherwise it is the very "green suite that asserts
 nothing" it warns against ([ADR 0002](../docs/adr/0002-llm-proposes-gates-decide.md)).
-These tests are [`boundaries.md`](../.claude/rules/boundaries.md) applied to Keel
+These tests are [`boundaries.md`](../.claude/rules/boundaries.md) applied to Nonna
 itself: if a gate is silently wrong, CI goes red.
 
 ## What runs
@@ -40,7 +40,7 @@ Exercises each deterministic gate with fixed inputs and asserts the exit code:
   disqualifies over-budget, lockfile, critical-surface, and rename-into-critical
   changes; fails closed off a repo.
 - **review-lanes** (review proportionality, ADR-0009): a fast-lane-sized diff takes the light
-  lane; a risky path, risky added code, or a `KEEL_CRITICAL_PATHS` match adds the security
+  lane; a risky path, risky added code, or a `NONNA_CRITICAL_PATHS` match adds the security
   reviewer; risky words in tests alone do not. A bad base, no repo, or a missing classifier fails
   closed to the full lane with security review.
 - **dep-audit** (supply-chain): exits non-zero when a required scanner is missing
@@ -103,7 +103,7 @@ project's name anywhere but `README.md`.
 
 A linter with no failing-case test is an unverified gate: it would still print
 `OK` if a check silently stopped firing — the same unwired-gate defect ADR-0005
-exists to prevent, one level up. `KEEL_LINT_ROOT` retargets the linter at a
+exists to prevent, one level up. `NONNA_LINT_ROOT` retargets the linter at a
 different tree so `run.sh` can copy the repo, break exactly one thing, and assert
 it is caught. CI never sets the variable.
 

@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 400" role="img" aria-label="Keel — a production-grade, token-efficient harness for Claude Code" font-family="'Inter', 'Segoe UI', Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 400" role="img" aria-label="Nonna — a production-grade, token-efficient harness for Claude Code" font-family="'Inter', 'Segoe UI', Helvetica, Arial, sans-serif">
   <defs>
     <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#0a2336"/>
@@ -62,7 +62,7 @@
     <rect x="26" y="26" width="1228" height="348" rx="9" fill="none" stroke="#3a6a8c" stroke-opacity="0.10" stroke-width="1"/>
   </g>
 
-  <!-- keel mark: hull · waterline · finned bulb keel -->
+  <!-- nonna mark: hull · waterline · finned bulb nonna -->
   <g transform="translate(120 92)">
     <ellipse cx="0" cy="150" rx="58" ry="40" fill="url(#focal)"/>
     <!-- hull underbody -->
@@ -81,8 +81,8 @@
   </g>
 
   <!-- wordmark -->
-  <text x="277" y="210" font-size="112" font-weight="800" letter-spacing="3" fill="#04121e" fill-opacity="0.45">KEEL</text>
-  <text x="275" y="207" font-size="112" font-weight="800" letter-spacing="3" fill="url(#ink)">KEEL</text>
+  <text x="277" y="210" font-size="112" font-weight="800" letter-spacing="3" fill="#04121e" fill-opacity="0.45">NONNA</text>
+  <text x="275" y="207" font-size="112" font-weight="800" letter-spacing="3" fill="url(#ink)">NONNA</text>
   <rect x="279" y="229" width="312" height="6" rx="3" fill="url(#rule)"/>
 
   <!-- taglines -->

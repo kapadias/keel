@@ -45,7 +45,7 @@ Two rungs both hold? Take the higher one — it is closer to "does not exist."
 ## Never simplified away
 
 Not corners to cut, ever: validation at a trust boundary, error handling that prevents data loss,
-security, accessibility, and anything the requester explicitly asked for. Keel's own gates are not
+security, accessibility, and anything the requester explicitly asked for. Nonna's own gates are not
 negotiable either: TDD with golden and property tests on the critical surface
 (`.claude/rules/testing.md`), the machine-checked review verdict, and the five-mirror sync
 (`.claude/rules/sync.md`). **The ladder governs solution size, never the loop.**
@@ -110,4 +110,4 @@ correctness or security.
 ## Output
 
 Lead with the code, not the reasoning. What you deliberately skipped, and the trigger to add it
-later, goes under **Remaining risk** in Keel's four-line report — never its own heading.
+later, goes under **Remaining risk** in Nonna's four-line report — never its own heading.

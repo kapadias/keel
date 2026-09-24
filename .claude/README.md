@@ -1,4 +1,4 @@
-# Keel `.claude/` harness
+# Nonna `.claude/` harness
 
 The agentic developer harness for any repository. It encodes _how the work gets done_ so that
 AI-assisted development stays disciplined, test-driven, review-gated, and safe — and the
@@ -53,7 +53,7 @@ discipline is **enforced by code, not prose**. Start with [`../CLAUDE.md`](../CL
 - **`settings.json`** — denies reading secrets (`.env`/`*.pem`/`*.key`/`.ssh`/`.aws`/…) and
   `git push --force`; wires the hooks (PreToolUse, PostToolUse, SessionStart, SubagentStart, Stop,
   SubagentStop, PostCompact).
-- **`.claude-plugin/`** — `plugin.json`, so Keel installs as a Claude Code plugin.
+- **`.claude-plugin/`** — `plugin.json`, so Nonna installs as a Claude Code plugin.
 
 Companion top-level surfaces: [`../docs/OVERVIEW.md`](../docs/OVERVIEW.md) (how the pieces
 fit — token economy, crew, gates, layout), [`../tests/`](../tests/) (the harness's own gate golden tests +
@@ -95,9 +95,9 @@ Create `.claude/settings.local.json` (git-ignored) to pre-approve routine comman
 linter, `git`) and reduce permission prompts. The [`../stacks/`](../stacks/) packs ship ready-made
 `settings.local.json` allow-lists per language.
 
-## Adapting Keel to your project
+## Adapting Nonna to your project
 
-Keel is language-agnostic. To make it yours: copy a [`../stacks/`](../stacks/) pack (or set your
+Nonna is language-agnostic. To make it yours: copy a [`../stacks/`](../stacks/) pack (or set your
 test/lint commands in [`skills/test/SKILL.md`](skills/test/SKILL.md) and [`skills/ship/SKILL.md`](skills/ship/SKILL.md)),
 set your tracker's issue prefix in [`rules/git-workflow.md`](rules/git-workflow.md), and point your
 formatter in [`hooks/format.sh`](hooks/format.sh). Everything else is principle, not tooling.

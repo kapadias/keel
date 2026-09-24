@@ -1,4 +1,4 @@
-# 0006 — Distribute Keel as a plugin (zero-duplication)
+# 0006 — Distribute Nonna as a plugin (zero-duplication)
 
 One source of truth, versioned and installable. The existing `.claude/` directory is the plugin root;
 no separate distribution tree.
@@ -13,17 +13,17 @@ Accepted
 
 ## Deciders
 
-Keel maintainers (owner: Shashank Kapadia)
+Nonna maintainers (owner: Shashank Kapadia)
 
 ## Context
 
-Keel's v0.1 distribution model was **copy the `.claude/` directory** into a target repository. This
+Nonna's v0.1 distribution model was **copy the `.claude/` directory** into a target repository. This
 worked as a bootstrapping mechanism but carried compounding costs at scale:
 
-- **No versioning.** A team that copied Keel in January and another that copied it in April have
+- **No versioning.** A team that copied Nonna in January and another that copied it in April have
   silently diverged. There is no declared version, no diff, and no upgrade path. The harness that
   preaches "reconcile, don't assume" had no reconciliation mechanism for its own distribution.
-- **No discovery.** Keel was findable only by word of mouth or by knowing to look at the repository.
+- **No discovery.** Nonna was findable only by word of mouth or by knowing to look at the repository.
   The Claude Code plugin marketplace provides structured discovery — search, install, update — that a
   copy-paste workflow cannot replicate.
 - **Maintenance burden.** Bug fixes and new capabilities required every adopter to manually re-copy or
@@ -31,9 +31,9 @@ worked as a bootstrapping mechanism but carried compounding costs at scale:
   the failure mode that the sync rule ([sync.md](../../.claude/rules/sync.md)) is designed to prevent.
 
 Claude Code's plugin system addresses all three: plugins are versioned, discoverable via
-`/plugin marketplace add <owner>/<name>`, and updatable. The question is how to structure Keel as a
+`/plugin marketplace add <owner>/<name>`, and updatable. The question is how to structure Nonna as a
 plugin without introducing a second source of truth. Claude Code plugins expect component directories
-(`agents/`, `skills/`, `hooks/`, `commands/`) at the **plugin root**. Keel already has exactly this
+(`agents/`, `skills/`, `hooks/`, `commands/`) at the **plugin root**. Nonna already has exactly this
 structure — under `.claude/`. A naive approach would duplicate the tree into a `dist/` directory
 maintained separately, which trades one set of problems (no versioning) for another (two sources of
 truth that drift).
@@ -44,7 +44,7 @@ truth that drift).
    Document it better; add a CHANGELOG.
    - Adds a CHANGELOG, which is net positive regardless. But it does not solve versioning (adopters
      still pin nothing), discovery (the marketplace is still unavailable), or the update path (still
-     manual re-copy). Keel's own distribution would contradict the sync and reconciliation discipline
+     manual re-copy). Nonna's own distribution would contradict the sync and reconciliation discipline
      it enforces on every project it governs.
 
 2. **Duplicate into a `dist/` plugin tree.** Build a release step that copies `.claude/` into
@@ -72,7 +72,7 @@ truth that drift).
 
 ## Decision
 
-Keel is distributed as a Claude Code plugin whose **root is the existing `.claude/` directory**.
+Nonna is distributed as a Claude Code plugin whose **root is the existing `.claude/` directory**.
 
 - `.claude/.claude-plugin/plugin.json` is the plugin manifest: it declares the plugin name,
   version, and description; it declares no component paths — Claude Code discovers `agents/`,
@@ -85,7 +85,7 @@ Keel is distributed as a Claude Code plugin whose **root is the existing `.claud
 - The plugin is installable via `/plugin marketplace add kapadias/keel` and updatable in place.
   Standalone-copy adoption continues to work unchanged — the plugin structure is additive, not a
   replacement.
-- The permission-posture limitation is documented in `docs/INSTALL.md`: adopters must add Keel's
+- The permission-posture limitation is documented in `docs/INSTALL.md`: adopters must add Nonna's
   deny-list entries to their own project `settings.json`. A template block is provided; the install
   documentation makes the required manual step explicit and mechanical.
 
@@ -95,7 +95,7 @@ Keel is distributed as a Claude Code plugin whose **root is the existing `.claud
   A change to `.claude/rules/boundaries.md` is immediately reflected in the published plugin; there is
   no sync step, no release copy, and no opportunity for the two to diverge.
 - **Versioned and discoverable.** Adopters install a declared version and receive updates through the
-  standard plugin mechanism. The CHANGELOG is the migration guide. Keel's own harness now satisfies
+  standard plugin mechanism. The CHANGELOG is the migration guide. Nonna's own harness now satisfies
   the sync discipline it imposes on others.
 - **Standalone copy still works.** Teams that prefer to fork the `.claude/` directory and own their
   own copy are unaffected. The plugin structure is purely additive metadata.

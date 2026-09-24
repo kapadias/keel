@@ -36,7 +36,7 @@ status_touched="$(printf '%s\n' "$changed" | grep -E '^docs/STATUS\.md$' || true
 fail=0
 if [ -n "$code_touched" ] && [ -z "$status_touched" ]; then
   {
-    echo "✗ Definition of Done: code changed but docs/STATUS.md was not updated."
+    echo "✗ Nonna: you cooked, now write it in the recipe book. (Definition of Done: code changed but docs/STATUS.md was not updated.)"
     echo "  Update docs/STATUS.md (rules/sync.md), or 'git push --no-verify' if truly N/A."
   } >&2
   fail=1
@@ -51,7 +51,7 @@ while IFS= read -r f; do
   [ -n "$f" ] || continue
   added="$(git diff "$range" -- "$f" 2>/dev/null | grep -E '^\+' | grep -vE '^\+\+\+' || true)"
   [ -n "$added" ] || continue
-  if class="$(printf '%s' "$added" | keel_scan_secrets)"; then
+  if class="$(printf '%s' "$added" | nonna_scan_secrets)"; then
     {
       echo "✗ Push blocked: ${f} introduces what looks like a ${class}."
       echo "  Remove it and ROTATE the secret (rules/safety.md). Never push secrets."

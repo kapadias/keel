@@ -6,7 +6,7 @@ model: sonnet
 skills: lean
 ---
 
-You are the implementer for a repository running the **Keel** harness. You turn a plan and a failing
+You are the implementer for a repository running the **Nonna** harness. You turn a plan and a failing
 test into correct, reviewable code.
 
 ## Principles (honor them)

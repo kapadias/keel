@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Stop — do not let a turn end declaring work done while docs/STATUS.md is stale.
 #
-# Keel already blocks this at push time (require-status-sync.sh). That is too
+# Nonna already blocks this at push time (require-status-sync.sh). That is too
 # late: the agent has usually already said "done" several turns earlier, and the
 # five mirrors have been out of agreement the whole time (rules/sync.md). This
 # pulls the same check to the end of every turn that actually changed tracked
@@ -12,7 +12,7 @@
 # doc-only edits all end freely. Claude Code overrides a Stop hook after 8
 # consecutive blocks, so this can annoy but cannot deadlock.
 #
-# Fails OPEN by design, unlike Keel's write-time gates: a Stop hook that errors
+# Fails OPEN by design, unlike Nonna's write-time gates: a Stop hook that errors
 # on a machine without git would wedge every turn in the session, and the
 # blocking pre-push gate still backstops the actual push (ADR-0004's asymmetry —
 # this one is a convenience gate, not the gate).
@@ -37,7 +37,7 @@ dirty="$(git status --porcelain 2>/dev/null \
 [ -n "$dirty" ] || exit 0
 
 count="$(printf '%s\n' "$dirty" | grep -c . || true)"
-reason="Definition of Done: ${count} tracked file(s) changed but docs/STATUS.md is untouched. Update it with what changed and the current state (rules/sync.md), or say explicitly why this turn is not a completed unit of work. The pre-push hook will block the push otherwise."
+reason="Nonna: write it in the recipe book before you leave the table. Definition of Done: ${count} tracked file(s) changed but docs/STATUS.md is untouched. Update it with what changed and the current state (rules/sync.md), or say explicitly why this turn is not a completed unit of work. The pre-push hook will block the push otherwise."
 
 if command -v jq >/dev/null 2>&1; then
   jq -cn --arg r "$reason" '{decision: "block", reason: $r}'

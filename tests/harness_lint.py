@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Keel harness linter — the harness validated against its own rules.
+"""Nonna harness linter — the harness validated against its own rules.
 
 Every check below fails the build (boundaries.md: deterministic gates decide):
   - agents: valid frontmatter (name/description/model/tools); model in the
@@ -10,7 +10,7 @@ Every check below fails the build (boundaries.md: deterministic gates decide):
   - cross-links: every intra-repo markdown link resolves to a real file.
   - slash refs: every `/name` named in the harness resolves to a command or skill.
   - domain leak: no domain-specific vocabulary in a domain-agnostic harness.
-  - external names: a project whose ideas Keel adapted is credited in README.md
+  - external names: a project whose ideas Nonna adapted is credited in README.md
     and named nowhere else.
   - the ladder: the seven rung keywords appear in both 00-core.md (always-on)
     and skills/lean/SKILL.md (depth), so the two copies cannot drift (ADR-0008).
@@ -18,7 +18,7 @@ Every check below fails the build (boundaries.md: deterministic gates decide):
   - review inflation: dev-process §4 and the severity rubric keep the rule that a
     review ask which adds code must name a failing input (ADR-0008).
 
-KEEL_LINT_ROOT points the linter at a different tree. It exists so tests/run.sh
+NONNA_LINT_ROOT points the linter at a different tree. It exists so tests/run.sh
 can golden-test the linter itself against mutated copies of this repo — a linter
 with no failing-case test is an unverified gate. CI never sets it.
 """
@@ -31,7 +31,7 @@ import os
 import re
 import sys
 
-ROOT = os.environ.get("KEEL_LINT_ROOT") or os.path.dirname(
+ROOT = os.environ.get("NONNA_LINT_ROOT") or os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))
 )
 offenders: list[str] = []
@@ -339,7 +339,7 @@ for rel, phrase in (
         bad(f"review-inflation rule: missing {rel}")
 
 # --- external names: credit lives in README.md and nowhere else ---
-# Keel adapts ideas from other projects; the credit line in the root README is the
+# Nonna adapts ideas from other projects; the credit line in the root README is the
 # one place their names appear. Everything the harness ships stays brand-free. The
 # term is assembled at runtime so this file cannot trip its own check.
 EXTERNAL_NAMES = ("pony" + "tail",)
@@ -526,7 +526,7 @@ if os.path.isfile(plugin_hooks):
     for _event, entries in (ph.get("hooks") or {}).items():
         for entry in entries:
             for hook in entry.get("hooks", []):
-                # The keel plugin's root is .claude/ (marketplace source "./.claude").
+                # The nonna plugin's root is .claude/ (marketplace source "./.claude").
                 m = re.search(
                     r"\$\{CLAUDE_PLUGIN_ROOT\}/(\S+\.sh)", hook.get("command", "")
                 )

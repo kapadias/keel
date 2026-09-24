@@ -1,9 +1,15 @@
 # Changelog
 
-All notable changes to Keel. Format follows [Keep a Changelog](https://keepachangelog.com/1.1.0/);
+All notable changes to Nonna. Format follows [Keep a Changelog](https://keepachangelog.com/1.1.0/);
 versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Changed
+
+- **Keel is now Nonna** (ADR-0010). The plugin id is `nonna@nonna`, environment variables are
+  `NONNA_*` (for example `NONNA_CRITICAL_PATHS`), and gate messages open with a line in her voice
+  before the technical reason. Reinstall the plugin under the new id.
 
 ### Added
 
@@ -44,9 +50,9 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **README says what Keel is and why**, with Keel measured against a bare agent, not against its
+- **README says what Nonna is and why**, with Nonna measured against a bare agent, not against its
   own previous version; the architecture detail (token economy, layers, crew, gates,
-  repository tree) lives verbatim in the new `docs/OVERVIEW.md`, and the bare-agent-vs-Keel
+  repository tree) lives verbatim in the new `docs/OVERVIEW.md`, and the bare-agent-vs-Nonna
   benchmark is a chart.
 - **A review ask that adds code must name a failing input** (ADR-0008, amended). The severity
   rubric, `code-review`, `code-reviewer`, `implementer` and `dev-process.md` §4 ("fix MEDIUM when it
@@ -60,7 +66,7 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
   one first; `test-engineer` applies the ladder to test code without cutting the test.
 - The no-jq fallback of the SessionStart emitter now escapes its payload — a multi-line carrier
   was not valid JSON without jq.
-- **The banner carries no version and no licence.** `assets/keel-banner.svg` hardcoded `v0.1.0` and
+- **The banner carries no version and no licence.** `assets/nonna-banner.svg` hardcoded `v0.1.0` and
   `MIT` — the version was two releases stale and nobody noticed, which is the argument against
   putting expiring facts in a hand-edited image. The `License` and `release` badges are gone from the
   README header for the same reason. The live version lives in `CHANGELOG.md` and the manifests; the

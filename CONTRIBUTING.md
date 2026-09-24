@@ -1,6 +1,6 @@
-# Contributing to Keel
+# Contributing to Nonna
 
-Keel is a portable `.claude/` operating system for disciplined, test-driven, review-gated, safe
+Nonna is a portable `.claude/` operating system for disciplined, test-driven, review-gated, safe
 AI-assisted development — the backbone that keeps you upright. Contributions are welcome and held to
 the same bar the harness enforces on everyone else.
 

@@ -1,6 +1,6 @@
 # Security Policy
 
-Keel ships scripts and hooks that run on contributors' machines, so we take reports seriously and
+Nonna ships scripts and hooks that run on contributors' machines, so we take reports seriously and
 respond quickly.
 
 ## Reporting a vulnerability
@@ -24,7 +24,7 @@ dependencies you wire in are out of scope here; report those to their respective
 
 ## Secrets posture
 
-Keel is built to keep secrets out of the loop:
+Nonna is built to keep secrets out of the loop:
 
 - **No secrets in code, logs, or prompts.** Keys and tokens live in a secret manager or a
   git-ignored `.env`, never committed and never echoed into agent context.
@@ -35,5 +35,5 @@ Keel is built to keep secrets out of the loop:
 
 ## Thank you
 
-Responsible disclosure protects everyone who relies on Keel. We appreciate the time and care it takes —
+Responsible disclosure protects everyone who relies on Nonna. We appreciate the time and care it takes —
 thank you.

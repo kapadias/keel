@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="assets/keel-banner.svg" alt="Keel — a production-grade, token-efficient harness for Claude Code" width="100%">
+<img src="assets/nonna-banner.svg" alt="Nonna — a production-grade, token-efficient harness for Claude Code" width="100%">
 
-<h1 align="center">Keel</h1>
+<h1 align="center">Nonna</h1>
 
 <p align="center">
   <em>The harness that makes your AI coding agent prove its work before anything ships.</em>
@@ -35,7 +35,7 @@ An AI coding agent is fast, tireless, and confidently wrong just often enough to
 "done" with no test. It pastes a key into a fixture. It force-pushes. It builds a 120-line class
 where one line would do, and then reviews itself and approves.
 
-Keel is a `.claude/` directory that changes that. It is the staff engineer who has been paged for
+Nonna is a `.claude/` directory that changes that. It is the staff engineer who has been paged for
 every shortcut anyone ever took: the one who asks where the test is, will not merge on the model's
 own word, and will not let "done" be declared while the docs say otherwise. Not by prompting — by
 hooks that block, scripts that decide, and a linter that keeps the whole thing small enough to read
@@ -59,8 +59,8 @@ on every turn.
 
 ## Before / after
 
-Same request, same model. Without Keel the agent edits production code, says "done," and nothing
-checked it. With Keel it writes the failing test first, then the diff, then hands you a verdict a
+Same request, same model. Without Nonna the agent edits production code, says "done," and nothing
+checked it. With Nonna it writes the failing test first, then the diff, then hands you a verdict a
 script decided and a four-line report:
 
 ```
@@ -75,19 +75,19 @@ Remaining risk: token refresh path has no property test yet (debt: tracked)
 
 ## Numbers
 
-Same model, same six tasks, with no harness and with Keel — twelve runs each, scored on hidden
+Same model, same six tasks, with no harness and with Nonna — twelve runs each, scored on hidden
 checks the agent never saw:
 
 <p align="center">
-  <img src="assets/benchmark-bare-vs-keel.svg" width="860" alt="Keel versus a bare agent on six trap tasks: both 12 of 12 correct; runs that left a test behind 0 versus 12; dependency files 0 and 0; median source lines 6.5 versus 16.5; cost per run $0.13 versus $2.82.">
+  <img src="assets/benchmark-bare-vs-nonna.svg" width="860" alt="Nonna versus a bare agent on six trap tasks: both 12 of 12 correct; runs that left a test behind 0 versus 12; dependency files 0 and 0; median source lines 6.5 versus 16.5; cost per run $0.13 versus $2.82.">
 </p>
 
 | Claude Sonnet, six trap tasks, n = 12 per arm | correct | left a test behind | added a dependency | src LOC (median) |  cost |
 | --------------------------------------------- | ------: | -----------------: | -----------------: | ---------------: | ----: |
 | **bare agent** (no harness)                   |   12/12 |               0/12 |                  0 |              6.5 | $0.13 |
-| **Keel**                                      |   12/12 |              12/12 |                  0 |             16.5 | $2.82 |
+| **Nonna**                                      |   12/12 |              12/12 |                  0 |             16.5 | $2.82 |
 
-Read it straight. On tasks this small a good model does not over-build, so Keel does not win on
+Read it straight. On tasks this small a good model does not over-build, so Nonna does not win on
 lines or price — it costs about twenty times more per change. What it buys, on every one of the
 twelve runs and on none of the bare agent's: a failing test written first, two independent
 reviews, a verdict a script decided, and a status doc that agrees with the code. Whether that is
@@ -132,16 +132,16 @@ the harness index, [`.claude/README.md`](.claude/README.md).
 
 ## Install
 
-The most effort Keel will ever ask of you:
+The most effort Nonna will ever ask of you:
 
 ```bash
-git clone https://github.com/kapadias/keel /tmp/keel
-cp -r /tmp/keel/.claude .claude && cp /tmp/keel/CLAUDE.md CLAUDE.md
-mkdir -p docs && cp /tmp/keel/docs/STATUS.md docs/STATUS.md
+git clone https://github.com/kapadias/keel /tmp/nonna
+cp -r /tmp/nonna/.claude .claude && cp /tmp/nonna/CLAUDE.md CLAUDE.md
+mkdir -p docs && cp /tmp/nonna/docs/STATUS.md docs/STATUS.md
 chmod +x .claude/hooks/*.sh      # the pre-push gate self-installs at SessionStart
 ```
 
-Or as a plugin: `/plugin marketplace add kapadias/keel`, then `/plugin install keel@keel`. A plugin
+Or as a plugin: `/plugin marketplace add kapadias/keel`, then `/plugin install nonna@nonna`. A plugin
 install is **not** equivalent to a copy-in — it cannot carry the permission posture or the other
 eight rules — see [`docs/INSTALL.md`](docs/INSTALL.md).
 
@@ -182,7 +182,7 @@ reviewers, an explorer, a debugger and a router. Who runs on what: [`docs/OVERVI
 
 ## Development
 
-Keel is held to its own bar. Before any change lands:
+Nonna is held to its own bar. Before any change lands:
 
 ```bash
 bash tests/run.sh              # gate golden tests — each hook proven to block vs. allow
@@ -207,7 +207,7 @@ You can. On a branch. Behind a `debt:` marker naming when you'll fix it. The gat
 **Does it lock me into a language?**
 No. Three small files name tooling; everything else is principle and transfers unchanged.
 
-**Why "Keel"?**
+**Why "Nonna"?**
 The part of the ship you never see, and the reason it doesn't tip.
 
 ## Credits

@@ -23,7 +23,7 @@ full loop.
    skips this.
 3. **Implement the minimal fix** (GREEN). No drive-by improvements — surgical changes only.
 4. **Eligibility — the script decides.** Run
-   `bash $KEEL/skills/fast-lane/scripts/check-trivial.sh` (`$KEEL` = the harness root announced at
+   `bash $NONNA/skills/fast-lane/scripts/check-trivial.sh` (`$NONNA` = the harness root announced at
    SessionStart; `.claude` in a standalone checkout). Non-zero means this is **not** a trivial
    change: stop and route through the full loop (`/plan` → `/tdd` → `/review` → `/ship`). Do not
    argue with the classifier.
@@ -32,7 +32,7 @@ full loop.
 6. **Single review — machine-checked.** Dispatch `code-reviewer` with `model: sonnet` (a fast-lane
    diff does not need the deep tier); write its fenced JSON verdict
    verbatim to `.claude/reviews/<sha>-code.json` (`git rev-parse --short HEAD`) and run
-   `bash $KEEL/skills/code-review/scripts/check-review.sh` on it. Non-zero blocks the ship.
+   `bash $NONNA/skills/code-review/scripts/check-review.sh` on it. Non-zero blocks the ship.
 7. **Ship.** One-line `docs/STATUS.md` entry, conventional commit, `git push -u origin <branch>`,
    PR to `develop` linked to the tracked issue.
 

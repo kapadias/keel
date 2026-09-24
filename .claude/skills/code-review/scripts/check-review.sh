@@ -120,7 +120,7 @@ case "$verdict" in
 esac
 
 if [ "$verdict" = "request_changes" ]; then
-  echo "✗ check-review: verdict is request_changes — blocking merge." >&2
+  echo "✗ Nonna tasted it: not yet. (check-review: verdict is request_changes — blocking merge.)" >&2
   exit 1
 fi
 
@@ -130,7 +130,7 @@ if [ "${offschema:-0}" -gt 0 ]; then
 fi
 
 if [ "${blocking:-0}" -gt 0 ]; then
-  echo "✗ check-review: $blocking blocking finding(s) at CRITICAL/HIGH severity — blocking merge." >&2
+  echo "✗ Nonna tasted it: not yet. (check-review: $blocking blocking finding(s) at CRITICAL/HIGH severity — blocking merge.)" >&2
   exit 1
 fi
 
@@ -144,5 +144,5 @@ if command -v jq >/dev/null 2>&1; then
     | "↷ check-review: optional: \(.path // "?"):\(.line // "?") — adds code with no failing input; leave it or mark it debt:."' >&2 || true
 fi
 
-echo "✓ check-review: no blocking findings; verdict approves." >&2
+echo "✓ Nonna tasted it: buono. (check-review: no blocking findings; verdict approves.)" >&2
 exit 0

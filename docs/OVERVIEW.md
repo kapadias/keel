@@ -1,4 +1,4 @@
-# Keel — how the pieces fit
+# Nonna — how the pieces fit
 
 The detail behind the [README](../README.md): the token economy, the layers, the crew, the gates,
 and the repository layout. The harness itself is indexed in [`.claude/README.md`](../.claude/README.md).
@@ -7,12 +7,12 @@ and the repository layout. The harness itself is indexed in [`.claude/README.md`
 
 Most "AI dev setups" fail the same way: they stuff every instruction into one always-on file. Every
 token in that file is re-read on **every** turn, the window fills, and the agent gets duller as the
-task gets longer. Keel is built the other way — **progressive disclosure**:
+task gets longer. Nonna is built the other way — **progressive disclosure**:
 
 |                 | Always-on (paid every turn)                                                                                                                             | On-demand (paid only when needed)                                         |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | **What**        | `CLAUDE.md` + 9 rules, plus the name+description of each skill, agent and workflow                                                                      | 12 skill playbooks + 15 pipeline workflows + 8 agents — bodies only       |
-| **Footprint**   | **~7.1k tokens** — 3,690 words of prose (3,700-word budget) + 5,570 chars of descriptions (5,600-char budget), both enforced by `tests/harness_lint.py` | the bulk of Keel — loaded only when relevant                              |
+| **Footprint**   | **~7.1k tokens** — 3,690 words of prose (3,700-word budget) + 5,570 chars of descriptions (5,600-char budget), both enforced by `tests/harness_lint.py` | the bulk of Nonna — loaded only when relevant                              |
 | **When loaded** | Every request                                                                                                                                           | Only when a trigger matches, a workflow runs, or a subagent is dispatched |
 
 The six side-effecting workflows (`/ship`, `/release`, `/rollback`, `/adr`, `/sync`, `/intake`) carry
@@ -83,7 +83,7 @@ See [`SECURITY.md`](../SECURITY.md) for how to report a vulnerability privately.
 ## Repository structure
 
 ```
-keel/
+nonna/
 ├── CLAUDE.md                  # always-on root guidance (read first)
 ├── README.md
 ├── LICENSE                    # MIT
