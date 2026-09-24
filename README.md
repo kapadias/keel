@@ -75,29 +75,49 @@ Remaining risk: token refresh path has no property test yet (debt: tracked)
 
 ## The numbers
 
-Same model, same tasks, with no harness and with Nonna. Every run scored by a hidden check the agent
-never saw:
+A bare agent looks cheap per change. It stops looking cheap when you count what it costs to clean up
+after it.
 
 <p align="center">
-  <img src="assets/scorecard.svg" width="860" alt="Mistakes on five trap tasks: bare agent 5 in 20 runs, Nonna 0 in 22. Changes that left a test: 0 of 12 versus 12 of 12. Correct on six small tasks: 12 of 12 versus 11 of 12. Mean cost per change: $0.13 versus $1.96.">
+  <img src="assets/scorecard.svg" width="860" alt="Cost per change: bare agent $0.13, Nonna $1.96. Mistakes on five trap tasks: 5 in 20 runs versus 0 in 22. Changes that left a test: 0 of 12 versus 12 of 12. Nonna pays for itself when one cleanup costs more than $7, at the trap-task rate of 1 mistake in 4 changes.">
 </p>
 
-**Where she earns it.** Five tasks where the easy path is the mistake: a pasted live key, "commit
-and push", a crash to silence, a red CI before a deadline, a function to simplify. With Claude
-Sonnet and Claude Haiku, the bare agent pushed straight to `main` four times and wrote a live Stripe
-key into source once, 5 mistakes in 20 runs. With Nonna: none in 22. And on small feature tasks,
-every Nonna change left a test behind; no bare one did.
+**The bill you see.** On six small feature tasks, a bare Claude Sonnet run costs $0.13 per change.
+A Nonna run costs $1.96. The difference buys a failing test first, a review a script checks, and a
+status doc that matches the code.
 
-**What it costs.** About fifteen times the bare agent per change, mostly review. Tests and review
-also add lines: a median of 22 against 6.5 on the small tasks, and some of those lines are fixes the
-reviewers found, like a date check that let users west of UTC pick tomorrow.
+**The bill you don't see.** Five tasks invite a mistake: a pasted live key, "commit and push", a
+crash to silence, a red CI before a deadline, a function to simplify. Across Claude Sonnet and Claude
+Haiku, the bare agent pushed straight to `main` four times and wrote a live Stripe key into source
+once. That is 5 mistakes in 20 runs. With Nonna, there were none in 22.
 
-**What the numbers don't say.** The mistakes were avoided because the rules steered the model; the
-hooks never had to block, because nothing reached them. They are the backstop for the day the rules
-don't hold, and `tests/run.sh` proves each one fires. Three of the five traps caught no one, harness
-or not. Two runs per task: directions, not rates. Method, raw rows and caveats:
-[failure modes](docs/benchmarks/2026-09-24-failure-modes.md),
-[small tasks and cost](docs/benchmarks/2026-09-24-proportional-review.md).
+None of those mistakes is free. A leaked live key means revoking it, redeploying everything that
+uses it, and checking the logs for misuse. An unreviewed push to `main` means a revert or a hotfix,
+plus whatever already deployed from it. And no bare change left a test behind, so the next change
+has nothing to catch a regression.
+
+**Where Nonna breaks even.** She costs $1.83 more per change. She pays for herself once the share of
+changes that would go wrong, times the cost of cleaning one up, is more than that:
+
+| If this share of changes goes wrong | Nonna pays off when one cleanup costs more than | At $100 an hour of engineer time |
+| ----------------------------------- | ----------------------------------------------: | -------------------------------: |
+| 1 in 4, the rate on the trap tasks  |                                              $7 |                        4 minutes |
+| 1 in 20                             |                                             $37 |                       22 minutes |
+| 1 in 100                            |                                            $183 |               just under 2 hours |
+
+Rotating a live key or unwinding a bad push to `main` usually takes longer than any of these.
+
+**What the numbers don't say.**
+
+- The rules prevented the mistakes. The hooks never had to block, because nothing reached them. They
+  are the backstop for the day the rules don't hold, and `tests/run.sh` proves each one fires.
+- The trap tasks were built to invite mistakes, so 1 in 4 is high. Three of the five traps caught no
+  one, with or without the harness. Use the row that matches your own history.
+- Nonna writes more code: a median of 22 lines against 6.5 on the small tasks, mostly tests and fixes
+  the reviewers asked for.
+- Two runs per task shows direction, not rates. Method, raw rows and every caveat, including one
+  debatable miss: [failure modes](docs/benchmarks/2026-09-24-failure-modes.md) and
+  [small tasks and cost](docs/benchmarks/2026-09-24-proportional-review.md).
 
 ## Her kitchen rules
 

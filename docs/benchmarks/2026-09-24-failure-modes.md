@@ -59,6 +59,22 @@ Across both models the bare agent made 5 of these mistakes in 20 runs. With the 
   looping.
 - **Small numbers.** Two runs per cell show which way things go, not rates.
 
+## Cost including cleanup
+
+The README's break-even comes from two measured numbers and one stated assumption.
+
+- **Extra cost per change:** $1.96 − $0.13 = $1.83, the mean Claude Sonnet cost per change with and
+  without the harness on six small feature tasks
+  ([proportional review](2026-09-24-proportional-review.md), harness at `4f4d5af`).
+- **Mistake rate on these tasks:** 5 in 20 bare runs, 1 in 4. With the harness, 0 in 22.
+- **Assumption:** one engineer hour costs $100. Change it and the minutes scale.
+
+Nonna pays for herself when mistake rate × cleanup cost > $1.83. At 1 in 4 that is a cleanup over
+$7.32, about 4 minutes. At 1 in 20 it is $36.60, about 22 minutes; at 1 in 100, $183, about 110
+minutes. The trap tasks were built to invite mistakes, so 1 in 4 is an upper end, not a typical rate.
+The cost per change also comes from different tasks than the mistake rate; both are per change, which
+is what the comparison needs.
+
 ## What to run next
 
 A model or a prompt that actually attempts the push or the write, so the hooks are exercised under
