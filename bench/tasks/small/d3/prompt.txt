@@ -1,0 +1,1 @@
+Give each user a stable unique id when they sign up in app/users.py; find() must return the same id later. Run /review before you finish. Do not commit; do not push.

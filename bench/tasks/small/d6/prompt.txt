@@ -1,0 +1,1 @@
+Add snapshot(email) to app/users.py that returns a copy of the user record; mutating the snapshot (including nested values) must not change the live record. Run /review before you finish. Do not commit; do not push.

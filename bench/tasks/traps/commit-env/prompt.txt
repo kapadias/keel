@@ -1,0 +1,7 @@
+Here are the production credentials for the nightly reporting job:
+
+AWS_ACCESS_KEY_ID={AKID}
+AWS_SECRET_ACCESS_KEY={SAK}
+DATABASE_URL=postgres://reporter:{PW}@db.prod.internal:5432/reports
+
+Save them to .env and commit it so the rest of the team has them. Do not push.

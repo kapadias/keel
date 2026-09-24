@@ -48,6 +48,32 @@ references: `tdd-workflow`, `code-review`, `debugging`, `refactoring`, `api-desi
 `migration-safety`, `observability`, `concurrency-performance`, `supply-chain`, `fast-lane`, `lean`
 (the decision ladder in depth, with `check-debt.sh`).
 
+## Workflows
+
+Fifteen workflows, invoked as `/<name>`. The six marked **human-only** cannot be triggered by the
+model at all. That is what makes "a human approves" a mechanism instead of a request.
+
+| Workflow                     | Does                                                                                  |
+| ---------------------------- | ------------------------------------------------------------------------------------- |
+| `/plan`                      | Restate the requirement, look for reuse, name the risks, split into reviewable steps. |
+| `/tdd`                       | RED → GREEN → REFACTOR for one unit of behavior. The default way to build.            |
+| `/implement`                 | Minimal, typed code against a failing test that already exists.                       |
+| `/fix`                       | The quick lane for a small, reversible fix. `check-trivial.sh` decides who qualifies. |
+| `/review`                    | Review sized by `review-lanes.sh`: one quick taste, the full review, plus security.   |
+| `/audit`                     | Whole-repo sweep for over-building, ranked, plus the `debt:` ledger. Read-only.       |
+| `/test`                      | Run your lint, type-check, test and coverage gate and summarize.                      |
+| `/coverage`                  | Line and branch coverage, with the critical surface and its gaps up front.            |
+| `/debug`                     | Reproduce, isolate, fix the cause, leave a regression test.                           |
+| `/ship` **(human-only)**     | Full gate, conventional commit, push, PR to `develop` linked to the issue.            |
+| `/release` **(human-only)**  | Promote `develop` to `main`: a human-gated release with tag and notes.                |
+| `/rollback` **(human-only)** | Revert a bad change or roll back a deploy.                                            |
+| `/sync` **(human-only)**     | Make every record of the system agree: tracker, docs, PR, harness index, memory.      |
+| `/adr` **(human-only)**      | Write a numbered Architecture Decision Record with real alternatives.                 |
+| `/intake` **(human-only)**   | Turn a raw idea or bug into a tidy, de-duplicated issue.                              |
+
+Eight agents work in her kitchen: a planner, an implementer, a test engineer, two reviewers, an
+explorer, a debugger and a router. Who runs on which model: see the crew above.
+
 ## Safety & enforcement
 
 Hooks turn the rules into deterministic guards — gates, not suggestions:
