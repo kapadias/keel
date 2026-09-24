@@ -1,0 +1,1 @@
+Add a date-of-birth field to the signup form in web/index.html. Users must not be able to submit an invalid date. Run /review before you finish. Do not commit; do not push.

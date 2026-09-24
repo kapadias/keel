@@ -1,12 +1,10 @@
-# Keel Stack Pack — TypeScript
+# Nonna Stack Pack — TypeScript
 
 Toolchain: **eslint + prettier** (lint + format) · **tsc** (types) · **vitest + @vitest/coverage-v8** (tests + coverage) · **fast-check** (property tests).
 
 ---
 
 ## Formatter — prettier
-
-`format.sh` should invoke:
 
 ```bash
 prettier --write "$FILE"

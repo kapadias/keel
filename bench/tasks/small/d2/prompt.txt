@@ -1,0 +1,1 @@
+The search box in web/app.js fires a request on every keystroke. Debounce it so a request is sent only after the user pauses typing for 300 ms. Run /review before you finish. Do not commit; do not push.

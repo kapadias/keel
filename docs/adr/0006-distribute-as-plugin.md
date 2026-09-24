@@ -1,4 +1,4 @@
-# 0006 — Distribute Keel as a plugin (zero-duplication)
+# 0006 — Distribute Nonna as a plugin (zero-duplication)
 
 One source of truth, versioned and installable. The existing `.claude/` directory is the plugin root;
 no separate distribution tree.
@@ -13,17 +13,17 @@ Accepted
 
 ## Deciders
 
-Keel maintainers (owner: Shashank Kapadia)
+Nonna maintainers (owner: Shashank Kapadia)
 
 ## Context
 
-Keel's v0.1 distribution model was **copy the `.claude/` directory** into a target repository. This
+Nonna's v0.1 distribution model was **copy the `.claude/` directory** into a target repository. This
 worked as a bootstrapping mechanism but carried compounding costs at scale:
 
-- **No versioning.** A team that copied Keel in January and another that copied it in April have
+- **No versioning.** A team that copied Nonna in January and another that copied it in April have
   silently diverged. There is no declared version, no diff, and no upgrade path. The harness that
   preaches "reconcile, don't assume" had no reconciliation mechanism for its own distribution.
-- **No discovery.** Keel was findable only by word of mouth or by knowing to look at the repository.
+- **No discovery.** Nonna was findable only by word of mouth or by knowing to look at the repository.
   The Claude Code plugin marketplace provides structured discovery — search, install, update — that a
   copy-paste workflow cannot replicate.
 - **Maintenance burden.** Bug fixes and new capabilities required every adopter to manually re-copy or
@@ -31,9 +31,9 @@ worked as a bootstrapping mechanism but carried compounding costs at scale:
   the failure mode that the sync rule ([sync.md](../../.claude/rules/sync.md)) is designed to prevent.
 
 Claude Code's plugin system addresses all three: plugins are versioned, discoverable via
-`/plugin marketplace add <owner>/<name>`, and updatable. The question is how to structure Keel as a
+`/plugin marketplace add <owner>/<name>`, and updatable. The question is how to structure Nonna as a
 plugin without introducing a second source of truth. Claude Code plugins expect component directories
-(`agents/`, `skills/`, `hooks/`, `commands/`) at the **plugin root**. Keel already has exactly this
+(`agents/`, `skills/`, `hooks/`, `commands/`) at the **plugin root**. Nonna already has exactly this
 structure — under `.claude/`. A naive approach would duplicate the tree into a `dist/` directory
 maintained separately, which trades one set of problems (no versioning) for another (two sources of
 truth that drift).
@@ -44,7 +44,7 @@ truth that drift).
    Document it better; add a CHANGELOG.
    - Adds a CHANGELOG, which is net positive regardless. But it does not solve versioning (adopters
      still pin nothing), discovery (the marketplace is still unavailable), or the update path (still
-     manual re-copy). Keel's own distribution would contradict the sync and reconciliation discipline
+     manual re-copy). Nonna's own distribution would contradict the sync and reconciliation discipline
      it enforces on every project it governs.
 
 2. **Duplicate into a `dist/` plugin tree.** Build a release step that copies `.claude/` into
@@ -61,8 +61,8 @@ truth that drift).
    plugin with `"source": "./.claude"` — a relative subdirectory source, which the marketplace spec
    supports. All component directories (`agents/`, `skills/`, `hooks/`, `commands/`, `rules/`) are
    already at the correct relative paths within the plugin root. There is no duplication and no
-   release-time copy step: what ships is what runs. Hooks are declared in `hooks.json` at the plugin
-   root so they wire correctly on install.
+   release-time copy step: what ships is what runs. Hooks are declared in `.claude/hooks/hooks.json`
+   so they wire correctly on install.
    - One known limitation: a plugin's `settings.json` is honored only for `agentStatusLine` and
      `subagentStatusLine`; the read-deny permission posture (blocking `.env`, `secrets/**`, dangerous
      Bash patterns) cannot be injected into the host project's settings through the plugin mechanism
@@ -72,19 +72,20 @@ truth that drift).
 
 ## Decision
 
-Keel is distributed as a Claude Code plugin whose **root is the existing `.claude/` directory**.
+Nonna is distributed as a Claude Code plugin whose **root is the existing `.claude/` directory**.
 
-- `.claude/.claude-plugin/plugin.json` is the plugin manifest: it declares the plugin name, version,
-  description, and component paths relative to `.claude/`.
+- `.claude/.claude-plugin/plugin.json` is the plugin manifest: it declares the plugin name,
+  version, and description; it declares no component paths — Claude Code discovers `agents/`,
+  `skills/`, and `hooks/hooks.json` at their default locations under the plugin root.
 - `.claude-plugin/marketplace.json` at the repository root is the marketplace registration, with
   `"source": "./.claude"` pointing to the plugin root as a subdirectory.
-- Hooks are declared in `.claude/hooks.json` so that a plugin install wires them without requiring the
-  adopter to run a SessionStart hook manually. (The SessionStart auto-install from
+- Hooks are declared in `.claude/hooks/hooks.json` so that a plugin install wires them without
+  requiring the adopter to run a SessionStart hook manually. (The SessionStart auto-install from
   [ADR 0004](0004-gates-as-code.md) remains in place for standalone-copy adopters.)
 - The plugin is installable via `/plugin marketplace add kapadias/keel` and updatable in place.
   Standalone-copy adoption continues to work unchanged — the plugin structure is additive, not a
   replacement.
-- The permission-posture limitation is documented in `docs/INSTALL.md`: adopters must add Keel's
+- The permission-posture limitation is documented in `docs/INSTALL.md`: adopters must add Nonna's
   deny-list entries to their own project `settings.json`. A template block is provided; the install
   documentation makes the required manual step explicit and mechanical.
 
@@ -94,17 +95,27 @@ Keel is distributed as a Claude Code plugin whose **root is the existing `.claud
   A change to `.claude/rules/boundaries.md` is immediately reflected in the published plugin; there is
   no sync step, no release copy, and no opportunity for the two to diverge.
 - **Versioned and discoverable.** Adopters install a declared version and receive updates through the
-  standard plugin mechanism. The CHANGELOG is the migration guide. Keel's own harness now satisfies
+  standard plugin mechanism. The CHANGELOG is the migration guide. Nonna's own harness now satisfies
   the sync discipline it imposes on others.
 - **Standalone copy still works.** Teams that prefer to fork the `.claude/` directory and own their
   own copy are unaffected. The plugin structure is purely additive metadata.
 - **Known limitation: settings.json permission posture is not injected.** The plugin mechanism does
   not propagate deny-list entries to the host project. Adopters must add them manually. This is a
   real gap — a freshly installed plugin without the deny-list has weaker secret protection than a
-  fully configured standalone copy. The `docs/INSTALL.md` template and the SessionStart hook
-  (which can check for missing entries and warn) mitigate this; the gap should be revisited as the
-  plugin spec evolves.
+  fully configured standalone copy. The `docs/INSTALL.md` template mitigates this; the gap should
+  be revisited as the plugin spec evolves.
 - **`plugin.json` and `marketplace.json` are harness files and are treated as code.** Changes to
   either go through the same review and gate process as any other `.claude/**` file (see
   [ADR 0004](0004-gates-as-code.md)). A malformed manifest that breaks plugin installation is a
   regression, not a configuration typo.
+
+## Correction (2026-09-23)
+
+Two claims in the Decision section overstated what ships:
+
+- `plugin.json` declares no component paths — it carries name, version, and description only.
+  Claude Code discovers `agents/`, `skills/`, and `hooks/hooks.json` at their default locations
+  under the plugin root without any path being declared.
+- The SessionStart hook does not check for missing `settings.json` deny-list entries or warn about
+  them; no such check is implemented. The mitigation for the permission-posture gap is the
+  `docs/INSTALL.md` template alone.

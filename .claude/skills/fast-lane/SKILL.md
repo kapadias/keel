@@ -24,7 +24,7 @@ into the fast lane would put the fox in charge of the henhouse — so eligibilit
   (supply-chain skill).
 - **No critical-surface path touched**: `.claude/hooks/**`, `.claude/settings.json`,
   `.claude/skills/*/scripts/**`, `.github/workflows/**`, `**/migrations/**`. Extend per-repo via
-  `KEEL_CRITICAL_PATHS` (colon-separated globs) — anything touching money, auth, persistence, or
+  `NONNA_CRITICAL_PATHS` (colon-separated globs) — anything touching money, auth, persistence, or
   irreversible actions belongs on it.
 - **No ambiguity**: not-a-repo, unresolvable base, or a binary change all exit 1. When
   classification is uncertain, the full loop applies — fail closed, per `rules/safety.md`.

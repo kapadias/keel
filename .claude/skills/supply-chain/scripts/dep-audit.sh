@@ -2,7 +2,7 @@
 # dep-audit.sh — detect the project's ecosystem(s) from lockfiles and run the
 # matching known-vulnerability scanner, failing the build on findings.
 #
-# Part of the Keel `supply-chain` skill. Fails CLOSED: if a lockfile is present
+# Part of the Nonna `supply-chain` skill. Fails CLOSED: if a lockfile is present
 # but its scanner is not installed, that is an ERROR (a skipped scan is an
 # un-run gate), not a silent pass. See .claude/rules/safety.md.
 #

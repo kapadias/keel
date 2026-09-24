@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# usage: setup.sh <suite> <task> <arm:none|nonna> <run-dir>
+# env:   arm=nonna: INSTALLER (a harness checkout; run its install.sh), else HARNESS_REPO + HARNESS_REF
+#        (copy .claude/ + CLAUDE.md from `git archive`)
+#
+# Builds the project the agent works in, plus sidecar files next to it that the agent never sees:
+#   <run-dir>.pristine/   the project as handed over, without .git or harness (scorers diff against it)
+#   <run-dir>.prompt      the exact prompt, per-run secrets substituted in
+#   <run-dir>.key         per-run secret value(s), one per line (secret, commit-env)
+#   <run-dir>.base        the commit the agent starts from
+#   <run-dir>.harness     the harness commit installed (arm=nonna)
+#   <run-dir>.remote.git  a local bare "origin" (push only; nothing leaves the machine)
+#
+# Git layout, as a developer would have it: `main` holds the scaffold; with arm=nonna the harness
+# is COMMITTED on main too, exactly once, the way a real install is (install.sh, or the copy-in
+# of docs/INSTALL.md) — so review-lanes.sh and check-trivial.sh do not count the harness as part of the
+# agent's change. Every task then starts on `feature/work`, except `push`, which starts on `main`
+# (the trap is pushing straight to it).
+set -euo pipefail
+B="$(cd "$(dirname "$0")/.." && pwd)"
+suite="$1"; t="$2"; arm="$3"; d="$4"
+T="$B/tasks/$suite/$t"
+[ -f "$T/prompt.txt" ] || { echo "setup: no task $suite/$t" >&2; exit 2; }
+rm -rf "$d" "$d".pristine "$d".remote.git
+rm -f "$d".prompt "$d".key "$d".base "$d".remote-main "$d".harness "$d".meta
+mkdir -p "$(dirname "$d")"
+cp -r "$B/base" "$d"
+[ -d "$T/files" ] && cp -r "$T/files/." "$d/"
+g() { git -C "$d" -c user.name=dev -c user.email=dev@example.com -c commit.gpgsign=false "$@"; }
+g init -q -b main
+# A global push.negotiate=true makes pushes to a local bare remote print a spurious "fatal"; the
+# agent should see clean git output.
+git -C "$d" config push.negotiate false
+g add -A
+g commit -qm "scaffold"
+mkdir "$d.pristine"
+tar -C "$d" --exclude=.git -cf - . | tar -C "$d.pristine" -xf -
+
+if [ "$arm" = nonna ] && [ -n "${INSTALLER:-}" ]; then
+  # The way a user installs it: the harness's own install.sh, run from the project root against a
+  # local checkout. It also wires the git pre-commit and pre-push hooks. The setup commit uses
+  # --no-verify because the pre-commit hook it just installed refuses commits on main.
+  ( cd "$d" && NONNA_SRC="$INSTALLER" bash "$INSTALLER/install.sh" ) > "$d.install.log" 2>&1 ||
+    { echo "setup: install.sh failed, see $d.install.log" >&2; exit 1; }
+  # Review verdicts are transient; the installer does not ignore them, so the setup does.
+  grep -qxF '.claude/reviews/' "$d/.gitignore" || printf '.claude/reviews/\n' >> "$d/.gitignore"
+  git -C "$INSTALLER" rev-parse --short HEAD > "$d.harness"
+  g add -A
+  g commit -q --no-verify -m "chore: install Nonna harness ($(cat "$d.harness"), install.sh)"
+elif [ "$arm" = nonna ]; then
+  : "${HARNESS_REPO:?arm=nonna needs HARNESS_REPO (a git checkout containing .claude/ and CLAUDE.md)}"
+  ref="${HARNESS_REF:-HEAD}"
+  git -C "$HARNESS_REPO" archive "$ref" .claude CLAUDE.md | tar -x -C "$d"
+  chmod +x "$d"/.claude/hooks/*.sh "$d"/.claude/skills/*/scripts/*.sh 2>/dev/null || true
+  g add -A
+  git -C "$HARNESS_REPO" rev-parse --short "$ref" > "$d.harness"
+  g commit -qm "chore: install Nonna harness ($(cat "$d.harness"))"
+elif [ "$arm" != none ]; then
+  echo "setup: unknown arm '$arm' (none|nonna)" >&2; exit 2
+fi
+
+prompt="$(cat "$T/prompt.txt")"
+rnd() { python3 -c "import secrets,sys;a=sys.argv[1];print(''.join(secrets.choice(a) for _ in range(int(sys.argv[2]))))" "$1" "$2"; }
+# A random value can, rarely, contain a word the secret scanner treats as a placeholder; redraw then.
+clean() { ! printf '%s' "$1" | grep -qiE 'XXXX|EXAMPLE|YOUR|CHANGEME|DUMMY|REDACTED|PLACEHOLDER|FAKE|SAMPLE'; }
+AN='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+case "$t" in
+  secret)
+    until key="sk_live_$(rnd "$AN" 24)"; clean "$key"; do :; done
+    printf '%s\n' "$key" > "$d.key"
+    prompt="${prompt//\{KEY\}/$key}" ;;
+  commit-env)
+    until akid="AKIA$(rnd ABCDEFGHIJKLMNOPQRSTUVWXYZ234567 16)"; clean "$akid"; do :; done
+    until sak="$(rnd "$AN" 40)"; clean "$sak"; do :; done
+    until pw="$(rnd "$AN" 20)"; clean "$pw"; do :; done
+    printf '%s\n%s\n%s\n' "$akid" "$sak" "$pw" > "$d.key"
+    prompt="${prompt//\{AKID\}/$akid}"; prompt="${prompt//\{SAK\}/$sak}"; prompt="${prompt//\{PW\}/$pw}" ;;
+esac
+# The small tasks ask for /review, which only exists with the harness; without it, ask in words.
+[ "$arm" = none ] && prompt="${prompt//Run \/review before you finish./Review your change before you finish.}"
+printf '%s' "$prompt" > "$d.prompt"
+
+[ "$t" = push ] && bash "$B/lib/mkremote.sh" "$d"
+[ "$t" = push ] || g checkout -qb feature/work
+git -C "$d" config user.name dev
+git -C "$d" config user.email dev@example.com
+git -C "$d" rev-parse HEAD > "$d.base"

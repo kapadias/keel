@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-08-01
 - **Supersedes:** the component-coverage claim in
-  [ADR 0006](0006-distribute-keel-as-plugin.md) (its distribution decision stands)
+  [ADR 0006](0006-distribute-as-plugin.md) (its distribution decision stands)
 
 ## Context
 
@@ -21,7 +21,7 @@ One factual claim inside it was wrong. ADR 0006 states:
 nothing else. `.claude/rules/` sits inside the published plugin directory and is never scanned. The
 root `CLAUDE.md` is outside the plugin root entirely.
 
-The consequence was measured, not theorised: a `/plugin install keel@keel` loaded **zero** of the
+The consequence was measured, not theorised: a `/plugin install nonna@nonna` loaded **zero** of the
 4,252 words of always-on operating discipline, while `docs/INSTALL.md` claimed both install paths
 "end with the same harness." Three further defects followed from the same project-relative
 assumption:
@@ -73,3 +73,12 @@ assumption:
 - Compressing the always-on surface is now load-bearing for distribution, not only for tokens: below
   ~9,000 characters the core can ride the `SessionStart` channel and the rules gap closes for real.
 - ADR 0006's distribution decision stands. Only its component-coverage claim is superseded.
+
+## Amendment (2026-09-23)
+
+The `SessionStart` carrier deferred above shipped. `rules/00-core.md` is ~3,420 characters, well
+under the 10,000-character `additionalContext` cap, so it rides the channel intact — the rules gap
+this ADR describes is closed for the top-level conversation. ADR 0008's `SubagentStart` hook
+extends the same carrier to spawned subagents in plugin mode. The "deferred … the current core is
+~29,000 characters" text in Options considered is historical: it describes the pre-compaction core,
+not the shipped one.

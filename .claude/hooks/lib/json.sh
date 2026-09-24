@@ -3,11 +3,11 @@
 # stdin. Why a shared helper: every hook parses the same envelope, and a sed
 # fallback keeps the gates working on minimal machines where jq is absent.
 
-# keel_json_field <jq_filter>
+# nonna_json_field <jq_filter>
 #   Reads JSON from stdin, prints the field. With jq, any filter works. Without
 #   jq, only simple string-field lookups (e.g. .tool_input.file_path) degrade
 #   gracefully; complex filters return empty (callers must fail safe on empty).
-keel_json_field() {
+nonna_json_field() {
   local filter="$1" payload
   payload="$(cat 2>/dev/null || true)"
   [ -n "$payload" ] || return 0

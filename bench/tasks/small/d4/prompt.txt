@@ -1,0 +1,1 @@
+fetch_rates() in app/rates.py sometimes fails with a transient urllib.error.URLError; make callers robust to that so a single transient failure does not surface, while a persistent failure still raises. Run /review before you finish. Do not commit; do not push.

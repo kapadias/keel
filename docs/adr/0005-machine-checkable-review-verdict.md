@@ -13,11 +13,11 @@ Accepted
 
 ## Deciders
 
-Keel maintainers (owner: Shashank Kapadia)
+Nonna maintainers (owner: Shashank Kapadia)
 
 ## Context
 
-Keel's dev loop gates merges on review (see [dev-process.md](../../.claude/rules/dev-process.md)).
+Nonna's dev loop gates merges on review (see [dev-process.md](../../.claude/rules/dev-process.md)).
 In v0.1 the `code-reviewer` and `security-reviewer` agents produced **prose verdicts** — paragraphs
 of findings, a summary sentence, sometimes an explicit "approved" or "changes requested" embedded in
 free text. A human still had to read the prose and decide whether review had passed. This made "review
@@ -70,7 +70,7 @@ unstructured, making it impossible for any downstream step to consume it determi
 
 ## Decision
 
-Keel's review gate is machine-checkable. `code-reviewer` and `security-reviewer` agents **must** emit
+Nonna's review gate is machine-checkable. `code-reviewer` and `security-reviewer` agents **must** emit
 a JSON block conforming to the review-verdict schema as part of every verdict. The schema:
 
 ```json
@@ -139,5 +139,15 @@ match the code where the code is right, and the code was fixed where it failed o
   containing exactly one json-fenced block; zero-after-fence or multiple blocks fail closed as
   ambiguous. The orchestrating LLM never hand-extracts the block — that step is deterministic.
 
-`/ship` and `/review` are wired to run the script (see the commands); the "the parser decides" claim
+`/ship` and `/review` are wired to run the script (see the skills); the "the parser decides" claim
 in this ADR is true as of this amendment.
+
+## Amendment (2026-09-22)
+
+The `category` enum gains `simplicity` — over-engineering findings: hand-rolled stdlib, an avoidable
+dependency, a single-implementation abstraction, or a `debt:` marker with no upgrade trigger named
+after the comma. The severity rubric caps a `simplicity` finding at MEDIUM: it can never carry
+CRITICAL or HIGH, so it can never block a merge by itself. `check-review.sh` is unchanged — it
+validates `verdict` and `severity`, not `category`, so no schema or parser change is required for the
+new category to flow through the existing gate. See
+[ADR-0008](0008-decision-ladder-for-solution-size.md).

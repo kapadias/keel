@@ -6,12 +6,12 @@ mood; it is a load-bearing classification. Calibrate it deliberately.
 
 ## The four levels
 
-| Severity     | What belongs here                                                                                                                                                             | Gate                                                  |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| **CRITICAL** | Trust-boundary breach (unvalidated input reaching a sink, authz bypass, injection); silent failure in money/data/state; **fail-open** behavior; secret committed to the repo. | Blocks merge. Non-negotiable.                         |
-| **HIGH**     | Correctness bug on a real, reachable path; missing/meaningless tests on critical logic; a swallowed error that hides failure; secret or PII in logs/traces.                   | Blocks merge.                                         |
-| **MEDIUM**   | Weak error handling, fragile assumption, missing edge case **off** the hot path, unclear or undocumented contract, a race that needs an unlikely interleaving.                | Fix when feasible; may ship with a tracked follow-up. |
-| **LOW**      | Local readability, naming, minor duplication, a comment that lies.                                                                                                            | Optional. Never block on it.                          |
+| Severity     | What belongs here                                                                                                                                                                                                  | Gate                                                                 |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| **CRITICAL** | Trust-boundary breach (unvalidated input reaching a sink, authz bypass, injection); silent failure in money/data/state; **fail-open** behavior; secret committed to the repo.                                      | Blocks merge. Non-negotiable.                                        |
+| **HIGH**     | Correctness bug on a real, reachable path; missing/meaningless tests on critical logic; a swallowed error that hides failure; secret or PII in logs/traces.                                                        | Blocks merge.                                                        |
+| **MEDIUM**   | Weak error handling, fragile assumption, missing edge case **off** the hot path, unclear or undocumented contract, a race that needs an unlikely interleaving — with a named failing input when the fix adds code. | Fix when it names a failing case; may ship with a tracked follow-up. |
+| **LOW**      | Local readability, naming, minor duplication, a comment that lies.                                                                                                                                                 | Optional. Never block on it.                                         |
 
 ## Auto-CRITICAL — no debate
 
@@ -39,9 +39,19 @@ Severity is a function of **blast radius × reachability × reversibility**:
 - **Does it fail closed or open?** Fail-open is the multiplier that turns a MEDIUM into a CRITICAL.
 - **Is there a test that would have caught it?** Missing tests on critical logic is itself HIGH —
   untested survival-critical code is incomplete, not merely thin.
+- **Does the fix add code?** Off the critical surface and outside the auto-CRITICAL list, a finding
+  whose fix _adds_ code (a bound, a branch, a type, a wrapper) must name the concrete input or
+  caller that reaches the bad path today. Hardening against inputs
+  nobody sends is a `simplicity` question, not a MEDIUM — the ladder applies to the reviewer's ask
+  as much as to the author's diff. Record it in the verdict: `"adds_code": true` and the input in
+  `"failing_input"`. `check-review.sh` lists an adds-code finding with no failing input as optional.
 
 When genuinely unsure whether something is a real defect, **do not pad the count** — mark it as a
 question, not a blocker. Ten weak HIGHs bury the one that matters and train authors to ignore the gate.
+
+**Simplicity findings** (`category: simplicity` — over-engineering, an avoidable dependency, a `debt:`
+marker with no trigger) cap at **MEDIUM**. Size never blocks a merge on its own; a CRITICAL or HIGH
+simplicity finding is a mis-classification.
 
 ## Severity → schema → gate
 

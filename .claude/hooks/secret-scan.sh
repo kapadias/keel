@@ -33,7 +33,7 @@ if printf '%s' "$payload" | grep -qE '"tool_name"[[:space:]]*:[[:space:]]*"Bash"
   secret_path='(([^[:space:]"'\'']*/)?(\.env(\.[A-Za-z0-9._-]+)?|id_rsa[A-Za-z0-9._-]*)|[^[:space:]"'\'']*\.(pem|key)|([^[:space:]"'\'']*/)?(\.ssh|\.aws|secrets)/[^[:space:]"'\'']+)(["'\''[:space:]]|$)'
   if printf '%s' "$cmd" | grep -qE "(^|[^A-Za-z])${read_verbs}[[:space:]]+([^;&|]*[[:space:]])?${secret_path}"; then
     {
-      echo "✗ Keel secret-scan: blocked — that command reads or copies a secret file."
+      echo "✗ Nonna: that drawer is private. (secret-scan: blocked — that command reads or copies a secret file.)"
       echo "  Secret files are read-denied (settings.json); reference an env var or use a"
       echo "  secret manager instead (rules/safety.md)."
     } >&2
@@ -45,7 +45,7 @@ fi
 if command -v jq >/dev/null 2>&1; then
   file="$(printf '%s' "$payload" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)"
   # Fixtures/tests/examples may legitimately contain sample secrets (anchored).
-  if keel_is_test_path "$file"; then exit 0; fi
+  if nonna_is_test_path "$file"; then exit 0; fi
   content="$(printf '%s' "$payload" \
     | jq -r '[.tool_input.content // empty, .tool_input.new_string // empty, (.tool_input.edits[]?.new_string // empty)] | join("\n")' \
       2>/dev/null || true)"
@@ -59,9 +59,9 @@ fi
 
 [ -n "${content//[$' \t\n']/}" ] || exit 0
 
-if class="$(printf '%s' "$content" | keel_scan_secrets)"; then
+if class="$(printf '%s' "$content" | nonna_scan_secrets)"; then
   {
-    echo "✗ Keel secret-scan: blocked — the content looks like a ${class}."
+    echo "✗ Nonna: you don't leave the house key under the mat. (secret-scan: blocked — the content looks like a ${class}.)"
     echo "  Never write secrets into tracked files. Use a secret manager or a"
     echo "  git-ignored .env (read-denied in settings.json); see rules/safety.md."
     echo "  False positive? Put sample values under a test/fixture/example PATH"

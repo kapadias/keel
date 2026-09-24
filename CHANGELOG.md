@@ -1,28 +1,94 @@
 # Changelog
 
-All notable changes to Keel. Format follows [Keep a Changelog](https://keepachangelog.com/1.1.0/);
+All notable changes to Nonna. Format follows [Keep a Changelog](https://keepachangelog.com/1.1.0/);
 versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
 ### Added
 
-- **Automated releases.** Pushing a `v*` tag now publishes the GitHub Release itself, with notes read
-  from this file. v1.0.0 was assembled by hand, and the hand-assembly is exactly what argued for
-  this: `git tag -F` defaults to `--cleanup=strip`, which deletes every `#`-prefixed line, so the
-  annotation lost all its markdown headings and a breaking change read like a feature. The tag is now
-  the trigger; `CHANGELOG.md` is the source of truth. The workflow refuses to publish when the
-  section is missing or empty, and refuses when the tag disagrees with the plugin manifests.
-- `.github/scripts/release-notes.sh` — the extractor, as a script rather than inline YAML so it is
-  golden-tested like every other gate here. Nine tests, including that a version matches literally so
-  `1.0.0` cannot select a `1x0x0` section. The first implementation built a dynamic regex and escaped
-  the dots; CI caught that awk's `-v` assignment strips those backslashes on some builds (mawk on the
-  runner) but not others (the same nominal version locally), leaving `.` live as a wildcard. `index()`
-  removes the class of bug rather than the instance.
+- **"Done" means the suite passes.** In the benchmark, agents said "done" on a broken suite in 16 of
+  16 bare runs and most harnessed ones: nothing deterministic ran the tests. Now the Stop hook and
+  the pre-push hook run the project's own test command (pytest, npm, go or cargo, detected; or
+  `NONNA_TEST_CMD`) whenever code changed, and refuse on red. `hooks/lib/tests.sh` holds it.
+  Detection runs only in a copy-in install; under the plugin the gate waits for an explicit
+  `NONNA_TEST_CMD`. A green tree is not re-tested at every turn end, a Stop-time timeout does not
+  block, and the pre-push gate reads the pushed range from git, so a branch's first push is gated.
+  The push scan covers every commit the remote lacks, one diff per commit, so a key in a local-only
+  base commit, or one added and removed inside the push, is caught; colour, external-diff config and
+  non-ASCII names no longer hide a line.
+- **One-command install** (`install.sh`, `--host` for eight agent hosts), host rules generated from
+  `00-core.md` (`hosts/build.py`, drift-linted), and a git `pre-commit` hook every host gets.
 
 ### Changed
 
-- **The banner carries no version and no licence.** `assets/keel-banner.svg` hardcoded `v0.1.0` and
+- **Security review of the installer and the new hooks.** `install.sh` merges into an existing
+  `.claude/`, never writes through a symlink, chmods only what it copied, and exits non-zero rather
+  than linking a git hook to a missing script. `pre-commit` reads staged file names literally and
+  binary-safe (type changes included), and fails closed when git cannot diff. The Stop hook's no-jq
+  output is valid JSON. The macOS timeout fallback kills the suite's whole process group. The
+  installer says so when your kept `.claude/settings.json` leaves Nonna's hooks unwired.
+- **Keel is now Nonna** (ADR-0010). The plugin id is `nonna@nonna`, environment variables are
+  `NONNA_*` (for example `NONNA_CRITICAL_PATHS`), and gate messages open with a line in her voice
+  before the technical reason. Reinstall the plugin under the new id.
+
+### Added
+
+- **Proportional review** (ADR-0009). `skills/review/scripts/review-lanes.sh` decides how much
+  review a diff buys: a diff the fast-lane classifier accepts gets one `code-reviewer` on the
+  cheaper tier, and the security reviewer runs only when a changed path or added line touches a
+  risky surface, on added or removed lines, in any file name, from any directory. It fails closed
+  to full review with security. `/review` itself and `/fix`'s single
+  reviewer move to the cheaper tier. Small changes start in `/fix`; off the critical surface, one
+  test that would have failed before is enough.
+- **Optional findings are named by the gate.** A verdict finding may carry `adds_code` and
+  `failing_input`. On approve, `check-review.sh` lists each adds-code finding with no failing input
+  as `optional:`, and the implementer leaves it. Exit codes unchanged.
+
+- **The decision ladder** (ADR-0008). `rules/00-core.md` now says, in seven rungs, how much code
+  to write: YAGNI, already in this codebase, stdlib, native platform, installed dependency, one
+  line, only then the minimum that works. It lives in the constitution because that is the one rule
+  a plugin install receives. Always-on prose 3,599 → 3,690 words (with the review-inflation rule
+  below), budget unchanged.
+- **`debt:` markers and `check-debt.sh`.** A `debt: <ceiling>, <upgrade trigger>` comment marks a
+  deliberate corner; the new gate under `skills/lean/scripts/` fails closed on a marker with no
+  trigger, `--range` gates only the lines a PR adds, `--ledger` prints the ledger. `/review` runs
+  it on the diff, `/sync` prints the ledger.
+- **`lean` skill** (preloaded into `implementer`) and **`/audit`** (repo-wide over-engineering
+  sweep, read-only).
+- **`category: simplicity`** in the review verdict, capped at MEDIUM — over-engineering never blocks
+  a merge alone (ADR-0005 amended; `check-review.sh` unchanged).
+- **`SubagentStart` → `subagent-start.sh`.** Under a plugin install, subagents now receive
+  `00-core.md`; `SessionStart` context was parent-only, so they had been running with no policy.
+  Standalone checkouts emit nothing (subagents load `rules/` natively). `hooks/lib/core.sh` holds
+  the shared harness-root resolution, carrier and emitter.
+- **Three lint checks** with failing-case tests: the seven rung keywords in both ladder copies;
+  `/review` and `/sync` wire `check-debt.sh`; an adapted project's name appears only in `README.md`.
+- **Automated releases.** Pushing a `v*` tag publishes the GitHub Release with notes read from this
+  file (`.github/workflows/release.yml`). It refuses to publish when the version's section is
+  missing or empty, or when the tag disagrees with the plugin manifests.
+- `.github/scripts/release-notes.sh` — the notes extractor, golden-tested like every other gate;
+  a version matches literally, so `1.0.0` cannot select a `1x0x0` section.
+
+### Changed
+
+- **README says what Nonna is and why**, with Nonna measured against a bare agent, not against its
+  own previous version; the architecture detail (token economy, layers, crew, gates,
+  repository tree) lives verbatim in the new `docs/OVERVIEW.md`, and the bare-agent-vs-Nonna
+  benchmark is a chart.
+- **A review ask that adds code must name a failing input** (ADR-0008, amended). The severity
+  rubric, `code-review`, `code-reviewer`, `implementer` and `dev-process.md` §4 ("fix MEDIUM when it
+  names a failing case; one that only adds code without one gets a `debt:` marker instead")
+  all carry it, pinned by two lint checks. Found by the first ladder eval, where the review loop turned
+  a six-line check into 25 lines.
+- `engineering.md` Simplicity now names what is never simplified away and the `debt:` marker;
+  "Reuse over rewrite" folded into `dev-process.md` §0; **Remaining risk** now includes what was
+  deliberately skipped and the trigger to add it. `code-review` gains a Complexity checklist;
+  `debugging` and `debugger` gain the grep-every-caller root-cause rule; `planner`/`/plan` ask rung
+  one first; `test-engineer` applies the ladder to test code without cutting the test.
+- The no-jq fallback of the SessionStart emitter now escapes its payload — a multi-line carrier
+  was not valid JSON without jq.
+- **The banner carries no version and no licence.** `assets/nonna-banner.svg` hardcoded `v0.1.0` and
   `MIT` — the version was two releases stale and nobody noticed, which is the argument against
   putting expiring facts in a hand-edited image. The `License` and `release` badges are gone from the
   README header for the same reason. The live version lives in `CHANGELOG.md` and the manifests; the
@@ -48,9 +114,8 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [1.0.0] — 2026-08-01 — "The Model Cannot Ship Itself"
 
-The first published release. Keel has existed since 2026-06-22 and reached v0.2.0 internally, but no
-tag or GitHub release was ever cut — the manifests claimed `0.2.0` against no artifact. This is the
-first real one.
+The first GitHub release. `v0.1.0` was tagged but never released; `v0.2.0` was neither tagged nor
+released, and the manifests claimed it against no artifact. This is the first real one.
 
 ### ⚠️ Breaking
 
@@ -124,21 +189,22 @@ first real one.
   `settings.json` permissions. Both are documented in `docs/INSTALL.md` with a copy-in remedy.
 - The plugin-path fixes are proven by golden tests that simulate `CLAUDE_PLUGIN_ROOT`, **not** by an
   observed `/plugin install`.
-- Still open from the roadmap: a statusline, orphan detection in the linter, a markdownlint CI job,
-  and behavioral (transcript-graded) evals.
+- Still open: a statusline, orphan detection in the linter, a markdownlint CI job, and a
+  behavioural eval on the failures the gates exist for.
 - Persistent agent `memory:` was evaluated and **deliberately rejected** — it is LLM-authored state
   that steers future sessions with no gate in front of it, which `boundaries.md` forbids. Adopting it
   requires an ADR and a validation gate first.
 
-## [0.2.0] — 2026-06-23 — "Gates as Code" (never published)
+## [0.2.0] — 2026-06-23 — "Gates as Code" (never tagged)
 
 Turned prose discipline into blocking scripts: `guard-branch.sh`, `secret-scan.sh`, the pre-push
 Definition-of-Done hook, the machine-checkable review verdict (ADR-0005), the `/fix` bounded fast
 lane, stack packs for python/typescript/go/rust, and plugin distribution (ADR-0006).
 
-## [0.1.0] — 2026-06-22 (never published)
+## [0.1.0] — 2026-06-22
 
 Initial harness: rules, agents, skills, commands, and the development loop — described, not yet
 enforced.
 
 [1.0.0]: https://github.com/kapadias/keel/releases/tag/v1.0.0
+[0.1.0]: https://github.com/kapadias/keel/releases/tag/v0.1.0

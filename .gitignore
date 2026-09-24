@@ -1,4 +1,4 @@
-# Secrets — never commit. Keel's settings.json also denies reading these.
+# Secrets — never commit. Nonna's settings.json also denies reading these.
 .env
 .env.*
 !.env.example

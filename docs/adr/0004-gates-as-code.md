@@ -1,6 +1,6 @@
 # 0004 — Gates as code, not prose
 
-A harness that preaches gates but enforces with paragraphs fails open. Keel's hooks are blocking,
+A harness that preaches gates but enforces with paragraphs fails open. Nonna's hooks are blocking,
 deterministic, and auto-wired — locally and in CI.
 
 ## Status
@@ -13,11 +13,11 @@ Accepted
 
 ## Deciders
 
-Keel maintainers (owner: Shashank Kapadia)
+Nonna maintainers (owner: Shashank Kapadia)
 
 ## Context
 
-Keel's headline principle is "the LLM proposes; deterministic gates decide" (see
+Nonna's headline principle is "the LLM proposes; deterministic gates decide" (see
 [ADR 0002](0002-llm-proposes-gates-decide.md)). In v0.1 the gap between the principle and the
 implementation was wide:
 
@@ -77,7 +77,7 @@ of how the session started.
 
 ## Decision
 
-Keel's gates are **code, not prose**: executable, blocking, and auto-wired from the first session.
+Nonna's gates are **code, not prose**: executable, blocking, and auto-wired from the first session.
 
 - **guard-branch** exits 2 on a `git commit`/`git merge` while on `main`/`master`/`develop`, and on a
   `git push` that is on, targets (including a `refs/heads/<branch>` refspec), or `--all`/`--mirror`-spans
@@ -96,9 +96,10 @@ Keel's gates are **code, not prose**: executable, blocking, and auto-wired from 
 - **settings.json deny-list** blocks reading secret files (`.env`, `*.pem`, `*.key`, `~/.ssh`, `~/.aws`,
   …) and `git push --force`. It is defense-in-depth, not the primary push gate — guard-branch is — so it
   deliberately is not a comprehensive blunt-deny of every dangerous Bash string.
-- **CI remains the backstop.** Branch protection, secret scanning, and status-sync checks run server-
-  side. Local hooks are the first gate; CI is the second. A change that slips past a misconfigured
-  local environment is still caught before merge.
+- **CI remains the backstop.** CI (`ci.yml`) runs shellcheck, `tests/harness_lint.py`, and
+  `tests/run.sh` on every push. Branch protection and GitHub secret scanning are recommended
+  repository settings, not something Nonna configures. Local hooks are the first gate; CI is the
+  second. A change that slips past a misconfigured local environment is still caught before merge.
 
 The governing rule lives in [`.claude/rules/boundaries.md`](../../.claude/rules/boundaries.md): when
 the safety layer and "move fast" disagree, the safety layer wins.
@@ -117,6 +118,6 @@ the safety layer and "move fast" disagree, the safety layer wins.
   are not a substitute for server-side enforcement. Both must exist. A security posture that depends on
   every developer's local environment being correctly configured is fragile; CI is the hard backstop
   that cannot be bypassed by a misconfigured clone.
-- **`.claude/**` is under version control and treated as production code.\*\* Hook scripts are reviewed,
+- **`.claude/` is under version control and treated as production code.** Hook scripts are reviewed,
   tested, and versioned with the same rigor as application code. A hook that silently fails is worse
   than no hook — it provides false assurance. Hook exit codes are tested in CI.
