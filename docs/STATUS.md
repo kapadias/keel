@@ -51,6 +51,11 @@ descriptions (5,600-char budget), both enforced by the linter.
 
 History lives in `CHANGELOG.md` and `git log`. Entries here describe the current unit of work.
 
+- **2026-09-24** — Third security review addressed before promotion to `main` (8 more tests, 362).
+  The push scan now sees merge resolutions (`--cc`), scans a URL push against that URL rather than
+  other remotes, treats a failed `git log` as a stop, reads file names NUL-safe in pre-commit and
+  pre-push, excludes a shallow clone's graft, and scans the whole push in one pass (a 1,000-commit
+  first push: 99 s before, 0.2 s after).
 - **2026-09-24** — Second security review addressed (12 more tests, 354): the push scan covers
   every commit the remote lacks, per commit, whatever the git config; tags and deletes are not
   refused; untracked files make the tree dirty for the test gate; the macOS timeout kills the
