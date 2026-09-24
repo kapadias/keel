@@ -1,66 +1,62 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="320" height="320" role="img" aria-labelledby="t d">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400" role="img" aria-labelledby="t d">
   <title id="t">Nonna</title>
-  <desc id="d">Nonna, a grandmother with a grey bun, round glasses on a chain and one raised eyebrow, holding up a wooden spoon.</desc>
-  <!-- plate -->
-  <circle cx="160" cy="160" r="156" fill="#FFF4E0"/>
-  <circle cx="160" cy="160" r="156" fill="none" stroke="#C8412B" stroke-width="8"/>
-  <circle cx="160" cy="160" r="143" fill="none" stroke="#C8412B" stroke-width="2" stroke-dasharray="3 7"/>
-  <clipPath id="plate"><circle cx="160" cy="160" r="152"/></clipPath>
-  <g clip-path="url(#plate)">
-    <!-- body: dress and apron -->
-    <path d="M58 320 C62 250 100 226 160 226 C220 226 258 250 262 320 Z" fill="#2E4A3A"/>
-    <path d="M112 320 L118 244 C135 250 185 250 202 244 L208 320 Z" fill="#FFFBF3"/>
-    <path d="M118 244 C135 250 185 250 202 244" fill="none" stroke="#C8412B" stroke-width="4"/>
-    <rect x="140" y="272" width="40" height="28" rx="6" fill="#C8412B"/>
-    <path d="M146 280 h28 M146 289 h20" stroke="#FFFBF3" stroke-width="3" stroke-linecap="round"/>
+  <desc id="d">Nonna: grey bun, big round glasses, one eyebrow up, holding a wooden spoon. Unimpressed.</desc>
+  <clipPath id="m"><circle cx="200" cy="200" r="200"/></clipPath>
+  <circle cx="200" cy="200" r="200" fill="#E14B2D"/>
+  <g clip-path="url(#m)">
+    <!-- cardigan and blouse -->
+    <path d="M44 420 C52 330 112 298 200 298 C288 298 348 330 356 420 Z" fill="#2F5D46"/>
+    <path d="M168 298 L200 356 L232 298 Z" fill="#FFF1DC"/>
+    <path d="M168 298 L200 356 L186 300 Z" fill="#264D3A"/>
+    <circle cx="150" cy="352" r="6" fill="#FFF1DC"/>
+    <circle cx="146" cy="384" r="6" fill="#FFF1DC"/>
     <!-- neck -->
-    <rect x="146" y="200" width="28" height="30" rx="10" fill="#E9B58C"/>
-    <!-- hair back and bun -->
-    <circle cx="160" cy="58" r="30" fill="#A9A6A1"/>
-    <circle cx="160" cy="58" r="30" fill="none" stroke="#8C8984" stroke-width="3"/>
-    <path d="M140 52 C150 44 170 44 180 52" fill="none" stroke="#8C8984" stroke-width="3" stroke-linecap="round"/>
-    <ellipse cx="160" cy="132" rx="72" ry="78" fill="#A9A6A1"/>
-    <!-- face -->
-    <ellipse cx="160" cy="142" rx="58" ry="66" fill="#F2C9A0"/>
-    <!-- hair front: parted, swept -->
-    <path d="M100 128 C102 88 130 70 160 70 C190 70 218 88 220 128 C204 104 184 94 160 98 C136 94 116 104 100 128 Z" fill="#BDBAB5"/>
-    <path d="M160 72 C158 84 158 92 160 98" fill="none" stroke="#8C8984" stroke-width="3" stroke-linecap="round"/>
+    <rect x="178" y="250" width="44" height="56" rx="14" fill="#E7AB86"/>
+    <!-- bun with a basil tie -->
+    <circle cx="200" cy="76" r="42" fill="#E2DED8"/>
+    <!-- hair behind the face -->
+    <ellipse cx="200" cy="186" rx="104" ry="100" fill="#E2DED8"/>
     <!-- ears and earrings -->
-    <ellipse cx="102" cy="146" rx="9" ry="14" fill="#E9B58C"/>
-    <ellipse cx="218" cy="146" rx="9" ry="14" fill="#E9B58C"/>
-    <circle cx="102" cy="164" r="4" fill="#C8412B"/>
-    <circle cx="218" cy="164" r="4" fill="#C8412B"/>
-    <!-- eyebrows: the left one is raised -->
-    <path d="M122 110 C130 100 142 99 150 104" fill="none" stroke="#6E6A64" stroke-width="5" stroke-linecap="round"/>
-    <path d="M170 118 C178 115 190 115 198 119" fill="none" stroke="#6E6A64" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="120" cy="206" r="17" fill="#E7AB86"/>
+    <circle cx="280" cy="206" r="17" fill="#E7AB86"/>
+    <circle cx="120" cy="232" r="8" fill="#E14B2D"/>
+    <circle cx="280" cy="232" r="8" fill="#E14B2D"/>
+    <!-- face -->
+    <ellipse cx="200" cy="202" rx="78" ry="86" fill="#F6C9A4"/>
+    <!-- fringe, swept to one side -->
+    <path d="M122 196 C114 132 158 108 204 110 C250 110 286 136 278 196 C268 164 246 146 214 142 C176 138 142 156 122 196 Z" fill="#E2DED8"/>
+    <path d="M204 110 C236 112 262 124 274 150 C258 138 236 132 214 132 C212 124 208 116 204 110 Z" fill="#B5AFA6"/>
+    <!-- eyebrows: the left one is up -->
+    <rect x="142" y="158" width="44" height="10" rx="5" fill="#B5AFA6" transform="rotate(-14 164 163)"/>
+    <rect x="216" y="170" width="42" height="10" rx="5" fill="#B5AFA6"/>
     <!-- glasses -->
-    <circle cx="136" cy="134" r="19" fill="#FFFFFF" fill-opacity="0.35" stroke="#2B1D14" stroke-width="4"/>
-    <circle cx="184" cy="134" r="19" fill="#FFFFFF" fill-opacity="0.35" stroke="#2B1D14" stroke-width="4"/>
-    <path d="M155 132 C158 128 162 128 165 132" fill="none" stroke="#2B1D14" stroke-width="4" stroke-linecap="round"/>
-    <path d="M117 132 L104 136 M203 132 L216 136" stroke="#2B1D14" stroke-width="3" stroke-linecap="round"/>
-    <!-- eyes: one open and looking at you, one narrowed -->
-    <circle cx="138" cy="136" r="5" fill="#2B1D14"/>
-    <circle cx="139.5" cy="134.5" r="1.6" fill="#FFFFFF"/>
-    <circle cx="182" cy="137" r="5" fill="#2B1D14"/>
-    <circle cx="183.5" cy="135.5" r="1.6" fill="#FFFFFF"/>
-    <path d="M172 129 C178 126 188 126 194 129" fill="none" stroke="#2B1D14" stroke-width="3" stroke-linecap="round"/>
-    <!-- glasses chain -->
-    <path d="M104 136 C92 170 100 200 124 214" fill="none" stroke="#D9A441" stroke-width="2.5" stroke-dasharray="1 5" stroke-linecap="round"/>
-    <path d="M216 136 C228 170 220 200 196 214" fill="none" stroke="#D9A441" stroke-width="2.5" stroke-dasharray="1 5" stroke-linecap="round"/>
+    <circle cx="164" cy="204" r="29" fill="#2A1E17"/>
+    <circle cx="164" cy="204" r="21" fill="#FCE3CD"/>
+    <circle cx="236" cy="204" r="29" fill="#2A1E17"/>
+    <circle cx="236" cy="204" r="21" fill="#FCE3CD"/>
+    <rect x="190" y="196" width="20" height="8" rx="4" fill="#2A1E17"/>
+    <rect x="124" y="198" width="14" height="7" rx="3.5" fill="#2A1E17"/>
+    <rect x="262" y="198" width="14" height="7" rx="3.5" fill="#2A1E17"/>
+    <!-- eyes: one looking at you, one unimpressed -->
+    <circle cx="166" cy="207" r="8" fill="#2A1E17"/>
+    <circle cx="169" cy="204" r="2.6" fill="#FFFFFF"/>
+    <circle cx="234" cy="209" r="8" fill="#2A1E17"/>
+    <rect x="224" y="199" width="22" height="9" fill="#FCE3CD"/>
     <!-- nose, cheeks, mouth -->
-    <path d="M160 142 C156 156 156 164 164 166" fill="none" stroke="#C98E66" stroke-width="3.5" stroke-linecap="round"/>
-    <circle cx="122" cy="166" r="10" fill="#E88C7A" fill-opacity="0.55"/>
-    <circle cx="198" cy="166" r="10" fill="#E88C7A" fill-opacity="0.55"/>
-    <path d="M142 184 C152 180 168 180 178 186" fill="none" stroke="#9E3A2A" stroke-width="4" stroke-linecap="round"/>
-    <!-- the wooden spoon, raised -->
-    <g transform="translate(8 22) rotate(6 262 214)">
-      <rect x="256" y="120" width="12" height="150" rx="6" fill="#B07A45"/>
-      <ellipse cx="262" cy="104" rx="22" ry="30" fill="#C98F57"/>
-      <ellipse cx="262" cy="104" rx="14" ry="20" fill="#B07A45"/>
+    <path d="M200 214 C188 232 190 244 204 244 C212 244 214 236 206 232 Z" fill="#E7AB86"/>
+    <circle cx="146" cy="250" r="14" fill="#F09A82"/>
+    <circle cx="254" cy="250" r="14" fill="#F09A82"/>
+    <rect x="182" y="262" width="36" height="9" rx="4.5" fill="#9A3323"/>
+    <!-- the wooden spoon -->
+    <g transform="rotate(16 304 330)">
+      <rect x="296" y="150" width="16" height="230" rx="8" fill="#D08F4E"/>
+      <ellipse cx="304" cy="132" rx="32" ry="42" fill="#D08F4E"/>
+      <ellipse cx="304" cy="128" rx="20" ry="28" fill="#A96C34"/>
     </g>
-    <!-- hand holding the spoon -->
-    <circle cx="272" cy="216" r="17" fill="#F2C9A0"/>
-    <path d="M260 208 h20 M260 216 h22 M262 224 h18" stroke="#E0AE85" stroke-width="2.5" stroke-linecap="round"/>
-    <path d="M226 262 C238 246 252 232 266 226" fill="none" stroke="#2E4A3A" stroke-width="22" stroke-linecap="round"/>
+    <!-- sleeve and hand -->
+    <path d="M250 420 C258 380 276 350 300 338 L322 372 C304 384 292 400 288 420 Z" fill="#2F5D46"/>
+    <circle cx="306" cy="332" r="24" fill="#F6C9A4"/>
+    <rect x="290" y="318" width="30" height="7" rx="3.5" fill="#E7AB86"/>
+    <rect x="290" y="330" width="32" height="7" rx="3.5" fill="#E7AB86"/>
   </g>
 </svg>
