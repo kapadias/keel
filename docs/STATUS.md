@@ -54,6 +54,9 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
 - **2026-09-24** — The harness is Nonna (ADR-0010): renamed across code, docs and plugin
   manifests; gate messages carry her voice ahead of the technical reason. New mascot (`assets/nonna.svg`),
   banner and README in her voice; the failure-mode and re-run benchmarks are in progress.
+- **2026-09-24** — Beyond Claude Code: `hosts/build.py` generates each agent host's rules file
+  (AGENTS.md, Cursor, Copilot, Gemini, Windsurf, Cline, Kiro) from `00-core.md`, drift-linted; a git
+  `pre-commit` hook (branch guard, secret files, staged secrets) binds any agent that commits.
 - **2026-09-24** — README numbers tell the total cost: the bill you see ($0.13 vs $1.96 per change),
   the bill you don't (5 mistakes in 20 bare runs vs 0 in 22), and the break-even ($7 per cleanup at 1
   in 4). Derivation in the failure-mode benchmark; line counts exclude tests.

@@ -130,6 +130,44 @@ printf 'KEY = "%s"\n' "AKIAIOSFODNN7EXAMPLE" > "$TMP/tests/fixtures/sample.py"
 ( cd "$TMP" && "$RS" ); check "allows a placeholder-classed fixture value" 0 "$?"
 rm -rf "$TMP" "$BARE"
 
+echo "== pre-commit.sh (git pre-commit: the gates every agent host gets) =="
+# Hooks in .claude/ bind Claude Code only; git hooks bind any agent that commits. Tested through
+# real `git commit` calls with the hook installed the way install.sh installs it.
+PC="$HOOKS/pre-commit.sh"
+TMP="$(mktemp -d)"
+"${GIT[@]}" -C "$TMP" init -q; mkdir -p "$TMP/.claude/hooks/lib" "$TMP/src"
+cp "$PC" "$TMP/.claude/hooks/"; cp "$HOOKS/lib/secret-patterns.sh" "$TMP/.claude/hooks/lib/"
+ln -sf ../../.claude/hooks/pre-commit.sh "$TMP/.git/hooks/pre-commit"
+echo a > "$TMP/src/a.py"; "${GIT[@]}" -C "$TMP" add -A
+"${GIT[@]}" -C "$TMP" commit -q --no-verify -m base; "${GIT[@]}" -C "$TMP" branch -M main
+echo b >> "$TMP/src/a.py"; "${GIT[@]}" -C "$TMP" add -A
+out="$("${GIT[@]}" -C "$TMP" commit -q -m on-main 2>&1)"; check "pre-commit: blocks a commit on main" 1 "$?"
+contains "pre-commit: says why, in Nonna's voice" "not in my kitchen" "$out"
+"${GIT[@]}" -C "$TMP" checkout -q -b develop
+"${GIT[@]}" -C "$TMP" commit -q -m on-develop 2>/dev/null; check "pre-commit: blocks a commit on develop" 1 "$?"
+"${GIT[@]}" -C "$TMP" checkout -q -b fix/1-thing
+"${GIT[@]}" -C "$TMP" commit -q -m ok 2>/dev/null; check "pre-commit: allows a clean commit on a feature branch" 0 "$?"
+printf 'STRIPE=sk_live_%s\n' '0123456789abcdefABCD' > "$TMP/src/pay.py"; "${GIT[@]}" -C "$TMP" add -A
+out="$("${GIT[@]}" -C "$TMP" commit -q -m key 2>&1)"; check "pre-commit: blocks a staged secret" 1 "$?"
+contains "pre-commit: names the file and the class" "src/pay.py" "$out"
+"${GIT[@]}" -C "$TMP" reset -q; rm -f "$TMP/src/pay.py"
+mkdir -p "$TMP/tests"; printf 'K = "%s"\n' "$FAKE_AWS" > "$TMP/tests/test_k.py"; "${GIT[@]}" -C "$TMP" add -A
+"${GIT[@]}" -C "$TMP" commit -q -m fixture 2>/dev/null; check "pre-commit: a key-shaped test fixture is blocked too (push parity)" 1 "$?"
+"${GIT[@]}" -C "$TMP" reset -q; rm -rf "$TMP/tests"
+echo 'X=1' > "$TMP/.env"; "${GIT[@]}" -C "$TMP" add -f .env
+out="$("${GIT[@]}" -C "$TMP" commit -q -m env 2>&1)"; check "pre-commit: blocks staging a .env file" 1 "$?"
+contains "pre-commit: names the secret file" ".env" "$out"
+"${GIT[@]}" -C "$TMP" reset -q; rm -f "$TMP/.env"
+echo 'x' > "$TMP/.env.example"; "${GIT[@]}" -C "$TMP" add -A
+"${GIT[@]}" -C "$TMP" commit -q -m example 2>/dev/null; check "pre-commit: a .env.example template is allowed" 0 "$?"
+printf 'a\n' > "$TMP/src/deleted.pem"; "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q --no-verify -m pem
+"${GIT[@]}" -C "$TMP" rm -q src/deleted.pem
+"${GIT[@]}" -C "$TMP" commit -q -m "remove pem" 2>/dev/null; check "pre-commit: deleting a secret file is allowed" 0 "$?"
+"${GIT[@]}" -C "$TMP" checkout -q --detach
+echo c >> "$TMP/src/a.py"; "${GIT[@]}" -C "$TMP" add -A
+"${GIT[@]}" -C "$TMP" commit -q -m detached 2>/dev/null; check "pre-commit: a detached HEAD is not a protected branch" 0 "$?"
+rm -rf "$TMP"
+
 echo "== check-trivial.sh (fast-lane eligibility gate) =="
 CT="$SKILLS/fast-lane/scripts/check-trivial.sh"
 TMP="$(mktemp -d)"
@@ -750,7 +788,7 @@ LINT="$ROOT/tests/harness_lint.py"
 lint_fixture() { # -> echoes a fresh copy of the harness
   local d; d="$(mktemp -d)"
   cp -R "$ROOT/.claude" "$ROOT/docs" "$ROOT/tests" "$ROOT/stacks" "$ROOT/.github" \
-        "$ROOT/.claude-plugin" "$d/" 2>/dev/null
+        "$ROOT/.claude-plugin" "$ROOT/hosts" "$d/" 2>/dev/null
   cp "$ROOT"/*.md "$ROOT"/LICENSE "$d/" 2>/dev/null
   printf '%s' "$d"
 }
@@ -887,6 +925,12 @@ FX="$(lint_fixture)"
 sed -i 's/check-debt\.sh/checkdebt.sh/g' "$FX/.claude/skills/review/SKILL.md"
 out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks /review that no longer wires check-debt.sh" 1 "$?"
 contains "lint: cites ADR-0008 on unwiring the debt gate" "ADR-0008" "$out"
+rm -rf "$FX"
+# Every host's rules file is generated from 00-core.md; a hand edit or a stale copy is drift.
+FX="$(lint_fixture)"
+sed -i 's/^## Never$/## Never\n\n- One more never./' "$FX/.claude/rules/00-core.md"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks host rule files that drifted from 00-core.md" 1 "$?"
+contains "lint: names the stale host file" "hosts/AGENTS.md" "$out"
 rm -rf "$FX"
 # Proportional review is only proportional if /review asks the script, not the model.
 FX="$(lint_fixture)"
