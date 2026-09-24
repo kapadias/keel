@@ -54,6 +54,9 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
 - **2026-09-24** — The harness is Nonna (ADR-0010): renamed across code, docs and plugin
   manifests; gate messages carry her voice ahead of the technical reason. New mascot (`assets/nonna.svg`),
   banner and README in her voice; the failure-mode and re-run benchmarks are in progress.
+- **2026-09-24** — "Done" means the suite passes: the Stop and pre-push hooks run the project's
+  test command when code changed and refuse on red (`hooks/lib/tests.sh`). The benchmark showed
+  agents claiming done on a broken suite; nothing had checked.
 - **2026-09-24** — One-command install (`install.sh`, `--host` for eight hosts): harness, host rules,
   blank STATUS, stack pack, git hooks; never overwrites. 18 golden tests.
 - **2026-09-24** — Beyond Claude Code: `hosts/build.py` generates each agent host's rules file

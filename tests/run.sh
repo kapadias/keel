@@ -94,6 +94,9 @@ mkdir -p "$TMP/src"; echo 'def f(): return 1' > "$TMP/src/app.py"
 mkdir -p "$TMP/docs"; echo 'changed' > "$TMP/docs/STATUS.md"
 "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m "update STATUS"
 ( cd "$TMP" && "$RS" ); check "allows code push with STATUS update" 0 "$?"
+out="$(cd "$TMP" && NONNA_TEST_CMD=false "$RS" 2>&1)"; check "pre-push: a red test suite blocks the push" 1 "$?"
+contains "pre-push: names the failing command" "NONNA_TEST_CMD" "$out"
+( cd "$TMP" && NONNA_TEST_CMD=true "$RS" ); check "pre-push: a green test suite lets it through" 0 "$?"
 echo 'KEY = "'"$FAKE_AWS"'"' > "$TMP/src/leak.py"
 echo 'more' >> "$TMP/docs/STATUS.md"
 "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m "leak with status"
@@ -101,7 +104,7 @@ echo 'more' >> "$TMP/docs/STATUS.md"
 # Installed AS a symlink (the way session-start wires it): must still resolve lib/.
 mkdir -p "$TMP/.claude/hooks/lib"
 cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"
-cp "$HOOKS/lib/secret-patterns.sh" "$TMP/.claude/hooks/lib/"
+cp "$HOOKS/lib/secret-patterns.sh" "$HOOKS/lib/tests.sh" "$TMP/.claude/hooks/lib/"
 ln -sf ../../.claude/hooks/require-status-sync.sh "$TMP/.git/hooks/pre-push"
 sl_out="$(cd "$TMP" && .git/hooks/pre-push 2>&1)"; sl_rc=$?
 check "blocks a secret when run via the installed symlink" 1 "$sl_rc"
@@ -639,6 +642,26 @@ printf '%s' "$out" | grep -q '"decision"'; check "docs-only + untracked scratch:
 NOGIT="$(mktemp -d)"
 printf '{}' | CLAUDE_PROJECT_DIR="$NOGIT" "$SD" >/dev/null; check "non-repo: fails open, never wedges the turn" 0 "$?"
 rm -rf "$TMP" "$NOGIT"
+# "Done" means the suite passes, not that the agent says so. The Stop hook runs the project's own
+# test command when code changed, and blocks once on red; the second stop goes through so an agent
+# that cannot fix it must say so instead of looping.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+mkdir -p "$TMP/docs" "$TMP/tests"; printf 'S\n' > "$TMP/docs/STATUS.md"; printf '[project]\nname = "x"\n' > "$TMP/pyproject.toml"
+printf 'def f():\n    return 1\n' > "$TMP/app.py"; printf 'from app import f\n\ndef test_f():\n    assert f() == 1\n' > "$TMP/tests/test_app.py"
+"${GIT[@]}" -C "$TMP" add -A >/dev/null; "${GIT[@]}" -C "$TMP" commit -qm init
+printf 'def f():\n    return 2\n' > "$TMP/app.py"; printf 'S2\n' > "$TMP/docs/STATUS.md"
+out="$(printf '{"stop_hook_active":false}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+contains "stop: a red suite blocks the turn even with STATUS updated" '"decision":"block"' "$out"
+contains "stop: says the tests said no, in Nonna's voice" "the tests say no" "$out"
+contains "stop: names the command it ran" "pytest" "$out"
+out="$(printf '{"stop_hook_active":true}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+printf '%s' "$out" | grep -q '"decision"'; check "stop: a second stop after a red block goes through (no loop)" 1 "$?"
+printf 'def f():\n    return 1\n\n\ndef g():\n    return 3\n' > "$TMP/app.py"
+out="$(printf '{"stop_hook_active":false}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+printf '%s' "$out" | grep -q '"decision"'; check "stop: a green suite with STATUS updated ends freely" 1 "$?"
+out="$(printf '{}' | NONNA_TEST_CMD=false CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+contains "stop: NONNA_TEST_CMD overrides detection" "the tests say no" "$out"
+rm -rf "$TMP"
 
 echo "== subagent-start.sh (SubagentStart: the constitution reaches subagents) =="
 # SessionStart additionalContext is parent-only, so under a plugin install every

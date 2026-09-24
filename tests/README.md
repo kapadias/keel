@@ -47,6 +47,9 @@ Exercises each deterministic gate with fixed inputs and asserts the exit code:
   or a legacy `KEEL_CRITICAL_PATHS` alone fail closed.
 - **dep-audit** (supply-chain): exits non-zero when a required scanner is missing
   (a skipped scan is not a pass).
+- **tests say no** (Stop and pre-push): when code changed, both run the project's own test
+  command (detected, or `NONNA_TEST_CMD`) and refuse on red; the Stop hook blocks once, then lets
+  an agent that cannot fix it stop and say so.
 - **stop-dod** (Stop): blocks a turn ending with tracked code changed and
   `docs/STATUS.md` untouched; lets doc-only edits, untracked scratch, and a clean
   tree end freely; fails **open** outside a git repo, because a Stop hook that

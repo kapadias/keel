@@ -5,6 +5,15 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **"Done" means the suite passes.** In the benchmark, agents said "done" on a broken suite in 16 of
+  16 bare runs and most harnessed ones: nothing deterministic ran the tests. Now the Stop hook and
+  the pre-push hook run the project's own test command (pytest, npm, go or cargo, detected; or
+  `NONNA_TEST_CMD`) whenever code changed, and refuse on red. `hooks/lib/tests.sh` holds it.
+- **One-command install** (`install.sh`, `--host` for eight agent hosts), host rules generated from
+  `00-core.md` (`hosts/build.py`, drift-linted), and a git `pre-commit` hook every host gets.
+
 ### Changed
 
 - **Keel is now Nonna** (ADR-0010). The plugin id is `nonna@nonna`, environment variables are

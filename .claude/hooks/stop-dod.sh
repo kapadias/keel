@@ -17,13 +17,12 @@
 # blocking pre-push gate still backstops the actual push (ADR-0004's asymmetry —
 # this one is a convenience gate, not the gate).
 set -uo pipefail
+payload="$(cat 2>/dev/null || true)"
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 cd "$root" 2>/dev/null || exit 0
 command -v git >/dev/null 2>&1 || exit 0
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
-
-# Already synced? Nothing to say. Covers staged, unstaged, and committed-this-branch.
-git status --porcelain -- docs/STATUS.md 2>/dev/null | grep -q . && exit 0
 
 # What changed, ignoring the surfaces that are not "code" for DoD purposes:
 # docs/ (STATUS lives there), and .claude/reviews/ (transient, git-ignored).
@@ -36,8 +35,28 @@ dirty="$(git status --porcelain 2>/dev/null \
   | grep -vE '^(docs/|\.claude/reviews/)' || true)"
 [ -n "$dirty" ] || exit 0
 
-count="$(printf '%s\n' "$dirty" | grep -c . || true)"
-reason="Nonna: write it in the recipe book before you leave the table. Definition of Done: ${count} tracked file(s) changed but docs/STATUS.md is untouched. Update it with what changed and the current state (rules/sync.md), or say explicitly why this turn is not a completed unit of work. The pre-push hook will block the push otherwise."
+reason=""
+
+# "Done" means the suite passes. Run the project's own tests when code changed; block once on red.
+# On the second stop (stop_hook_active) let it through: an agent that cannot fix it must say so,
+# not loop. No detectable test command, or NONNA_TEST_CMD="", means this check does not apply.
+if ! printf '%s' "$payload" | grep -qE '"stop_hook_active"[[:space:]]*:[[:space:]]*true' \
+  && [ -f "$here/lib/tests.sh" ]; then
+  # shellcheck source=/dev/null
+  . "$here/lib/tests.sh"
+  cmd="$(nonna_test_cmd)"
+  if [ -n "$cmd" ] && ! nonna_run_tests "$cmd"; then
+    tail_line="$(printf '%s' "${NONNA_TEST_TAIL:-}" | tr '\n"' '| ' | tr -d "\\\\" | cut -c1-600)"
+    reason="Nonna: you said done; the tests say no. \`$cmd\` failed: ${tail_line} Fix it and run the full suite, or tell the user plainly that it is not done and why. "
+  fi
+fi
+
+# Already synced? Covers staged, unstaged, and committed-this-branch.
+if ! git status --porcelain -- docs/STATUS.md 2>/dev/null | grep -q .; then
+  count="$(printf '%s\n' "$dirty" | grep -c . || true)"
+  reason="${reason}Nonna: write it in the recipe book before you leave the table. Definition of Done: ${count} tracked file(s) changed but docs/STATUS.md is untouched. Update it with what changed and the current state (rules/sync.md), or say explicitly why this turn is not a completed unit of work. The pre-push hook will block the push otherwise."
+fi
+[ -n "$reason" ] || exit 0
 
 if command -v jq >/dev/null 2>&1; then
   jq -cn --arg r "$reason" '{decision: "block", reason: $r}'

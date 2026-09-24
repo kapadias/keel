@@ -62,4 +62,20 @@ done <<EOF
 $changed
 EOF
 
+# "Done" means the suite passes: a code push runs the project's own tests (lib/tests.sh). No
+# detectable test command, or NONNA_TEST_CMD="", means this check does not apply.
+if [ -n "$code_touched" ] && [ -f "$here/lib/tests.sh" ]; then
+  # shellcheck source=/dev/null
+  . "$here/lib/tests.sh"
+  cmd="$(nonna_test_cmd)"
+  if [ -n "$cmd" ] && ! nonna_run_tests "$cmd"; then
+    {
+      echo "✗ Nonna: you said done; the tests say no. (pre-push: \`$cmd\` failed.)"
+      printf '%s\n' "${NONNA_TEST_TAIL:-}" | sed 's/^/    /'
+      echo "  Fix it, or set NONNA_TEST_CMD if that is not your test command."
+    } >&2
+    fail=1
+  fi
+fi
+
 exit "$fail"
