@@ -16,7 +16,7 @@
 
 <p align="center">
   <strong>Failing test first &middot; secrets and force-pushes blocked &middot; every review machine-checked &middot; "done" means the docs agree</strong><br>
-  <sub>Enforced by hooks and scripts, not by asking nicely: 220 golden tests prove each gate blocks what it should and allows what it should. Drop it into any repo, any language, in four commands.</sub>
+  <sub>Enforced by hooks and scripts, not by asking nicely: 238 golden tests prove each gate blocks what it should and allows what it should. Drop it into any repo, any language, in four commands.</sub>
 </p>
 
 <p align="center">

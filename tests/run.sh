@@ -517,35 +517,90 @@ printf '{}' | CLAUDE_PROJECT_DIR="$(mktemp -d)" "$PC" >/dev/null; check "non-rep
 rm -rf "$TMP"
 
 echo "== subagent-verdict.sh (SubagentStop: ADR-0005 at the boundary) =="
+# The SubagentStop payload: transcript_path is the PARENT session's transcript
+# (never the reviewer's); agent_transcript_path is the subagent's own; and
+# last_assistant_message is its final text, the authoritative source because
+# the transcript file may lag it. stop_hook_active is true once a stop hook has
+# already sent the subagent back this turn.
 SV="$HOOKS/subagent-verdict.sh"
-TR="$(mktemp -d)/t.jsonl"
-mk_transcript() { # <assistant text>
-  python3 -c "
-import json,sys
-open(sys.argv[1],'w').write(json.dumps({'type':'assistant','message':{'content':[{'type':'text','text':sys.argv[2]}]}})+chr(10))" "$TR" "$1"
+SVT="$(mktemp -d)"
+SV_PARENT="$SVT/parent.jsonl"
+printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"text","text":"Both reviewers are still running; I will gate their verdicts when they land."}]}}' > "$SV_PARENT"
+sv_payload() { # <last_assistant_message|""> [extra JSON object merged in]
+  local extra="${2:-}"; [ -n "$extra" ] || extra='{}'
+  jq -cn --arg parent "$SV_PARENT" --arg last "$1" --argjson extra "$extra" \
+    '{hook_event_name:"SubagentStop",agent_type:"code-reviewer",stop_hook_active:false,transcript_path:$parent}
+     + (if $last=="" then {} else {last_assistant_message:$last} end) + $extra'
 }
-mk_transcript 'Looks good to me, ship it.'
-out="$(printf '{"transcript_path":"%s"}' "$TR" | CLAUDE_PROJECT_DIR="$ROOT" "$SV")"
-contains "prose instead of a verdict: blocks" '"decision":"block"' "$out"
-contains "block cites ADR-0005" "ADR-0005" "$out"
-mk_transcript 'Review done.
+sv_run() { CLAUDE_PLUGIN_ROOT='' CLAUDE_PROJECT_DIR="$ROOT" "$SV"; }
+sv_blocks() { # <desc> <stdout> -- a block is top-level decision=block with a reason
+  local d; d="$(printf '%s' "$2" | jq -r 'select(.decision=="block" and (.reason|length)>0) | "block"' 2>/dev/null)"
+  if [ "$d" = "block" ]; then PASS=$((PASS + 1)); printf '  ok   %s\n' "$1"
+  else FAIL=$((FAIL + 1)); printf '  FAIL %s (expected a block, got: %s)\n' "$1" "${2:-<no output>}"; fi
+}
+sv_allows() { # <desc> <stdout> -- no decision at all means the stop proceeds
+  if [ -z "$2" ]; then PASS=$((PASS + 1)); printf '  ok   %s\n' "$1"
+  else FAIL=$((FAIL + 1)); printf '  FAIL %s (expected no output, got: %s)\n' "$1" "$2"; fi
+}
+SV_APPROVE='Review done.
 
 ```json
-{"verdict":"approve","summary":"ok","findings":[]}
+{"verdict":"approve","summary":"ok","findings":[{"severity":"LOW","path":"a.py","line":1,"category":"style","issue":"i","fix":"f"}]}
 ```'
-out="$(printf '{"transcript_path":"%s"}' "$TR" | CLAUDE_PROJECT_DIR="$ROOT" "$SV")"
-printf '%s' "$out" | grep -q '"decision"'; check "a valid approve verdict passes" 1 "$?"
-mk_transcript 'Review done.
+SV_REQUEST='Found one.
 
 ```json
+{"verdict":"request_changes","summary":"no","findings":[{"severity":"HIGH","path":"a.py","line":1,"category":"correctness","issue":"i","fix":"f"}]}
+```'
+SV_CRITICAL='```json
 {"verdict":"approve","summary":"ok","findings":[{"severity":"CRITICAL","path":"a.py","line":1,"category":"correctness","issue":"i","fix":"f"}]}
 ```'
-out="$(printf '{"transcript_path":"%s"}' "$TR" | CLAUDE_PROJECT_DIR="$ROOT" "$SV")"
-contains "approve carrying a CRITICAL finding: blocks" '"decision":"block"' "$out"
-# Fails OPEN when it cannot read anything -- /review still runs the real gate.
-printf '{"transcript_path":"/nonexistent/x.jsonl"}' | CLAUDE_PROJECT_DIR="$ROOT" "$SV" >/dev/null; check "unreadable transcript: fails open" 0 "$?"
-printf '{}' | CLAUDE_PROJECT_DIR="$ROOT" "$SV" >/dev/null; check "no transcript path: fails open" 0 "$?"
-rm -rf "$(dirname "$TR")"
+SV_OFF_SCHEMA='```json
+{"verdict":"approve","summary":"ok","findings":[{"severity":"BLOCKER","path":"a.py","line":1,"category":"correctness","issue":"i","fix":"f"}]}
+```'
+SV_PROSE='Looks good to me, ship it.'
+SV_TWO='```json
+{"verdict":"approve","summary":"a","findings":[]}
+```
+and
+```json
+{"verdict":"approve","summary":"b","findings":[]}
+```'
+out="$(sv_payload "$SV_APPROVE" | sv_run)"; check "approve in last_assistant_message: exit 0" 0 "$?"
+sv_allows "a valid approve verdict passes (parent transcript ends in prose and is never read)" "$out"
+out="$(sv_payload "$SV_REQUEST" | sv_run)"; check "request_changes: exit 0" 0 "$?"
+sv_allows "a well-formed request_changes is the reviewer doing its job: not sent back" "$out"
+# A blocking finding or an off-schema severity is checker exit 1, like a
+# request_changes; the hook cannot tell them apart without a second parser, so
+# the reviewer stops and the downstream gate -- same checker, same text -- is red.
+out="$(sv_payload "$SV_CRITICAL" | sv_run)"; sv_allows "approve carrying a CRITICAL finding: passes the hook (checker exit 1)" "$out"
+printf '%s' "$SV_CRITICAL" | bash "$CR" >/dev/null 2>&1; check "...and the downstream gate still rejects it" 1 "$?"
+out="$(sv_payload "$SV_OFF_SCHEMA" | sv_run)"; sv_allows "off-schema severity: passes the hook (checker exit 1)" "$out"
+printf '%s' "$SV_OFF_SCHEMA" | bash "$CR" >/dev/null 2>&1; check "...and the downstream gate still rejects it" 1 "$?"
+out="$(sv_payload "$SV_PROSE" | sv_run)"; check "prose instead of a verdict: exit 0 (the decision is in the JSON)" 0 "$?"
+sv_blocks "prose instead of a verdict: blocks" "$out"
+contains "block cites ADR-0005" "ADR-0005" "$out"
+out="$(sv_payload "$SV_TWO" | sv_run)"; sv_blocks "two fenced blocks (ambiguous): blocks" "$out"
+# last_assistant_message absent: fall back to the subagent's own transcript.
+SV_AGENT="$SVT/agent.jsonl"
+jq -cn --arg t "$SV_APPROVE" '{type:"assistant",message:{content:[{type:"text",text:$t}]}}' > "$SV_AGENT"
+out="$(sv_payload "" "$(jq -cn --arg p "$SV_AGENT" '{agent_transcript_path:$p}')" | sv_run)"; check "agent transcript fallback: exit 0" 0 "$?"
+sv_allows "falls back to agent_transcript_path, not the parent" "$out"
+jq -cn --arg t "$SV_PROSE" '{type:"assistant",message:{content:[{type:"text",text:$t}]}}' >> "$SV_AGENT"
+out="$(sv_payload "" "$(jq -cn --arg p "$SV_AGENT" '{agent_transcript_path:$p}')" | sv_run)"
+sv_blocks "malformed last text in the agent transcript: blocks" "$out"
+# Fails OPEN when it cannot read the reviewer's output -- /review still runs the real gate.
+out="$(sv_payload "" | sv_run)"; check "only transcript_path (the parent): exit 0" 0 "$?"
+sv_allows "never grades the parent transcript" "$out"
+out="$(sv_payload "" '{"agent_transcript_path":"/nonexistent/x.jsonl"}' | sv_run)"; check "unreadable agent transcript: exit 0" 0 "$?"
+sv_allows "unreadable agent transcript: fails open" "$out"
+printf '{}' | sv_run >/dev/null; check "empty object: fails open" 0 "$?"
+out="$(sv_payload "$SV_PROSE" | CLAUDE_PLUGIN_ROOT='' CLAUDE_PROJECT_DIR="$SVT" "$SV")"; check "checker not locatable: exit 0" 0 "$?"
+sv_allows "checker not locatable: fails open" "$out"
+# Sent back once already this turn: do not loop forever.
+out="$(sv_payload "$SV_PROSE" '{"stop_hook_active":true}' | sv_run)"; check "stop_hook_active with malformed output: exit 0" 0 "$?"
+sv_allows "stop_hook_active: does not block a second time" "$out"
+rm -rf "$SVT"
 
 echo "== release-notes.sh (the release gate) =="
 # v1.0.0 was released by hand, and the hand-assembly showed why that is a bad

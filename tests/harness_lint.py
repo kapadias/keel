@@ -149,7 +149,7 @@ for cmd in ("review", "ship"):
 # any "N-gate" / "N golden" number in the living docs must equal it. Historical
 # entries under STATUS.md's "Recently changed" are records, not claims — skipped.
 with open(f"{ROOT}/tests/run.sh", encoding="utf-8") as fh:
-    ACTUAL_GATES = len(re.findall(r'\b(?:check|contains) "', fh.read()))
+    ACTUAL_GATES = len(re.findall(r'\b(?:check|contains|sv_blocks|sv_allows) "', fh.read()))
 COUNT = re.compile(r"\b(\d+)[- ](?:gate|golden)\b", re.IGNORECASE)
 for rel in (
     "CLAUDE.md",
