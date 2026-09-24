@@ -120,6 +120,11 @@ Nonna's deny-list to your own project settings. This step is manual and mechanic
 - **The test gate is opt-in.** A copy-in install detects your test command. A plugin install does
   not: nobody agreed to have each repo's own code run at every turn end, so the Stop and pre-push
   test gates run only once you set `NONNA_TEST_CMD` (for example in `.claude/settings.json` `env`).
+  The copy-in marker (`.claude/hooks/lib/tests.sh`) lives in the repo, so a repo can carry it; the
+  real consent boundary is Claude Code's folder trust, which already covers the repo's own hooks.
+- **The pre-push test gate tastes what you push.** It runs in the working tree, so it refuses a push
+  while the tree differs from `HEAD`, untracked files included. A pushed branch that is not checked
+  out gets a warning that its tests did not run; tags and deletes run nothing.
 - **Gate scripts stay reachable.** `SessionStart` announces the resolved harness root, so
   `/review`, `/ship` and `/fix` can invoke `check-review.sh` and `check-trivial.sh` wherever the
   plugin is installed. Their first run may prompt for approval, because the absolute plugin path

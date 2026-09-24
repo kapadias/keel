@@ -168,6 +168,12 @@ if [ -n "$stack" ] && [ -f "$P/stacks/$stack/settings.local.json" ]; then
   [ "${#copied[@]}" -gt "$n" ] && done_msgs+=(".claude/settings.local.json ($stack)")
 fi
 
+# A settings.json you already had was kept; without Nonna's hooks in it, her Claude Code gates are off.
+if [ -f .claude/settings.json ] && ! grep -q '\.claude/hooks/' .claude/settings.json; then
+  warn_msgs+=(".claude/settings.json: yours was kept, so my Claude Code hooks are not running — merge the \"hooks\" block from $REPO/blob/main/.claude/settings.json")
+  failed=1
+fi
+
 hooks_dir="$(git rev-parse --git-path hooks)"
 link_hook() { # <git hook name> <script under .claude/hooks>
   local dest="$hooks_dir/$1"

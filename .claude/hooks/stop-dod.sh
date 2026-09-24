@@ -42,6 +42,9 @@ reason=""
 # not loop. No test command (see lib/tests.sh: plugin installs need NONNA_TEST_CMD) means this check
 # does not apply. A green run is remembered per tree and command, so an idle turn end costs nothing;
 # a suite slower than the Stop budget is not red, and the pre-push gate still runs it in full.
+# The cache key is the tree (tracked + untracked) and the command; git-ignored inputs, submodule
+# working trees and the environment are not in it. That is a convenience gate's trade: pre-push has
+# no cache.
 if ! printf '%s' "$payload" | grep -qE '"stop_hook_active"[[:space:]]*:[[:space:]]*true' \
   && [ -f "$here/lib/tests.sh" ]; then
   # shellcheck source=/dev/null

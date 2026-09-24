@@ -103,24 +103,59 @@ contains "pre-push: names the failing command" "NONNA_TEST_CMD" "$out"
 "${GIT[@]}" -C "$TMP" checkout -q -b feature/new
 echo 'def g(): return 2' >> "$TMP/src/app.py"; echo 'again' >> "$TMP/docs/STATUS.md"
 "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m "new branch"
+PS="$(mktemp)"  # outside the repo: an untracked file there is a dirty tree
 ZERO=0000000000000000000000000000000000000000; NEWSHA="$("${GIT[@]}" -C "$TMP" rev-parse HEAD)"
-printf 'refs/heads/feature/new %s refs/heads/feature/new %s\n' "$NEWSHA" "$ZERO" > "$TMP/.push-stdin"
-( cd "$TMP" && NONNA_TEST_CMD='exit 1' "$RS" < .push-stdin ) 2>/dev/null; check "pre-push: a branch's first push runs the test gate" 1 "$?"
+printf 'refs/heads/feature/new %s refs/heads/feature/new %s\n' "$NEWSHA" "$ZERO" > "$PS"
+( cd "$TMP" && NONNA_TEST_CMD='exit 1' "$RS" origin "$BARE" < "$PS" ) 2>/dev/null; check "pre-push: a branch's first push runs the test gate" 1 "$?"
 ( cd "$TMP" && NONNA_TEST_CMD='exit 1' "$RS" < /dev/null ) 2>/dev/null; check "pre-push: no stdin, no upstream: the range falls back to the base branch" 1 "$?"
-( cd "$TMP" && NONNA_TEST_CMD=true "$RS" < .push-stdin ); check "pre-push: a green first push goes through" 0 "$?"
+( cd "$TMP" && NONNA_TEST_CMD=true "$RS" origin "$BARE" < "$PS" ); check "pre-push: a green first push goes through" 0 "$?"
 # The suite must taste what is pushed, not an uncommitted fix sitting on top of it.
 echo '# uncommitted' >> "$TMP/src/app.py"
-out="$(cd "$TMP" && NONNA_TEST_CMD=true "$RS" < .push-stdin 2>&1)"; check "pre-push: refuses to vouch for a push from a dirty tree" 1 "$?"
+out="$(cd "$TMP" && NONNA_TEST_CMD=true "$RS" origin "$BARE" < "$PS" 2>&1)"; check "pre-push: refuses to vouch for a push from a dirty tree" 1 "$?"
 contains "pre-push: says to commit or stash first" "commit or stash" "$out"
 "${GIT[@]}" -C "$TMP" checkout -q -- src/app.py
-out="$(cd "$TMP" && NONNA_TEST_TIMEOUT=1 NONNA_TEST_CMD='sleep 5' "$RS" < .push-stdin 2>&1)"; check "pre-push: a suite that times out blocks the push" 1 "$?"
+echo 'import helper' > "$TMP/src/forgot.py"
+( cd "$TMP" && NONNA_TEST_CMD=true "$RS" origin "$BARE" < "$PS" ) 2>/dev/null; check "pre-push: an untracked file is a dirty tree too (the forgotten git add)" 1 "$?"
+rm -f "$TMP/src/forgot.py"
+# A tag and a delete are not code "done"; refusing them only teaches --no-verify, which drops the scan.
+"${GIT[@]}" -C "$TMP" tag -a v1 -m v1; TAGSHA="$("${GIT[@]}" -C "$TMP" rev-parse v1)"
+printf 'refs/tags/v1 %s refs/tags/v1 %s\n' "$TAGSHA" "$ZERO" > "$PS"
+( cd "$TMP" && NONNA_TEST_CMD=true "$RS" origin "$BARE" < "$PS" ); check "pre-push: an annotated tag push is not refused as foreign" 0 "$?"
+printf '(delete) %s refs/heads/old %s\n' "$ZERO" "$NEWSHA" > "$PS"
+( cd "$TMP" && NONNA_TEST_CMD=false "$RS" origin "$BARE" < "$PS" ); check "pre-push: a delete-only push runs nothing and passes" 0 "$?"
+printf 'refs/heads/feature/new %s refs/heads/feature/new %s\n' "$NEWSHA" "$ZERO" > "$PS"
+out="$(cd "$TMP" && NONNA_TEST_TIMEOUT=1 NONNA_TEST_CMD='sleep 5' "$RS" origin "$BARE" < "$PS" 2>&1)"; check "pre-push: a suite that times out blocks the push" 1 "$?"
 contains "pre-push: says the suite timed out" "timed out" "$out"
-rm -f "$TMP/.push-stdin"
+rm -f "$PS"
 "${GIT[@]}" -C "$TMP" checkout -q feature/y
 echo 'KEY = "'"$FAKE_AWS"'"' > "$TMP/src/leak.py"
 echo 'more' >> "$TMP/docs/STATUS.md"
 "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m "leak with status"
 ( cd "$TMP" && "$RS" ); check "blocks push that introduces a secret" 1 "$?"
+# The scan covers every commit the remote lacks, never "since a local branch": a key in a root commit
+# made with --no-verify on main must not ride a feature branch's first push unscanned.
+T2="$(mktemp -d)"; B2="$(mktemp -d)"; "${GIT[@]}" init -q --bare "$B2"; "${GIT[@]}" -C "$T2" init -q
+"${GIT[@]}" -C "$T2" remote add origin "$B2"; mkdir -p "$T2/docs"; echo s > "$T2/docs/STATUS.md"
+echo 'KEY = "'"$FAKE_AWS"'"' > "$T2/cfg.py"; "${GIT[@]}" -C "$T2" add -A; "${GIT[@]}" -C "$T2" commit -q -m root
+"${GIT[@]}" -C "$T2" checkout -q -b feature/x; echo 'x = 1' > "$T2/x.py"; echo t >> "$T2/docs/STATUS.md"
+"${GIT[@]}" -C "$T2" add -A; "${GIT[@]}" -C "$T2" commit -q -m feat
+printf 'refs/heads/feature/x %s refs/heads/feature/x %s\n' "$("${GIT[@]}" -C "$T2" rev-parse HEAD)" "$ZERO" > "$PS"
+( cd "$T2" && "$RS" origin "$B2" < "$PS" ) 2>/dev/null; check "pre-push: a key in a local-only base commit is caught on a first push" 1 "$?"
+# A key added then removed inside one push still reached the remote's history.
+"${GIT[@]}" -C "$T2" rm -q cfg.py; "${GIT[@]}" -C "$T2" commit -q -m "drop cfg"
+printf 'refs/heads/feature/x %s refs/heads/feature/x %s\n' "$("${GIT[@]}" -C "$T2" rev-parse HEAD)" "$ZERO" > "$PS"
+( cd "$T2" && "$RS" origin "$B2" < "$PS" ) 2>/dev/null; check "pre-push: a key added and removed within the push is still caught" 1 "$?"
+rm -rf "$T2" "$B2"
+# Git config and file names must not hide added lines from the push scan.
+T2="$(mktemp -d)"; B2="$(mktemp -d)"; "${GIT[@]}" init -q --bare "$B2"; "${GIT[@]}" -C "$T2" init -q
+"${GIT[@]}" -C "$T2" remote add origin "$B2"; mkdir -p "$T2/docs"; echo s > "$T2/docs/STATUS.md"
+"${GIT[@]}" -C "$T2" add -A; "${GIT[@]}" -C "$T2" commit -q -m root; "${GIT[@]}" -C "$T2" push -q origin HEAD:refs/heads/main 2>/dev/null
+echo 'KEY = "'"$FAKE_AWS"'"' > "$T2/café.py"; echo t >> "$T2/docs/STATUS.md"
+"${GIT[@]}" -C "$T2" add -A; "${GIT[@]}" -C "$T2" commit -q -m cafe
+( cd "$T2" && "$RS" ) 2>/dev/null; check "pre-push: a non-ASCII file name does not hide a secret" 1 "$?"
+( cd "$T2" && GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=color.ui GIT_CONFIG_VALUE_0=always GIT_CONFIG_KEY_1=diff.external GIT_CONFIG_VALUE_1=true "$RS" ) 2>/dev/null
+check "pre-push: color.ui=always and diff.external do not hide a secret" 1 "$?"
+rm -rf "$T2" "$B2" "$PS"
 # Installed AS a symlink (the way session-start wires it): must still resolve lib/.
 mkdir -p "$TMP/.claude/hooks/lib"
 cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"
@@ -148,6 +183,8 @@ echo ok > "$TMP/docs/STATUS.md"
 printf 'KEY = "%s"\n' "AKIA""AB12CD34EF56GH78" > "$TMP/tests/fixtures/sample.py"
 "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m "realistic secret in a fixture"
 ( cd "$TMP" && "$RS" ); check "blocks a realistic secret even under a fixture path" 1 "$?"
+"${GIT[@]}" -C "$TMP" reset -q --hard HEAD~1  # the push scans every commit: the realistic key must leave history
+mkdir -p "$TMP/tests/fixtures" "$TMP/docs"; echo ok > "$TMP/docs/STATUS.md"
 printf 'KEY = "%s"\n' "AKIAIOSFODNN7EXAMPLE" > "$TMP/tests/fixtures/sample.py"
 "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m "placeholder fixture value"
 ( cd "$TMP" && "$RS" ); check "allows a placeholder-classed fixture value" 0 "$?"
@@ -193,6 +230,11 @@ echo c >> "$TMP/src/a.py"; "${GIT[@]}" -C "$TMP" add -A
 printf 'K = "%s"\n' "$FAKE_AWS" > "$TMP/:(exclude)*"; "${GIT[@]}" -C "$TMP" add -- ':(literal):(exclude)*'
 "${GIT[@]}" -C "$TMP" commit -q -m magic 2>/dev/null; check "pre-commit: a pathspec-magic file name does not hide a secret" 1 "$?"
 "${GIT[@]}" -C "$TMP" reset -q; rm -f "$TMP/:(exclude)*"
+# A tracked symlink replaced by a regular file is a type change (T), still staged content.
+ln -s a.py "$TMP/src/link.py"; "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q --no-verify -m link
+rm "$TMP/src/link.py"; printf 'K = "%s"\n' "$FAKE_AWS" > "$TMP/src/link.py"; "${GIT[@]}" -C "$TMP" add -A
+"${GIT[@]}" -C "$TMP" commit -q -m typechange 2>/dev/null; check "pre-commit: a symlink turned file does not hide a secret" 1 "$?"
+"${GIT[@]}" -C "$TMP" reset -q --hard
 # A NUL byte makes git call the file binary; the scan must still read its lines.
 printf 'K = "%s"\n\0\n' "$FAKE_AWS" > "$TMP/src/bin.py"; "${GIT[@]}" -C "$TMP" add -A
 "${GIT[@]}" -C "$TMP" commit -q -m nul 2>/dev/null; check "pre-commit: a NUL byte does not hide a secret" 1 "$?"
@@ -245,6 +287,11 @@ echo '{"mine":true}' > "$TMP/.claude/settings.local.json"; echo 'echo mine' > "$
 rc=0; [ -x "$TMP/.claude/hooks/pre-commit.sh" ] && [ -f "$TMP/.claude/rules/00-core.md" ] && [ -f "$TMP/.claude/hooks/lib/secret-patterns.sh" ] || rc=1
 check "install: the merge brings every harness file the hooks need" 0 "$rc"
 grep -q mine "$TMP/.claude/settings.local.json" && [ ! -x "$TMP/.claude/hooks/mine.sh" ]; check "install: your files are untouched, not even chmod-ed" 0 "$?"
+rm -rf "$TMP"
+# A settings.json you already had is kept, but then Nonna's Claude Code hooks are not wired: say so.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; mkdir -p "$TMP/.claude"; echo '{"permissions":{}}' > "$TMP/.claude/settings.json"
+out="$(cd "$TMP" && NONNA_SRC="$ROOT" bash "$IN" 2>&1)"; check "install: a kept settings.json with no Nonna hooks is not a success" 1 "$?"
+contains "install: says to merge the hooks block" "settings.json" "$out"
 rm -rf "$TMP"
 # Never write through a symlink, and never claim success with a git hook pointing at nothing.
 TMP="$(mktemp -d)"; OUT="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
@@ -743,11 +790,21 @@ printf '%s' "$out" | grep -q '"decision"'; check "stop: plugin install never aut
 out="$(printf '{}' | NONNA_TEST_CMD='python3 -m pytest -q' CLAUDE_PROJECT_DIR="$TMP" "$SD")"
 contains "stop: plugin install runs the suite once NONNA_TEST_CMD opts in" "the tests say no" "$out"
 rm -rf "$TMP"
+# Without timeout(1) (macOS), the fallback must kill the whole process group, not wait out a child.
+NOTO="$(mktemp -d)"
+for b in bash sh perl tail sleep cat rm mktemp; do p="$(command -v "$b")"; ln -s "$p" "$NOTO/$b"; done
+start=$SECONDS
+# shellcheck disable=SC2030  # PATH is meant to change only inside the subshell
+( PATH="$NOTO"; . "$HOOKS/lib/tests.sh"; NONNA_TEST_TIMEOUT=1 nonna_run_tests 'sh -c "sleep 6"' ); rc=$?
+check "tests.sh: no timeout(1): a forking suite is cut off on time (124)" 124 "$rc"
+check "tests.sh: no timeout(1): ...and within the budget, not after the child" 1 "$(( SECONDS - start < 4 ))"
+rm -rf "$NOTO"
 # Detection claims pytest only when pytest is there; a false red would block every push.
 TMP="$(mktemp -d)"; STUB="$(mktemp -d)"; mkdir -p "$TMP/tests" "$TMP/.claude/hooks/lib"; : > "$TMP/.claude/hooks/lib/tests.sh"
 printf 'def test_x():\n    pass\n' > "$TMP/tests/test_x.py"
 printf '#!/bin/sh\nexit 1\n' > "$STUB/python3"; chmod +x "$STUB/python3"
 got="$(cd "$TMP" && unset NONNA_TEST_CMD && . "$HOOKS/lib/tests.sh" && nonna_test_cmd)"; contains "tests.sh: detects pytest in a copy-in install" "pytest" "$got"
+# shellcheck disable=SC2031
 got="$(cd "$TMP" && unset NONNA_TEST_CMD && PATH="$STUB:$PATH" && . "$HOOKS/lib/tests.sh" && nonna_test_cmd)"; check "tests.sh: no pytest installed, no pytest command" 0 "${#got}"
 rm -rf "$TMP" "$STUB"
 

@@ -14,6 +14,9 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
   Detection runs only in a copy-in install; under the plugin the gate waits for an explicit
   `NONNA_TEST_CMD`. A green tree is not re-tested at every turn end, a Stop-time timeout does not
   block, and the pre-push gate reads the pushed range from git, so a branch's first push is gated.
+  The push scan covers every commit the remote lacks, one diff per commit, so a key in a local-only
+  base commit, or one added and removed inside the push, is caught; colour, external-diff config and
+  non-ASCII names no longer hide a line.
 - **One-command install** (`install.sh`, `--host` for eight agent hosts), host rules generated from
   `00-core.md` (`hosts/build.py`, drift-linted), and a git `pre-commit` hook every host gets.
 
@@ -22,7 +25,9 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
 - **Security review of the installer and the new hooks.** `install.sh` merges into an existing
   `.claude/`, never writes through a symlink, chmods only what it copied, and exits non-zero rather
   than linking a git hook to a missing script. `pre-commit` reads staged file names literally and
-  binary-safe, and fails closed when git cannot diff. The Stop hook's no-jq output is valid JSON.
+  binary-safe (type changes included), and fails closed when git cannot diff. The Stop hook's no-jq
+  output is valid JSON. The macOS timeout fallback kills the suite's whole process group. The
+  installer says so when your kept `.claude/settings.json` leaves Nonna's hooks unwired.
 - **Keel is now Nonna** (ADR-0010). The plugin id is `nonna@nonna`, environment variables are
   `NONNA_*` (for example `NONNA_CRITICAL_PATHS`), and gate messages open with a line in her voice
   before the technical reason. Reinstall the plugin under the new id.

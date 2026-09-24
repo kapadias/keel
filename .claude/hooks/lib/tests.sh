@@ -34,19 +34,27 @@ nonna_test_cmd() {
 }
 
 nonna_run_tests() { # <command>
-  local out rc secs="${NONNA_TEST_TIMEOUT:-600}"
-  if command -v timeout >/dev/null 2>&1; then
-    out="$(timeout "$secs" bash -c "$1" 2>&1)"
+  local out rc secs="${NONNA_TEST_TIMEOUT:-600}" log
+  # Output goes to a file, not $(...): a child that outlives a timeout must not hold the pipe open.
+  log="$(mktemp)" || return 1
+  if command -v timeout >/dev/null 2>&1; then # GNU timeout signals the whole process group
+    timeout "$secs" bash -c "$1" >"$log" 2>&1
     rc=$?
-  elif command -v perl >/dev/null 2>&1; then # macOS has no timeout(1); SIGALRM reads as 142
-    out="$(perl -e 'alarm shift; exec @ARGV' "$secs" bash -c "$1" 2>&1)"
+  elif command -v perl >/dev/null 2>&1; then # macOS: own process group, killed whole on the alarm
+    perl -e '
+      my $secs = shift; my $pid = fork; die "fork: $!" unless defined $pid;
+      if (!$pid) { setpgrp(0, 0); exec @ARGV or exit 127 }
+      $SIG{ALRM} = sub { kill "TERM", -$pid; sleep 1; kill "KILL", -$pid; exit 124 };
+      alarm $secs; waitpid($pid, 0);
+      exit($? & 127 ? 128 + ($? & 127) : $? >> 8)' "$secs" bash -c "$1" >"$log" 2>&1
     rc=$?
-    [ "$rc" = 142 ] && rc=124
   else
-    out="$(bash -c "$1" 2>&1)"
+    bash -c "$1" >"$log" 2>&1
     rc=$?
   fi
+  out="$(tail -n 8 "$log")"
+  rm -f "$log"
   # shellcheck disable=SC2034  # read by the hook that sourced this file
-  NONNA_TEST_TAIL="$(printf '%s\n' "$out" | tail -n 8)"
+  NONNA_TEST_TAIL="$out"
   return "$rc"
 }

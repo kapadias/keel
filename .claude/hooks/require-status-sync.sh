@@ -20,43 +20,49 @@ here="$(cd "$(dirname "$self")" && pwd)"
 # shellcheck source=/dev/null
 . "$here/lib/secret-patterns.sh"
 
-# What is being pushed. git hands the hook "<local ref> <local sha> <remote ref> <remote sha>" lines
-# on stdin; a new branch has an all-zero remote sha, so its range starts where it left the base
-# branch. Run by hand (no stdin), fall back to the upstream, then to the base branch.
+# What is being pushed: every commit the remote does not have yet, never "since a local branch" (a
+# commit that only exists locally, say a --no-verify root commit on main, is pushed too). git passes
+# the remote as $1 and "<local ref> <local sha> <remote ref> <remote sha>" lines on stdin. Run by
+# hand (no stdin): HEAD's commits that no remote has.
 ZERO=0000000000000000000000000000000000000000
-base_of() { # <sha>: where it forked from the default branch, else the empty tree (everything)
-  local b
-  for b in origin/HEAD origin/develop origin/main origin/master develop main master; do
-    [ "$(git rev-parse --verify --quiet "$b^{commit}")" = "$(git rev-parse --verify --quiet "$1^{commit}")" ] && continue
-    git merge-base "$b" "$1" 2>/dev/null && return 0
-  done
-  git hash-object -t tree /dev/null
-}
-ranges=()
-pushed_tips=()
+remote="${1:-}"
+not_remote=(--remotes)
+if [ -n "$remote" ] && git config --get "remote.$remote.url" >/dev/null 2>&1; then
+  not_remote=("--remotes=$remote")
+fi
+tips=()      # pushed commits (tags peeled)
+branch_tips=() # pushed branch commits: what the test gate must vouch for
+saw_line=""
 if [ ! -t 0 ]; then
-  while read -r _lref lsha _rref rsha; do
-    [ -n "${lsha:-}" ] && [ "$lsha" != "$ZERO" ] || continue # a delete pushes no code
-    pushed_tips+=("$lsha")
-    if [ "$rsha" = "$ZERO" ] || ! git cat-file -e "$rsha^{commit}" 2>/dev/null; then
-      ranges+=("$(base_of "$lsha")..$lsha")
-    else
-      ranges+=("$rsha..$lsha")
+  while read -r lref lsha _rref rsha; do
+    [ -n "${lsha:-}" ] || continue
+    saw_line=1
+    [ "$lsha" != "$ZERO" ] || continue # a delete pushes no code
+    c="$(git rev-parse --verify --quiet "$lsha^{commit}")" || continue # a tag on a tree or blob
+    tips+=("$c")
+    case "$lref" in refs/tags/*) ;; *) branch_tips+=("$c") ;; esac
+    if [ "${rsha:-$ZERO}" != "$ZERO" ] && git cat-file -e "$rsha^{commit}" 2>/dev/null; then
+      not_remote+=("^$rsha")
     fi
   done
 fi
-if [ "${#ranges[@]}" -eq 0 ] && [ "${#pushed_tips[@]}" -eq 0 ]; then
-  upstream="origin/$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)"
-  if git rev-parse --verify --quiet "$upstream" >/dev/null; then
-    ranges=("$upstream..HEAD")
-  else
-    ranges=("$(base_of HEAD)..HEAD")
-  fi
-  pushed_tips=("$(git rev-parse HEAD 2>/dev/null)")
+if [ -z "$saw_line" ]; then
+  c="$(git rev-parse --verify --quiet HEAD)" || exit 0
+  tips=("$c")
+  branch_tips=("$c")
 fi
-[ "${#ranges[@]}" -gt 0 ] || exit 0
+[ "${#tips[@]}" -gt 0 ] || exit 0 # deletes only
+revs=("${tips[@]}" --not "${not_remote[@]}")
+new_commits="$(git rev-list "${revs[@]}" 2>/dev/null)" || {
+  echo "✗ Nonna: I could not tell what you are pushing, so I cannot vouch for it. (pre-push: git rev-list failed.)" >&2
+  exit 1
+}
+[ -n "$new_commits" ] || exit 0
+# Every commit's own diff, so a key added then removed inside the push is still seen. Flags keep
+# user config (colour, external diff, textconv, quoted names) from hiding a line.
+LOG=(git --literal-pathspecs -c core.quotePath=false log --format= --no-color --no-ext-diff --no-textconv --text --no-renames)
 
-changed="$(for r in "${ranges[@]}"; do git diff --name-only "${r%%..*}" "${r##*..}" 2>/dev/null; done | sort -u)"
+changed="$("${LOG[@]}" --name-only -z "${revs[@]}" | tr '\0' '\n' | sort -u)"
 [ -n "$changed" ] || exit 0
 
 # CODE = everything EXCEPT docs/ and a few top-level meta files. NOTE: .claude/**
@@ -79,9 +85,8 @@ fi
 # looking credential under tests/ leaks exactly like one under src/. Fixtures
 # must use placeholder-classed values (AKIAIOSFODNN7EXAMPLE, XXXX, CHANGEME, …)
 # — those are value-exempt in lib/secret-patterns.sh.
-while IFS= read -r f; do
-  [ -n "$f" ] || continue
-  added="$(for r in "${ranges[@]}"; do git --literal-pathspecs diff --text "${r%%..*}" "${r##*..}" -- "$f" 2>/dev/null; done | grep -aE '^\+' | grep -avE '^\+\+\+' || true)"
+while IFS= read -r -d '' f; do
+  added="$("${LOG[@]}" -p -U0 "${revs[@]}" -- "$f" 2>/dev/null | grep -aE '^\+' | grep -avE '^\+\+\+ ' || true)"
   [ -n "$added" ] || continue
   if class="$(printf '%s' "$added" | nonna_scan_secrets)"; then
     {
@@ -90,9 +95,7 @@ while IFS= read -r f; do
     } >&2
     fail=1
   fi
-done <<EOF
-$changed
-EOF
+done < <("${LOG[@]}" --name-only -z --diff-filter=ACMRT "${revs[@]}" | sort -zu)
 
 # "Done" means the suite passes: a code push runs the project's own tests (lib/tests.sh). No test
 # command (plugin installs need NONNA_TEST_CMD, or NONNA_TEST_CMD="") means this check does not
@@ -104,12 +107,18 @@ if [ -n "$code_touched" ] && [ -f "$here/lib/tests.sh" ]; then
   cmd="$(nonna_test_cmd)"
   if [ -n "$cmd" ]; then
     head="$(git rev-parse HEAD 2>/dev/null)"
-    foreign=""
-    for t in "${pushed_tips[@]}"; do [ "$t" = "$head" ] || foreign=1; done
-    if [ -n "$foreign" ] || ! git diff --quiet HEAD -- 2>/dev/null; then
+    at_head=""
+    for t in ${branch_tips[@]+"${branch_tips[@]}"}; do
+      if [ "$t" = "$head" ]; then at_head=1; else
+        echo "! Nonna: $t is not checked out, so its tests did not run here. Push it from its own checkout." >&2
+      fi
+    done
+    if [ -z "$at_head" ]; then
+      : # tags, or branches that are not checked out: nothing here to taste
+    elif [ -n "$(git status --porcelain --untracked-files=normal 2>/dev/null)" ]; then
       {
-        echo "✗ Nonna: I taste what you serve, not what is still on the stove. (pre-push: the tests run in the working tree, which is not what you are pushing.)"
-        echo "  commit or stash your changes, and push the branch you have checked out."
+        echo "✗ Nonna: I taste what you serve, not what is still on the stove. (pre-push: the tests run in the working tree, and it differs from HEAD.)"
+        echo "  commit or stash your changes (untracked files too: a forgotten git add passes here and breaks there)."
       } >&2
       fail=1
     else
