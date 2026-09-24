@@ -51,6 +51,11 @@ descriptions (5,600-char budget), both enforced by the linter.
 
 History lives in `CHANGELOG.md` and `git log`. Entries here describe the current unit of work.
 
+- **2026-09-24** — README answers an outside review. A bridge sentence says the 8 of 8 task is
+  the worst case (a third of runs on average); the break-even is a four-row table so readers can pick
+  their own mistake rate (derivation now in `bench/README.md`); one line up top names the rest of the
+  harness (8 agents, 15 workflows, 6 human-only); and a table says what Claude Code gets versus
+  every other agent.
 - **2026-09-24** — Fourth security review (of the third round's fixes, after `main` was promoted)
   addressed, 8 more tests (370): added lines are found by position, not text, so an octopus merge's
   `+++` lines and content starting `++ ` are scanned; `--root` overrides `log.showRoot=false`; a
