@@ -57,10 +57,34 @@ if [ -z "$saw_line" ]; then
   [ "${#remote_refs[@]}" -gt 0 ] || remote_refs=(--remotes)
 fi
 [ "${#tips[@]}" -gt 0 ] || exit 0 # deletes only
-# A shallow clone's grafted boundary is history the remote has, not a whole tree this push adds.
+# A shallow clone's grafted boundary is history the remote has, not a whole tree this push adds, but
+# only when the destination is known to have it (its tracking refs or a reported remote sha). A graft
+# it may lack (a shallow fetch of a fork's tip) cannot be scanned in full, so it is a stop.
 shallow="$(git rev-parse --git-path shallow)"
 if [ -f "$shallow" ]; then
-  while read -r g; do [ -n "$g" ] && excl+=("^$g"); done < "$shallow"
+  known=()
+  case "${remote_refs[*]-}" in
+    --remotes) ref_ns=refs/remotes ;;
+    --remotes=*) ref_ns="refs/remotes/${remote_refs[0]#--remotes=}" ;;
+    *) ref_ns="" ;; # a URL: only the remote shas git reported
+  esac
+  if [ -n "$ref_ns" ]; then
+    while IFS= read -r r; do known+=("$r"); done < <(git for-each-ref --format='%(objectname)' "$ref_ns")
+  fi
+  for e in ${excl[@]+"${excl[@]}"}; do known+=("${e#^}"); done
+  while read -r g; do
+    [ -n "$g" ] || continue
+    in_push=""
+    for t in "${tips[@]}"; do git merge-base --is-ancestor "$g" "$t" 2>/dev/null && in_push=1; done
+    [ -n "$in_push" ] || continue
+    has=""
+    for k in ${known[@]+"${known[@]}"}; do git merge-base --is-ancestor "$g" "$k" 2>/dev/null && { has=1; break; }; done
+    if [ -z "$has" ]; then
+      echo "✗ Nonna: I only have the top of this pot. (pre-push: shallow-clone boundary $g is not known to be on the destination, so its history cannot be scanned.) Fetch the full history (git fetch --unshallow) and push again." >&2
+      exit 1
+    fi
+    excl+=("^$g")
+  done < "$shallow"
 fi
 revs=("${tips[@]}" ${excl[@]+"${excl[@]}"})
 [ "${#remote_refs[@]}" -eq 0 ] || revs+=(--not "${remote_refs[@]}")
@@ -73,7 +97,7 @@ new_commits="$(git rev-list "${revs[@]}" 2>/dev/null)" || {
 # Every commit's own diff, so a key added then removed inside the push is still seen; --cc shows
 # what a merge's resolution adds. Flags keep user config (colour, external diff, textconv, quoted
 # names) from hiding a line. Output goes to files so a failing git log is a stop, never "clean".
-LOG=(git --literal-pathspecs -c core.quotePath=false log --format= --no-color --no-ext-diff --no-textconv --text --no-renames --cc)
+LOG=(git --literal-pathspecs -c core.quotePath=false log --format= --no-color --no-ext-diff --no-textconv --text --no-renames --cc --root)
 tmp="$(mktemp -d)" || exit 1
 trap 'rm -rf "$tmp"' EXIT
 unreadable() {
@@ -113,14 +137,16 @@ fi
 # realistic-looking credential under tests/ leaks exactly like one under src/. Fixtures must use
 # placeholder-classed values (AKIAIOSFODNN7EXAMPLE, XXXX, CHANGEME, …) — those are value-exempt in
 # lib/secret-patterns.sh.
-added_lines() { grep -aE '^\+' "$1" | grep -avE '^\+\+\+ ' || true; }
+# Added lines, with file headers dropped by position (between "diff " and the first "@@"), never by
+# text: an octopus merge prints a line added over all parents as "+++", and content can start "++ ".
+added_lines() { LC_ALL=C awk '/^diff /{h=1} h && /^@@/{h=0; next} !h && /^\+/' "$1"; }
 "${LOG[@]}" -p -U0 "${revs[@]}" > "$tmp/patch" || unreadable
 if class="$(added_lines "$tmp/patch" | nonna_scan_secrets)"; then
   fail=1
   named=""
   "${LOG[@]}" --name-only -z --diff-filter=ACMRT "${revs[@]}" > "$tmp/files" || unreadable
   while IFS= read -r -d '' f; do
-    "${LOG[@]}" -p -U0 "${revs[@]}" -- "$f" > "$tmp/one" || unreadable
+    "${LOG[@]}" -p -U0 --full-history "${revs[@]}" -- "$f" > "$tmp/one" || unreadable
     if c="$(added_lines "$tmp/one" | nonna_scan_secrets)"; then
       echo "✗ Push blocked: ${f} introduces what looks like a ${c}." >&2
       named=1

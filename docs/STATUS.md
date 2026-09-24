@@ -51,6 +51,11 @@ descriptions (5,600-char budget), both enforced by the linter.
 
 History lives in `CHANGELOG.md` and `git log`. Entries here describe the current unit of work.
 
+- **2026-09-24** — Fourth security review (of the third round's fixes, after `main` was promoted)
+  addressed, 8 more tests (370): added lines are found by position, not text, so an octopus merge's
+  `+++` lines and content starting `++ ` are scanned; `--root` overrides `log.showRoot=false`; a
+  shallow boundary the destination is not known to have is a stop; the per-file pass names a key on
+  a side branch a merge discarded. The merge-scan test now proves the scan, not the STATUS check.
 - **2026-09-24** — Third security review addressed before promotion to `main` (8 more tests, 362).
   The push scan now sees merge resolutions (`--cc`), scans a URL push against that URL rather than
   other remotes, treats a failed `git log` as a stop, reads file names NUL-safe in pre-commit and

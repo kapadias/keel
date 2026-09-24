@@ -18,7 +18,9 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
   base commit, or one added and removed inside the push, is caught; colour, external-diff config and
   non-ASCII names no longer hide a line. Merge resolutions are scanned too, a URL push is judged
   against that URL, a failed `git log` blocks, a shallow clone's graft is excluded, and the scan is
-  one pass over the push rather than one history walk per file.
+  one pass over the push rather than one history walk per file. Added lines are found by position,
+  not text (octopus merges, content starting `++ `), `log.showRoot=false` cannot hide a root commit,
+  and a shallow boundary the destination may lack blocks the push.
 - **One-command install** (`install.sh`, `--host` for eight agent hosts), host rules generated from
   `00-core.md` (`hosts/build.py`, drift-linted), and a git `pre-commit` hook every host gets.
 

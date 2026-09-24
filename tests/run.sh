@@ -169,10 +169,38 @@ T2="$(mktemp -d)"; B2="$(mktemp -d)"; push_fixture "$T2" "$B2"
 "${GIT[@]}" -C "$T2" checkout -q -b feature/m trunk; echo 'a = 2' > "$T2/src/a.py"; echo t >> "$T2/docs/STATUS.md"
 "${GIT[@]}" -C "$T2" commit -qam feat; "${GIT[@]}" -C "$T2" push -q origin feature/m other 2>/dev/null
 OLDTIP="$("${GIT[@]}" -C "$T2" rev-parse HEAD)"
-"${GIT[@]}" -C "$T2" merge -q --no-commit other >/dev/null 2>&1; echo 'KEY = "'"$FAKE_AWS"'"' >> "$T2/src/a.py"; "${GIT[@]}" -C "$T2" add -A
-"${GIT[@]}" -C "$T2" commit -q --no-verify -m "merge other"
+"${GIT[@]}" -C "$T2" merge -q --no-commit other >/dev/null 2>&1; echo 'KEY = "'"$FAKE_AWS"'"' >> "$T2/src/a.py"
+echo m >> "$T2/docs/STATUS.md"; "${GIT[@]}" -C "$T2" add -A; "${GIT[@]}" -C "$T2" commit -q --no-verify -m "merge other"
 printf 'refs/heads/feature/m %s refs/heads/feature/m %s\n' "$("${GIT[@]}" -C "$T2" rev-parse HEAD)" "$OLDTIP" > "$PS"
-( cd "$T2" && "$RS" origin "$B2" < "$PS" ) 2>/dev/null; check "pre-push: a key added in a merge resolution is caught" 1 "$?"
+out="$(cd "$T2" && "$RS" origin "$B2" < "$PS" 2>&1)"; check "pre-push: a key added in a merge resolution is caught" 1 "$?"
+contains "pre-push: ...by the secret scan, not only the STATUS check" "Push blocked" "$out"
+# An octopus merge prints a line added over all three parents as '+++'; indented, it looks like a header.
+"${GIT[@]}" -C "$T2" checkout -q -b third trunk; echo 'c = 3' > "$T2/src/c.py"; "${GIT[@]}" -C "$T2" add -A; "${GIT[@]}" -C "$T2" commit -qm third
+"${GIT[@]}" -C "$T2" push -q origin third feature/m 2>/dev/null; "${GIT[@]}" -C "$T2" checkout -q feature/m; OLDTIP="$("${GIT[@]}" -C "$T2" rev-parse HEAD)"
+"${GIT[@]}" -C "$T2" checkout -q -b octo trunk; "${GIT[@]}" -C "$T2" merge -q --no-ff --no-commit other third >/dev/null 2>&1
+printf 'def f():\n    k = "%s"\n' "$FAKE_AWS" >> "$T2/src/a.py"; echo o >> "$T2/docs/STATUS.md"
+"${GIT[@]}" -C "$T2" add -A; "${GIT[@]}" -C "$T2" commit -q --no-verify -m octopus
+printf 'refs/heads/octo %s refs/heads/octo %s\n' "$("${GIT[@]}" -C "$T2" rev-parse HEAD)" "$ZERO" > "$PS"
+out="$(cd "$T2" && "$RS" origin "$B2" < "$PS" 2>&1)"; check "pre-push: an indented key in an octopus merge is caught" 1 "$?"
+contains "pre-push: ...and named" "src/a.py" "$out"
+# A plain added line that starts with '++ ' is content, not a header.
+"${GIT[@]}" -C "$T2" checkout -q -b plus trunk; printf '++ k = "%s"\n' "$FAKE_AWS" > "$T2/src/p.py"; echo p >> "$T2/docs/STATUS.md"
+"${GIT[@]}" -C "$T2" add -A; "${GIT[@]}" -C "$T2" commit -q --no-verify -m plus
+printf 'refs/heads/plus %s refs/heads/plus %s\n' "$("${GIT[@]}" -C "$T2" rev-parse HEAD)" "$ZERO" > "$PS"
+( cd "$T2" && "$RS" origin "$B2" < "$PS" ) 2>/dev/null; check "pre-push: an added line starting '++ ' is scanned" 1 "$?"
+# A key on a side branch that the merge then discards (-s ours) still went out; name the file.
+"${GIT[@]}" -C "$T2" checkout -q -b side trunk; echo 'KEY = "'"$FAKE_AWS"'"' > "$T2/src/a.py"; "${GIT[@]}" -C "$T2" commit -q --no-verify -qam side
+"${GIT[@]}" -C "$T2" checkout -q -b ours trunk; echo s >> "$T2/docs/STATUS.md"; "${GIT[@]}" -C "$T2" commit -qam s
+"${GIT[@]}" -C "$T2" merge -q -s ours --no-edit side
+printf 'refs/heads/ours %s refs/heads/ours %s\n' "$("${GIT[@]}" -C "$T2" rev-parse HEAD)" "$ZERO" > "$PS"
+out="$(cd "$T2" && "$RS" origin "$B2" < "$PS" 2>&1)"; contains "pre-push: a key on a discarded side branch is named" "src/a.py introduces" "$out"
+rm -rf "$T2" "$B2"
+# User config must not hide a root commit's diff (log.showRoot=false).
+T2="$(mktemp -d)"; B2="$(mktemp -d)"; "${GIT[@]}" init -q --bare "$B2"; "${GIT[@]}" -C "$T2" init -q; "${GIT[@]}" -C "$T2" remote add origin "$B2"
+mkdir -p "$T2/src"; echo 'KEY = "'"$FAKE_AWS"'"' > "$T2/src/k.py"; "${GIT[@]}" -C "$T2" add -A; "${GIT[@]}" -C "$T2" commit -q --no-verify -m root
+printf 'refs/heads/r %s refs/heads/r %s\n' "$("${GIT[@]}" -C "$T2" rev-parse HEAD)" "$ZERO" > "$PS"
+( cd "$T2" && GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=log.showRoot GIT_CONFIG_VALUE_0=false "$RS" origin "$B2" < "$PS" ) 2>/dev/null
+check "pre-push: log.showRoot=false does not hide a root commit" 1 "$?"
 rm -rf "$T2" "$B2"
 # Pushing to a URL: only the destination's own refs say what it already has, not other remotes'.
 T2="$(mktemp -d)"; B2="$(mktemp -d)"; PUB="$(mktemp -d)"; push_fixture "$T2" "$B2"; "${GIT[@]}" init -q --bare "$PUB"
@@ -203,6 +231,16 @@ T2="$(mktemp -d)"; B2="$(mktemp -d)"; SRC="$(mktemp -d)"; push_fixture "$SRC" "$
 "${GIT[@]}" -C "$T2" remote add origin "$B2"; echo 'n = 1' > "$T2/src/new.py"; "${GIT[@]}" -C "$T2" add -A; "${GIT[@]}" -C "$T2" commit -q -m new
 printf 'refs/heads/feature/s %s refs/heads/feature/s %s\n' "$("${GIT[@]}" -C "$T2" rev-parse HEAD)" "$ZERO" > "$PS"
 ( cd "$T2" && "$RS" origin "$B2" < "$PS" ) 2>/dev/null; check "pre-push: a shallow clone's graft does not pass the STATUS check" 1 "$?"
+# A graft the destination is not known to have (a shallow fetch of a fork's tip) cannot be skipped.
+FORK="$(mktemp -d)"; T3="$(mktemp -d)"; "${GIT[@]}" clone -q -b trunk "$B2" "$FORK/w" 2>/dev/null
+"${GIT[@]}" -C "$FORK/w" checkout -q -b fk; echo 'KEY = "'"$FAKE_AWS"'"' > "$FORK/w/src/k.py"; echo f >> "$FORK/w/docs/STATUS.md"
+"${GIT[@]}" -C "$FORK/w" add -A; "${GIT[@]}" -C "$FORK/w" commit -q --no-verify -m fork
+"${GIT[@]}" -C "$T3" init -q; "${GIT[@]}" -C "$T3" remote add origin "$B2"; "${GIT[@]}" -C "$T3" fetch -q origin 2>/dev/null
+"${GIT[@]}" -C "$T3" fetch -q --depth 1 "file://$FORK/w" fk; "${GIT[@]}" -C "$T3" checkout -q -b fk FETCH_HEAD
+printf 'refs/heads/fk %s refs/heads/fk %s\n' "$("${GIT[@]}" -C "$T3" rev-parse HEAD)" "$ZERO" > "$PS"
+out="$(cd "$T3" && "$RS" origin "$B2" < "$PS" 2>&1)"; check "pre-push: a shallow fork tip the remote lacks is not skipped" 1 "$?"
+contains "pre-push: ...and says why" "shallow" "$out"
+rm -rf "$FORK" "$T3"
 rm -rf "$T2" "$B2" "$SRC"
 # A first push of a long history is scanned in one pass, not one history walk per file.
 T2="$(mktemp -d)"; B2="$(mktemp -d)"; "${GIT[@]}" init -q --bare "$B2"; "${GIT[@]}" -C "$T2" init -q; "${GIT[@]}" -C "$T2" remote add origin "$B2"
