@@ -68,13 +68,24 @@ case "$tool" in
   Bash)
     cmd="$(printf '%s' "$payload" | nonna_json_field '.tool_input.command')"
     [ -n "$cmd" ] || exit 0
-    # How the shell will see it (lib/shell-words.awk). Two readings, checked together: A keeps each
-    # word whole, so a quoted value with a space cannot shift the words after it; B exposes what a
-    # quoted string holds, so code in sh -c "…" or "$(…)" is seen. A commit message is masked in a
-    # plain git command only. A match in either refuses. Without awk: quotes deleted, nothing
-    # masked, which can only refuse more.
+    # How the shell will see it (lib/shell-words.awk). Readings, checked together: A keeps each word
+    # whole, so a quoted value with a space cannot shift the words after it; B exposes what a quoted
+    # string holds, so code in sh -c "…" or "$(…)" is seen; and B read again, masking nothing, until
+    # it stops changing, so a quote nested inside one (sh -c '… "--force"') is removed as the inner
+    # shell removes it. A message is masked only where the reading is sure to be the shell's. A match
+    # in any refuses. Without awk: quotes deleted, nothing masked, which can only refuse more.
     words() { printf '%s\n' "$cmd" | awk -v out="$1" -f "$here/lib/shell-words.awk" 2>/dev/null; }
-    segs="$(words A; words B)"
+    lvl="$(words B)"
+    segs="$(words A)"$'\n'"$lvl"
+    case "$lvl" in *[\'\"\\]*) # a quote or an escape is left inside a quoted string
+      for _ in 1 2 3; do
+        next="$(printf '%s\n' "$lvl" | awk -v out=B -v nomask=1 -f "$here/lib/shell-words.awk" 2>/dev/null)"
+        [ "$next" = "$lvl" ] && break
+        segs="$segs"$'\n'"$next"
+        lvl="$next"
+      done
+      ;;
+    esac
     if [ -z "${segs//[[:space:]]/}" ]; then
       # shellcheck disable=SC2020  # tr maps each of those characters to a newline
       segs="$(printf '%s\n' "$cmd" | tr -d "\"'\\\\" | tr ';&|()`' '\n\n\n\n\n\n')"
