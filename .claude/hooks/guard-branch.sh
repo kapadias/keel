@@ -247,14 +247,23 @@ case "$tool" in
     # Her /nonna scripts are the user's switch, run by the skill when a person types /nonna: they
     # change her settings, as git config nonna.* does. A command that names them (her skill's
     # directory, nonna.sh, or any script when it runs inside her directory) and runs a shell is
-    # refused, however the two are joined. A shell runs as a command (sh, bash, source, ., exec, or
-    # a *.sh as the command) or through one that runs another (env, sudo, xargs, find -exec, …);
-    # a shell's name as a word to grep for runs nothing, and reading, linting or staging is fine.
+    # refused, however the two are joined. A shell runs as a command (sh, bash, source, ., exec,
+    # eval, a *.sh, or any program given by its path, as a copy would be) or through one that runs
+    # another (env, sudo, xargs, find -exec, …); a shell's name as a word to grep for runs nothing.
+    # A part of the command that only reads her files (cat, grep, shellcheck, git add or diff, …,
+    # redirecting nothing) does not name them, unless a pipe or a command or process substitution
+    # could carry what it read into a shell: so reading or linting her scripts, then running the
+    # suite, passes.
     HERS='(^|[^A-Za-z0-9_.-])(skills/nonna|nonna/scripts|nonna\.sh)([^A-Za-z0-9_-]|$)'
     SH='([^[:space:]]*/)?(sh|bash|zsh|dash|ksh|mksh|yash|fish|busybox)'
     WRAP='([^[:space:]]*/)?(env|sudo|doas|xargs|nohup|exec|command|builtin|nice|timeout|time|stdbuf|setsid|ionice|chrt|taskset|flock|unbuffer|parallel|watch)|-(exec|execdir|ok|okdir)'
-    SHELLS="${AT}(${SH}|source|\\.|exec|[^[:space:]]*\\.sh)([[:space:]]|$)|(^|[[:space:]])(${WRAP})[[:space:]](.*[[:space:]])?${SH}([[:space:]]|$)"
-    if { [ "$in_hers" = 1 ] || printf '%s\n' "$segs" | grep -qiE "$HERS"; } \
+    SHELLS="${AT}(${SH}|source|\\.|exec|eval|[^[:space:]]*\\.sh|\\.{0,2}/[^[:space:]]*|~/[^[:space:]]*)([[:space:]]|$)|(^|[[:space:]])(${WRAP})[[:space:]](.*[[:space:]])?${SH}([[:space:]]|$)"
+    READS='(cat|less|more|head|tail|grep|egrep|fgrep|rg|ag|ack|wc|ls|stat|file|shellcheck|diff|cmp|nl|bat|git[[:space:]]+(add|diff|log|show|status|blame|ls-files|grep))'
+    named="$segs"
+    if ! printf '%s' "$cmd" | grep -qE '\||<\(|>\(|\$\(|`'; then
+      named="$(printf '%s\n' "$segs" | grep -vE "^[[:space:]]*([^[:space:]]*/)?${READS}([[:space:]][^>${RD}]*)?$")"
+    fi
+    if { [ "$in_hers" = 1 ] || printf '%s\n' "$named" | grep -qiE "$HERS"; } \
       && printf '%s\n' "$segs" | grep -qiE "$SHELLS"; then
       recipe "refusing to run her /nonna scripts: they change her settings."
     fi
