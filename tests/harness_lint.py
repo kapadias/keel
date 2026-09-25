@@ -206,7 +206,7 @@ for _event, entries in (settings.get("hooks") or {}).items():
     for entry in entries:
         for hook in entry.get("hooks", []):
             m = re.search(
-                r"\$\{?CLAUDE_PROJECT_DIR\}?/(\S+\.sh)", hook.get("command", "")
+                r'"?\$\{?CLAUDE_PROJECT_DIR\}?"?/(\S+\.sh)', hook.get("command", "")
             )
             if m and not os.path.isfile(os.path.join(ROOT, m.group(1))):
                 bad(f"settings.json: wired hook missing on disk: {m.group(1)}")
@@ -516,9 +516,10 @@ def hook_shape(cfg: dict) -> dict:
             scripts = []
             for hook in entry.get("hooks", []):
                 cmd = hook.get("command", "")
-                cmd = re.sub(r"^\$\{?CLAUDE_PLUGIN_ROOT\}?/", "", cmd)
-                cmd = re.sub(r"^\$\{?CLAUDE_PROJECT_DIR\}?/\.claude/", "", cmd)
-                scripts.append(cmd)
+                cmd = re.sub(r'^"?\$\{?CLAUDE_PLUGIN_ROOT\}?"?/', "", cmd)
+                cmd = re.sub(r'^"?\$\{?CLAUDE_PROJECT_DIR\}?"?/\.claude/', "", cmd)
+                # The script is the gate; arguments (SessionStart's plugin data dir) are not.
+                scripts.append(cmd.split()[0] if cmd.strip() else cmd)
             by_matcher.setdefault(entry.get("matcher", "*"), []).extend(scripts)
         shape[event] = by_matcher
     return shape
@@ -544,10 +545,34 @@ if os.path.isfile(plugin_hooks):
             for hook in entry.get("hooks", []):
                 # The nonna plugin's root is .claude/ (marketplace source "./.claude").
                 m = re.search(
-                    r"\$\{CLAUDE_PLUGIN_ROOT\}/(\S+\.sh)", hook.get("command", "")
+                    r'"?\$\{CLAUDE_PLUGIN_ROOT\}"?/(\S+\.sh)', hook.get("command", "")
                 )
                 if m and not os.path.isfile(os.path.join(ROOT, ".claude", m.group(1))):
                     bad(f"hooks.json: wired hook missing on disk: {m.group(1)}")
+
+# --- hook commands quote their root ---
+# Claude Code substitutes the plugin root or project dir into the command and runs it through a
+# shell. Unquoted, a path with a space ("Application Support", "/Users/a b") splits into words:
+# the script is never found and the gate silently never runs. `claude plugin validate` warns for
+# hooks.json only; settings.json has no validator, so the lint holds both.
+for rel, prefix in (
+    (".claude/hooks/hooks.json", '"${CLAUDE_PLUGIN_ROOT}"/'),
+    (".claude/settings.json", '"$CLAUDE_PROJECT_DIR"/'),
+):
+    path = os.path.join(ROOT, rel)
+    if not os.path.isfile(path):
+        continue
+    with open(path, encoding="utf-8") as fh:
+        wiring = json.load(fh)
+    for event, entries in (wiring.get("hooks") or {}).items():
+        for entry in entries:
+            for hook in entry.get("hooks", []):
+                cmd = hook.get("command", "")
+                if not cmd.startswith(prefix):
+                    bad(
+                        f"{rel}: {event} hook '{cmd}' must start with {prefix} "
+                        f"(quote the root so a path with a space cannot split it)"
+                    )
 
 if offenders:
     print("Harness lint FAILED:")

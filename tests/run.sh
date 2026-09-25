@@ -1128,6 +1128,28 @@ printf '# Changelog\n\n## [1x0x0] - x\n\nwrong section\n' > "$TMP/CH2.md"
 bash "$RN" 1.0.0 "$TMP/CH2.md" >/dev/null 2>&1; check "version matches literally, not as a regex" 1 "$?"
 rm -rf "$TMP"
 
+echo "== hook wiring (every command survives a path with a space) =="
+# Claude Code puts the plugin root or the project dir into each hook command and hands it to a
+# shell. Under an unquoted root, "/Users/a b/..." splits into words: the shell reports "not
+# found" (126/127) and the gate silently never runs. Run every wired command from such a path.
+SP="$(mktemp -d)/with space"; mkdir -p "$SP"; cp -R "$ROOT/.claude" "$SP/.claude"; "${GIT[@]}" -C "$SP" init -q
+unrunnable() { # <json file>: prints each command the shell could not even start
+  python3 -c 'import json,sys
+for es in json.load(open(sys.argv[1]))["hooks"].values():
+    for e in es:
+        for h in e["hooks"]: print(h["command"])' "$1" | while IFS= read -r cmd; do
+    (cd "$SP" && printf '{}' | CLAUDE_PLUGIN_ROOT="$SP/.claude" CLAUDE_PROJECT_DIR="$SP" bash -c "$cmd" >/dev/null 2>&1)
+    case $? in 126 | 127) printf '%s\n' "$cmd" ;; esac
+  done
+}
+bad_cmds="$(unrunnable "$SP/.claude/hooks/hooks.json")"
+if [ -z "$bad_cmds" ]; then rc=0; else rc=1; fi
+check "hooks.json: every command runs from a plugin root with a space${bad_cmds:+ (not: $bad_cmds)}" 0 "$rc"
+bad_cmds="$(unrunnable "$SP/.claude/settings.json")"
+if [ -z "$bad_cmds" ]; then rc=0; else rc=1; fi
+check "settings.json: every command runs from a project dir with a space${bad_cmds:+ (not: $bad_cmds)}" 0 "$rc"
+rm -rf "$(dirname "$SP")"
+
 echo "== harness_lint.py (the linter is itself a gate) =="
 # A linter with no failing-case test is an unverified gate: it would still print
 # "OK" if a check silently stopped firing. Each case copies the real tree, breaks
@@ -1310,6 +1332,41 @@ FX="$(lint_fixture)"
 sed -i 's/Does the fix add code?/Is it nice?/' "$FX/.claude/skills/code-review/references/severity-rubric.md"
 out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks the rubric losing the adds-code calibration" 1 "$?"
 contains "lint: names the rubric for the review-inflation rule" "missing 'Does the fix add code?'" "$out"
+rm -rf "$FX"
+
+# Hook commands quote their root. Claude Code puts the path into a shell command, and an
+# unquoted path with a space splits into words: the script is never found and the gate never runs.
+set_hook_cmd() { # <json file> <event> <command>: rewrite that event's first hook command
+  python3 - "$@" <<'PY'
+import json, sys
+path, event, cmd = sys.argv[1:4]
+cfg = json.load(open(path, encoding="utf-8"))
+cfg["hooks"][event][0]["hooks"][0]["command"] = cmd
+json.dump(cfg, open(path, "w", encoding="utf-8"), indent=2)
+PY
+}
+FX="$(lint_fixture)"
+set_hook_cmd "$FX/.claude/hooks/hooks.json" PostToolUse '${CLAUDE_PLUGIN_ROOT}/hooks/format.sh'
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks an unquoted plugin root in hooks.json" 1 "$?"
+contains "lint: says to quote the plugin root" '"${CLAUDE_PLUGIN_ROOT}"/' "$out"
+rm -rf "$FX"
+FX="$(lint_fixture)"
+set_hook_cmd "$FX/.claude/settings.json" PostToolUse '$CLAUDE_PROJECT_DIR/.claude/hooks/format.sh'
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks an unquoted project dir in settings.json" 1 "$?"
+contains "lint: says to quote the project dir" '"$CLAUDE_PROJECT_DIR"/' "$out"
+rm -rf "$FX"
+# The quoted form must not blind the wired-script checks: a script that is gone is still reported.
+FX="$(lint_fixture)"
+rm "$FX/.claude/hooks/format.sh"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a wired hook script that is missing" 1 "$?"
+contains "lint: settings.json names the missing script" "settings.json: wired hook missing on disk: .claude/hooks/format.sh" "$out"
+contains "lint: hooks.json names the missing script" "hooks.json: wired hook missing on disk: hooks/format.sh" "$out"
+rm -rf "$FX"
+# Arguments after the script (SessionStart gets the plugin data dir) are not part of the gate's identity.
+FX="$(lint_fixture)"
+set_hook_cmd "$FX/.claude/settings.json" Stop '"$CLAUDE_PROJECT_DIR"/.claude/hooks/format.sh'
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a gate wired differently in the two install modes" 1 "$?"
+contains "lint: names the event that differs" "hook wiring: 'Stop' differs" "$out"
 rm -rf "$FX"
 
 printf '\n%s passed, %s failed\n' "$PASS" "$FAIL"
