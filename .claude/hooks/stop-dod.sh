@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Stop — do not let a turn end declaring work done while docs/STATUS.md is stale.
+# Stop — do not let a turn end declaring work done while the suite is red, or (full mode, in a repo
+# that keeps docs/STATUS.md) while that record is stale.
 #
-# Nonna already blocks this at push time (require-status-sync.sh). That is too
-# late: the agent has usually already said "done" several turns earlier, and the
-# five mirrors have been out of agreement the whole time (rules/sync.md). This
-# pulls the same check to the end of every turn that actually changed tracked
-# code, so drift is caught where it starts.
+# Nonna already blocks both at push time (require-status-sync.sh). That is too
+# late: the agent has usually already said "done" several turns earlier. This
+# pulls the checks to the end of every turn that actually changed tracked code,
+# so the problem is caught where it starts.
 #
-# Deliberately narrow. It fires ONLY when tracked, non-doc files are modified
-# and docs/STATUS.md is untouched. Reading, planning, running tests, and
-# doc-only edits all end freely. Claude Code overrides a Stop hook after 8
-# consecutive blocks, so this can annoy but cannot deadlock.
+# Deliberately narrow. It fires ONLY when tracked, non-doc files are modified.
+# Reading, planning, running tests, and doc-only edits all end freely. Claude
+# Code overrides a Stop hook after 8 consecutive blocks, so this can annoy but
+# cannot deadlock.
 #
 # Fails OPEN by design, unlike Nonna's write-time gates: a Stop hook that errors
 # on a machine without git would wedge every turn in the session, and the
@@ -25,7 +25,8 @@ command -v git >/dev/null 2>&1 || exit 0
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 # shellcheck source=/dev/null
 . "$here/lib/core.sh"
-[ "$(nonna_mode)" = off ] && exit 0 # off means off: nothing enforced, nothing said
+mode="$(nonna_mode)"
+[ "$mode" = off ] && exit 0 # off means off: nothing enforced, nothing said
 
 # What changed, ignoring the surfaces that are not "code" for DoD purposes:
 # docs/ (STATUS lives there), and .claude/reviews/ (transient, git-ignored).
@@ -70,25 +71,34 @@ if ! printf '%s' "$payload" | grep -qE '"stop_hook_active"[[:space:]]*:[[:space:
       if [ "$rc" = 0 ]; then
         [ -n "$key" ] && [ -n "$green_file" ] && printf '%s\n' "$key" > "$green_file" 2>/dev/null
       elif [ "$rc" != 124 ]; then
-        tail_line="$(printf '%s' "${NONNA_TEST_TAIL:-}" | tr '\n' '|' | cut -c1-600)"
-        reason="Nonna: you said done; the tests say no. \`$cmd\` failed: ${tail_line} Fix it and run the full suite, or tell the user plainly that it is not done and why. "
+        # Her line, a stable tag the tools can match, then what failed, a line each (600 chars at most).
+        shown="$(printf '%s\n' "${NONNA_TEST_TAIL:-}" | awk '{ n += length($0) + 3; if (n > 600) exit; print "  " $0 }')"
+        reason="✗ Nonna: you said done; the tests say no. (stop: \`$(nonna_shown_cmd "$cmd")\` failed)
+${shown}
+Fix it and run the full suite, or tell the user plainly that it is not done and why.
+"
       fi
     fi
   fi
 fi
 
-# Already synced? Covers staged, unstaged, and committed-this-branch.
-if ! git status --porcelain -- docs/STATUS.md 2>/dev/null | grep -q .; then
+# The Definition-of-Done record is full mode's, and only where the repo keeps one: a lite repo, or one
+# with no docs/STATUS.md, is never asked to write it. Already synced? Covers staged and unstaged.
+if [ "$mode" = full ] && [ -f docs/STATUS.md ] \
+  && ! git status --porcelain -- docs/STATUS.md 2>/dev/null | grep -q .; then
   count="$(printf '%s\n' "$dirty" | grep -c . || true)"
-  reason="${reason}Nonna: write it in the recipe book before you leave the table. Definition of Done: ${count} tracked file(s) changed but docs/STATUS.md is untouched. Update it with what changed and the current state (rules/sync.md), or say explicitly why this turn is not a completed unit of work. The pre-push hook will block the push otherwise."
+  reason="${reason}✗ Nonna: write it in the recipe book before you leave the table. Definition of Done: ${count} tracked file(s) changed but docs/STATUS.md is untouched. Update it with what changed and the current state (rules/sync.md), or say explicitly why this turn is not a completed unit of work. The pre-push hook will block the push otherwise."
 fi
 [ -n "$reason" ] || exit 0
 
 if command -v jq >/dev/null 2>&1; then
   jq -cn --arg r "$reason" '{decision: "block", reason: $r}'
 else
-  # No jq: printable ASCII only, then escape the two characters JSON strings cannot hold raw.
-  reason="$(printf '%s' "$reason" | LC_ALL=C tr -c '[:print:]' ' ' | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  # No jq: printable ASCII and newlines only (a stray byte must not make the JSON invalid, which
+  # would fail the gate open), escape the two characters JSON strings cannot hold raw, and write
+  # each newline as \n.
+  reason="$(printf '%s' "$reason" | LC_ALL=C tr -c '[:print:]\n' ' ' | sed 's/\\/\\\\/g; s/"/\\"/g' \
+    | awk 'NR > 1 { printf "\\n" } { printf "%s", $0 }')"
   printf '{"decision":"block","reason":"%s"}\n' "$reason"
 fi
 exit 0

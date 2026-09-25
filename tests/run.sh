@@ -85,7 +85,9 @@ TMP="$(mktemp -d)"; BARE="$(mktemp -d)"
 "${GIT[@]}" init -q --bare "$BARE"
 "${GIT[@]}" -C "$TMP" init -q
 "${GIT[@]}" -C "$TMP" remote add origin "$BARE"
-"${GIT[@]}" -C "$TMP" commit -q --allow-empty -m init
+git -C "$TMP" config nonna.mode full  # the STATUS gate is full mode's, on a repo that keeps the file
+mkdir -p "$TMP/docs"; echo 'S' > "$TMP/docs/STATUS.md"; "${GIT[@]}" -C "$TMP" add -A
+"${GIT[@]}" -C "$TMP" commit -q -m init
 "${GIT[@]}" -C "$TMP" branch -M main
 "${GIT[@]}" -C "$TMP" push -q origin main
 "${GIT[@]}" -C "$TMP" checkout -q -b feature/y
@@ -93,7 +95,11 @@ TMP="$(mktemp -d)"; BARE="$(mktemp -d)"
 mkdir -p "$TMP/src"; echo 'def f(): return 1' > "$TMP/src/app.py"
 "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m "code, no status"
 ( cd "$TMP" && "$RS" ); check "blocks code push without STATUS update" 1 "$?"
-mkdir -p "$TMP/docs"; echo 'changed' > "$TMP/docs/STATUS.md"
+( cd "$TMP" && NONNA_MODE=lite "$RS" ); check "pre-push: in lite mode a stale STATUS does not block" 0 "$?"
+mv "$TMP/docs/STATUS.md" "$TMP/docs/STATUS.bak"
+( cd "$TMP" && "$RS" ); check "pre-push: full mode without docs/STATUS.md has no STATUS gate" 0 "$?"
+mv "$TMP/docs/STATUS.bak" "$TMP/docs/STATUS.md"
+echo 'changed' > "$TMP/docs/STATUS.md"
 "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m "update STATUS"
 ( cd "$TMP" && "$RS" ); check "allows code push with STATUS update" 0 "$?"
 out="$(cd "$TMP" && NONNA_TEST_CMD=false "$RS" 2>&1)"; check "pre-push: a red test suite blocks the push" 1 "$?"
@@ -159,6 +165,7 @@ rm -rf "$T2" "$B2"
 # A fresh repo with a pushed base, for the cases below: $1 = the dir, $2 = its bare remote.
 push_fixture() {
   "${GIT[@]}" init -q --bare "$2"; "${GIT[@]}" -C "$1" init -q; "${GIT[@]}" -C "$1" remote add origin "$2"
+  git -C "$1" config nonna.mode full  # these repos keep docs/STATUS.md: full mode's record applies
   mkdir -p "$1/docs" "$1/src"; echo s > "$1/docs/STATUS.md"; echo 'a = 1' > "$1/src/a.py"; echo 'b = 1' > "$1/src/b.py"
   "${GIT[@]}" -C "$1" add -A; "${GIT[@]}" -C "$1" commit -q -m root; "${GIT[@]}" -C "$1" branch -M trunk
   "${GIT[@]}" -C "$1" push -q origin trunk 2>/dev/null
@@ -937,6 +944,7 @@ SD="$HOOKS/stop-dod.sh"
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 mkdir -p "$TMP/docs"; printf 'x\n' > "$TMP/src.py"; printf 'S\n' > "$TMP/docs/STATUS.md"
 "${GIT[@]}" -C "$TMP" add -A >/dev/null; "${GIT[@]}" -C "$TMP" commit -qm init
+git -C "$TMP" config nonna.mode full  # the STATUS gate is full mode's, on a repo that keeps the file
 printf 'clean tree\n' > /dev/null
 out="$(printf '{}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"; check "clean tree: turn ends freely" 0 "$?"
 contains "clean tree: emits no block" "" "$out"
@@ -944,6 +952,12 @@ printf 'y\n' >> "$TMP/src.py"
 out="$(printf '{}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"
 contains "code changed + STATUS stale: blocks" '"decision":"block"' "$out"
 contains "block names the Definition of Done" "Definition of Done" "$out"
+out="$(printf '{}' | NONNA_MODE=lite CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+printf '%s' "$out" | grep -q '"decision"'; check "stop: in lite mode a stale STATUS does not block" 1 "$?"
+mv "$TMP/docs/STATUS.md" "$TMP/STATUS.bak"; "${GIT[@]}" -C "$TMP" rm -q --cached docs/STATUS.md
+out="$(printf '{}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+printf '%s' "$out" | grep -q 'Definition of Done'; check "stop: full mode without docs/STATUS.md has no STATUS gate" 1 "$?"
+"${GIT[@]}" -C "$TMP" reset -q; mv "$TMP/STATUS.bak" "$TMP/docs/STATUS.md"
 printf 'more\n' >> "$TMP/docs/STATUS.md"
 out="$(printf '{}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"
 printf '%s' "$out" | grep -q '"decision"'; check "STATUS updated alongside: does NOT block" 1 "$?"
@@ -977,6 +991,16 @@ out="$(printf '{"stop_hook_active":false}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"
 printf '%s' "$out" | grep -q '"decision"'; check "stop: a green suite with STATUS updated ends freely" 1 "$?"
 out="$(printf '{}' | NONNA_TEST_CMD=false CLAUDE_PROJECT_DIR="$TMP" "$SD")"
 contains "stop: NONNA_TEST_CMD overrides detection" "the tests say no" "$out"
+out="$(printf '{}' | NONNA_TEST_CMD='printf "collected 4 items\n\n..F.\nFAILED tests/test_a.py::test_x - assert 1 == 2\nFAILED tests/test_b.py::test_y\n1 failed, 3 passed in 0.01s\n"; false' CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+reason="$(printf '%s' "$out" | jq -r .reason)"
+contains "stop: the block carries a stable tag after her line" '(stop: `printf' "$reason"
+contains "stop: failing tests get lines of their own" "$(printf '\n  FAILED tests/test_a.py::test_x - assert 1 == 2\n  FAILED tests/test_b.py::test_y')" "$reason"
+contains "stop: the summary line follows the failures" "1 failed, 3 passed" "$reason"
+printf '%s' "$reason" | tail -n +2 | grep -q 'collected 4 items'; check "stop: noise above the failures is left out" 1 "$?"
+out="$(printf '{}' | NONNA_TEST_CMD='printf "\033[31mFAILED t.py::t\033[0m\n"; false' CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+printf '%s' "$out" | jq -r .reason | grep -q "$(printf '\033')"; check "stop: colour codes are stripped" 1 "$?"
+out="$(printf '{}' | NONNA_TEST_CMD="echo 'aws_key = \"$FAKE_AWS\"'; echo 'FAILED t.py::t'; false" CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+printf '%s' "$out" | grep -q "$FAKE_AWS"; check "stop: a secret in the test output never reaches the agent" 1 "$?"
 # A green run is remembered: the same tree and command are not re-run at every turn end.
 CNT="$(mktemp)"; printf 'def f():\n    return 4\n' > "$TMP/app.py"
 printf '{}' | NONNA_TEST_CMD="echo x >> $CNT" CLAUDE_PROJECT_DIR="$TMP" "$SD" >/dev/null

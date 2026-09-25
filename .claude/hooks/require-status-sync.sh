@@ -21,7 +21,8 @@ here="$(cd "$(dirname "$self")" && pwd)"
 . "$here/lib/secret-patterns.sh"
 # shellcheck source=/dev/null
 . "$here/lib/core.sh"
-[ "$(nonna_mode)" = off ] && exit 0 # off means off: nothing enforced, nothing said
+mode="$(nonna_mode)"
+[ "$mode" = off ] && exit 0 # off means off: nothing enforced, nothing said
 
 # What is being pushed: every commit the remote does not have yet, never "since a local branch" (a
 # commit that only exists locally, say a --no-verify root commit on main, is pushed too). git passes
@@ -113,7 +114,8 @@ while IFS= read -r -d '' f; do
 done < "$tmp/names"
 
 fail=0
-if [ -n "$code_touched" ] && [ -z "$status_touched" ]; then
+# The Definition-of-Done record is full mode's, and only where the repo keeps one.
+if [ -n "$code_touched" ] && [ -z "$status_touched" ] && [ "$mode" = full ] && [ -f docs/STATUS.md ]; then
   {
     echo "✗ Nonna: you cooked, now write it in the recipe book. (Definition of Done: code changed but docs/STATUS.md was not updated.)"
     echo "  Update docs/STATUS.md (rules/sync.md), or 'git push --no-verify' if truly N/A."
@@ -173,13 +175,13 @@ if [ -n "$code_touched" ] && [ -f "$here/lib/tests.sh" ]; then
       rc=$?
       if [ "$rc" = 124 ]; then
         {
-          echo "✗ Nonna: the tests never finished, so they did not say yes. (pre-push: \`$cmd\` timed out after ${NONNA_TEST_TIMEOUT:-600}s.)"
+          echo "✗ Nonna: the tests never finished, so they did not say yes. (pre-push: \`$(nonna_shown_cmd "$cmd")\` timed out after ${NONNA_TEST_TIMEOUT:-600}s.)"
           echo "  Raise NONNA_TEST_TIMEOUT, or set NONNA_TEST_CMD to a faster suite."
         } >&2
         fail=1
       elif [ "$rc" != 0 ]; then
         {
-          echo "✗ Nonna: you said done; the tests say no. (pre-push: \`$cmd\` failed.)"
+          echo "✗ Nonna: you said done; the tests say no. (pre-push: \`$(nonna_shown_cmd "$cmd")\` failed.)"
           printf '%s\n' "${NONNA_TEST_TAIL:-}" | sed 's/^/    /'
           echo "  Fix it, or set NONNA_TEST_CMD if that is not your test command."
         } >&2

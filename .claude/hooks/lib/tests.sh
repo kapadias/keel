@@ -12,7 +12,10 @@
 # nonna_detect_test_cmd  prints the command detection finds here: pytest config/tests,
 #                  package.json's "test" script, go.mod or Cargo.toml.
 # nonna_run_tests  runs it with a timeout (NONNA_TEST_TIMEOUT seconds, default 600); exit status is
-#                  the suite's, 124 when it timed out; output tail in $NONNA_TEST_TAIL.
+#                  the suite's, 124 when it timed out. $NONNA_TEST_TAIL gets what a person needs to
+#                  see: up to five failing-test lines (pytest, jest, go, cargo, TAP) and the summary,
+#                  else the last eight lines; colour codes stripped, and any line that looks like a
+#                  secret replaced, because this text is shown to the agent and to the user.
 # shellcheck shell=bash
 
 nonna_test_cmd() {
@@ -65,9 +68,41 @@ nonna_run_tests() { # <command>
     bash -c "$1" >"$log" 2>&1
     rc=$?
   fi
-  out="$(tail -n 8 "$log")"
+  out="$(nonna_test_digest "$log")"
   rm -f "$log"
   # shellcheck disable=SC2034  # read by the hook that sourced this file
   NONNA_TEST_TAIL="$out"
   return "$rc"
+}
+
+# nonna_shown_cmd <command>  the command as a message may show it: never one that carries a secret.
+nonna_shown_cmd() {
+  # shellcheck source=/dev/null
+  . "$(dirname "${BASH_SOURCE[0]}")/secret-patterns.sh" 2>/dev/null || { printf 'your test command'; return 0; }
+  if printf '%s' "$1" | nonna_scan_secrets >/dev/null; then printf 'your test command'; else printf '%s' "$1"; fi
+}
+
+# nonna_test_digest <log>  prints the lines of a test run worth showing (see nonna_run_tests).
+nonna_test_digest() {
+  local esc clean fails last out line class
+  esc="$(printf '\033')"
+  clean="$(sed "s/${esc}\[[0-9;]*[A-Za-z]//g" "$1" 2>/dev/null)"
+  fails="$(printf '%s\n' "$clean" | grep -E '^(FAILED|ERROR) |^--- FAIL: |^not ok |^test .* \.\.\. FAILED$|✕ ' | head -n 5)"
+  last="$(printf '%s\n' "$clean" | grep -v '^[[:space:]]*$' | tail -n 1)"
+  if [ -n "$fails" ]; then
+    out="$fails"
+    case "$fails" in *"$last"*) ;; *) out="$out
+$last" ;; esac
+  else
+    out="$(printf '%s\n' "$clean" | tail -n 8)"
+  fi
+  # shellcheck source=/dev/null
+  . "$(dirname "${BASH_SOURCE[0]}")/secret-patterns.sh" 2>/dev/null || { printf '%s\n' "$out"; return 0; }
+  while IFS= read -r line; do
+    if class="$(printf '%s' "$line" | nonna_scan_secrets)"; then
+      printf '[a line that looks like a %s was hidden]\n' "$class"
+    else
+      printf '%s\n' "$line"
+    fi
+  done <<<"$out"
 }
