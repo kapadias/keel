@@ -75,6 +75,28 @@ nonna_run_tests() { # <command>
   return "$rc"
 }
 
+# nonna_is_test_file <path>  0 when the path is a test: in a test directory, or named like one.
+#   Deliberately not the secret scan's nonna_is_test_path, which also exempts fixtures and examples.
+nonna_is_test_file() {
+  case "/$1" in */test/* | */tests/* | */__tests__/* | */spec/* | */specs/* | */testing/*) return 0 ;; esac
+  case "${1##*/}" in
+    test_*.py | *_test.py | *_test.go | *.test.[jt]s | *.test.[jt]sx | *.test.[cm][jt]s | *.spec.[jt]s \
+      | *.spec.[jt]sx | *.spec.[cm][jt]s | *Test.java | *Tests.java | *Test.kt | *Tests.kt | *_spec.rb \
+      | *_test.rb | *Test.php | *Test.cs | *Tests.cs | *Tests.swift | *_test.exs | *_test.dart | *_test.c* \
+      | *_test.rs) return 0 ;;
+  esac
+  return 1
+}
+
+# nonna_is_source_file <path>  0 when the path is program source (by extension): what a test covers.
+nonna_is_source_file() {
+  case "${1##*.}" in
+    py | js | jsx | ts | tsx | mjs | cjs | go | rs | java | kt | kts | rb | php | cs | swift | c | h | cc \
+      | cpp | hpp | m | mm | scala | ex | exs | erl | clj | dart | lua | vue | svelte) return 0 ;;
+  esac
+  return 1
+}
+
 # nonna_shown_cmd <command>  the command as a message may show it: never one that carries a secret.
 nonna_shown_cmd() {
   # shellcheck source=/dev/null

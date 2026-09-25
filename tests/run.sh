@@ -1129,6 +1129,45 @@ rm -f "$CNT"  # kept outside the repo: a counter inside it would change the tree
 # A suite slower than the Stop budget is not "red": the turn ends, the pre-push gate still runs it.
 out="$(printf '{}' | NONNA_TEST_TIMEOUT=1 NONNA_TEST_CMD='sleep 5' CLAUDE_PROJECT_DIR="$TMP" "$SD")"
 printf '%s' "$out" | grep -q '"decision"'; check "stop: a timed-out suite does not block the turn" 1 "$?"
+# "Where's the test?": source changed this session and no test did. Blocks once, like a red suite,
+# and only where there is a test command to add a test to.
+WT="$(mktemp -d)"; "${GIT[@]}" -C "$WT" init -q; mkdir -p "$WT/tests"
+printf 'def f():\n    return 1\n' > "$WT/app.py"; printf 'def test_f():\n    pass\n' > "$WT/tests/test_app.py"
+"${GIT[@]}" -C "$WT" add -A >/dev/null; "${GIT[@]}" -C "$WT" commit -qm init --no-verify
+printf 'def f():\n    return 2\n' > "$WT/app.py"
+out="$(printf '{}' | NONNA_TEST_CMD=true CLAUDE_PROJECT_DIR="$WT" "$SD")"
+contains "stop: code changed and no test did: where's the test?" "where's the test?" "$out"
+contains "stop: the no-test block carries its tag" "(stop: code changed, no test changed)" "$out"
+out="$(printf '{"stop_hook_active":true}' | NONNA_TEST_CMD=true CLAUDE_PROJECT_DIR="$WT" "$SD")"
+printf '%s' "$out" | grep -q '"decision"'; check "stop: the no-test block lets the second stop through" 1 "$?"
+out="$(printf '{}' | NONNA_TEST_CMD='' CLAUDE_PROJECT_DIR="$WT" "$SD")"
+printf '%s' "$out" | grep -q '"decision"'; check "stop: no test command, no demand for a test" 1 "$?"
+printf 'def test_g():\n    pass\n' > "$WT/tests/test_new.py"
+out="$(printf '{}' | NONNA_TEST_CMD=true CLAUDE_PROJECT_DIR="$WT" "$SD")"
+printf '%s' "$out" | grep -q '"decision"'; check "stop: a new (untracked) test file counts" 1 "$?"
+rm -f "$WT/tests/test_new.py"; printf 'def test_f():\n    assert True\n' > "$WT/tests/test_app.py"
+out="$(printf '{}' | NONNA_TEST_CMD=true CLAUDE_PROJECT_DIR="$WT" "$SD")"
+printf '%s' "$out" | grep -q '"decision"'; check "stop: a changed test file counts" 1 "$?"
+"${GIT[@]}" -C "$WT" checkout -q -- . ; printf 'x\n' >> "$WT/README.md"; "${GIT[@]}" -C "$WT" add README.md
+out="$(printf '{}' | NONNA_TEST_CMD=true CLAUDE_PROJECT_DIR="$WT" "$SD")"
+printf '%s' "$out" | grep -q '"decision"'; check "stop: a change to no source file asks for no test" 1 "$?"
+rm -rf "$WT"
+# Work committed during the session cannot dodge the gate: SessionStart records where the session
+# began, and Stop tests everything changed since, committed or not.
+WT="$(mktemp -d)"; "${GIT[@]}" -C "$WT" init -q; mkdir -p "$WT/tests"
+printf 'def f():\n    return 1\n' > "$WT/app.py"; printf 'def test_f():\n    pass\n' > "$WT/tests/test_app.py"
+"${GIT[@]}" -C "$WT" add -A >/dev/null; "${GIT[@]}" -C "$WT" commit -qm init --no-verify
+printf '{"session_id":"s-1"}' | CLAUDE_PROJECT_DIR="$WT" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh" >/dev/null
+printf 'def f():\n    return 2\n' > "$WT/app.py"; printf 'def test_f():\n    assert 0\n' > "$WT/tests/test_app.py"
+"${GIT[@]}" -C "$WT" commit -qam "red, committed" --no-verify
+out="$(printf '{"session_id":"s-1"}' | NONNA_TEST_CMD=false CLAUDE_PROJECT_DIR="$WT" "$SD")"
+contains "stop: a red suite committed this session still blocks" "the tests say no" "$out"
+out="$(printf '{"session_id":"s-other"}' | NONNA_TEST_CMD=false CLAUDE_PROJECT_DIR="$WT" "$SD")"
+printf '%s' "$out" | grep -q '"decision"'; check "stop: another session's base does not apply" 1 "$?"
+touch -d '10 days ago' "$(git -C "$WT" rev-parse --git-path nonna)/base-s-1"
+printf '{"session_id":"s-2"}' | CLAUDE_PROJECT_DIR="$WT" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh" >/dev/null
+if [ -e "$(git -C "$WT" rev-parse --git-path nonna)/base-s-1" ]; then rc=1; else rc=0; fi; check "session base: a week-old base is pruned" 0 "$rc"
+rm -rf "$WT"
 # Without jq the block must still be valid JSON, whatever the command and its output contain.
 NOJQ="$(mktemp -d)"
 for b in bash sh env cat grep sed head tail tr cut awk dirname git timeout printf mktemp cp rm; do

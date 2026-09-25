@@ -22,6 +22,18 @@ cd "$root" 2>/dev/null || exit 0
 #    unwired-gate defect ADR-0004 exists to prevent.
 #    Resolution lives in lib/core.sh, shared with subagent-start.sh.
 nonna_root="$(nonna_harness_root)"
+# 0. Where this session began. Stop tests everything changed since, committed or not, so work
+#    committed during a session cannot dodge the gate. One file per session, kept a week.
+# shellcheck source=/dev/null
+. "$here/lib/json.sh"
+sid="$(nonna_json_field '.session_id' <<<"$(cat 2>/dev/null || true)" | tr -cd 'A-Za-z0-9._-')"
+if [ -n "$sid" ] && base_dir="$(git rev-parse --git-path nonna 2>/dev/null)" && mkdir -p "$base_dir" 2>/dev/null; then
+  find "$base_dir" -name 'base-*' -mtime +7 -delete 2>/dev/null || true
+  if [ ! -e "$base_dir/base-$sid" ] && head_sha="$(git rev-parse --verify --quiet HEAD)"; then
+    printf '%s\n' "$head_sha" > "$base_dir/base-$sid" 2>/dev/null || true
+  fi
+fi
+
 # 1. Wire the git hooks (pre-push, pre-commit). A copy-in install links relative to the repo's own
 #    .claude/hooks, which survives a repo move. A plugin install links through
 #    ${CLAUDE_PLUGIN_DATA}/current, a link to the running plugin version refreshed every session: the

@@ -33,10 +33,18 @@ mode="$(nonna_mode)"
 # Order matters: drop untracked entries while the porcelain status column is
 # still present, THEN strip it. Stripping first erases the '??' marker and every
 # scratch file would read as a tracked change.
-dirty="$(git status --porcelain 2>/dev/null \
-  | grep -vE '^\?\?' \
-  | awk '{ $1=""; sub(/^ +/,""); print }' \
-  | grep -vE '^(docs/|\.claude/reviews/)' || true)"
+# Since where the session began, when SessionStart recorded it: work committed during the session
+# counts, so committing first cannot dodge the gate. Without a base, the working tree.
+sid="$(printf '%s' "$payload" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1 | tr -cd 'A-Za-z0-9._-')"
+base=""
+if [ -n "$sid" ]; then
+  base="$(head -n 1 "$(git rev-parse --git-path nonna 2>/dev/null)/base-$sid" 2>/dev/null)"
+  git cat-file -e "${base}^{commit}" 2>/dev/null || base=""
+fi
+changed="$( { [ -z "$base" ] || git diff --name-only "$base" 2>/dev/null
+  git status --porcelain 2>/dev/null | grep -vE '^\?\?' | awk '{ $1=""; sub(/^ +/,""); print }'
+} | awk 'NF && !seen[$0]++')"  # awk, not sort: minimal machines have awk
+dirty="$(printf '%s\n' "$changed" | grep -vE '^(docs/|\.claude/reviews/)' | grep . || true)"
 [ -n "$dirty" ] || exit 0
 
 reason=""
@@ -79,13 +87,29 @@ Fix it and run the full suite, or tell the user plainly that it is not done and 
 "
       fi
     fi
+    # Where's the test? Source changed this session and no test did: a fix leaves behind a test that
+    # fails without it. A new, untracked test file counts; an untracked scratch file is not source.
+    src_changed=""
+    test_changed=""
+    while IFS= read -r f; do
+      if nonna_is_test_file "$f"; then test_changed=1; elif nonna_is_source_file "$f"; then src_changed=1; fi
+    done <<<"$dirty"
+    if [ -n "$src_changed" ] && [ -z "$test_changed" ]; then
+      while IFS= read -r f; do
+        [ -n "$f" ] && nonna_is_test_file "$f" && test_changed=1 && break
+      done < <(git ls-files --others --exclude-standard 2>/dev/null)
+    fi
+    if [ -n "$src_changed" ] && [ -z "$test_changed" ]; then
+      reason="${reason}✗ Nonna: where's the test? (stop: code changed, no test changed)
+Add a test that fails without your change and passes with it, or tell the user plainly why this change needs none.
+"
+    fi
   fi
 fi
 
 # The Definition-of-Done record is full mode's, and only where the repo keeps one: a lite repo, or one
 # with no docs/STATUS.md, is never asked to write it. Already synced? Covers staged and unstaged.
-if [ "$mode" = full ] && [ -f docs/STATUS.md ] \
-  && ! git status --porcelain -- docs/STATUS.md 2>/dev/null | grep -q .; then
+if [ "$mode" = full ] && [ -f docs/STATUS.md ] && ! printf '%s\n' "$changed" | grep -qx 'docs/STATUS.md'; then
   count="$(printf '%s\n' "$dirty" | grep -c . || true)"
   reason="${reason}✗ Nonna: write it in the recipe book before you leave the table. Definition of Done: ${count} tracked file(s) changed but docs/STATUS.md is untouched. Update it with what changed and the current state (rules/sync.md), or say explicitly why this turn is not a completed unit of work. The pre-push hook will block the push otherwise."
 fi
