@@ -431,6 +431,25 @@ TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 n=0; for f in CLAUDE.md AGENTS.md GEMINI.md .cursor/rules/nonna.mdc .github/copilot-instructions.md .windsurf/rules/nonna.md .clinerules/nonna.md .kiro/steering/nonna.md; do [ -f "$TMP/$f" ] && n=$((n + 1)); done
 check "install: --host all writes all eight host files" 8 "$n"
 rm -rf "$TMP"
+# --mode lite: the gates and the house rules, nothing else; the mode is recorded for every hook.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+out="$(cd "$TMP" && NONNA_SRC="$ROOT" bash "$IN" --mode lite 2>&1)"; check "install: --mode lite succeeds" 0 "$?"
+rc=0; [ -f "$TMP/.claude/hooks/stop-dod.sh" ] && [ -f "$TMP/.claude/hooks/lib/lite.md" ] && [ -f "$TMP/.claude/settings.json" ] || rc=1; check "install: lite brings the hooks and their wiring" 0 "$rc"
+rc=0; [ ! -e "$TMP/.claude/rules" ] && [ ! -e "$TMP/.claude/agents" ] && [ ! -e "$TMP/.claude/skills" ] && [ ! -e "$TMP/CLAUDE.md" ] && [ ! -e "$TMP/docs/STATUS.md" ] || rc=1
+check "install: lite brings no rules, agents, workflows, CLAUDE.md or STATUS.md" 0 "$rc"
+check "install: lite records the mode" lite "$(git -C "$TMP" config --get nonna.mode)"
+rc=0; [ -x "$TMP/.git/hooks/pre-commit" ] && [ -x "$TMP/.git/hooks/pre-push" ] || rc=1; check "install: lite wires the git hooks" 0 "$rc"
+out="$(CLAUDE_PROJECT_DIR="$TMP" "$TMP/.claude/hooks/session-start.sh")"
+contains "install: a lite copy-in carries the house rules at session start" "Nonna is on (lite)" "$out"
+rm -rf "$TMP"
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+( cd "$TMP" && NONNA_SRC="$ROOT" bash "$IN" --mode lite --host cursor >/dev/null 2>&1 ); check "install: --mode lite --host cursor succeeds" 0 "$?"
+contains "install: lite gives other hosts the house rules" "Nonna (lite)" "$(cat "$TMP/.cursor/rules/nonna.mdc" 2>/dev/null)"
+rm -rf "$TMP"
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+( cd "$TMP" && NONNA_SRC="$ROOT" bash "$IN" --mode spicy >/dev/null 2>&1 ); check "install: an unknown mode is refused" 2 "$?"
+( cd "$TMP" && NONNA_SRC="$ROOT" bash "$IN" --mode full >/dev/null 2>&1 ); check "install: --mode full records full" full "$(git -C "$TMP" config --get nonna.mode)"
+rm -rf "$TMP"
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; printf '#!/bin/sh\necho mine\n' > "$TMP/.git/hooks/pre-commit"; chmod +x "$TMP/.git/hooks/pre-commit"
 out="$(cd "$TMP" && NONNA_SRC="$ROOT" bash "$IN" 2>&1)"; check "install: a foreign git hook does not fail the install" 0 "$?"
 grep -q 'echo mine' "$TMP/.git/hooks/pre-commit"; check "install: never overwrites a foreign git hook" 0 "$?"
