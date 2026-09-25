@@ -106,17 +106,47 @@ case "$tool" in
     lvl="$(words B)" || cant_read
     segs="$(words A)" || cant_read
     segs="$segs"$'\n'"$lvl"
+    code="$lvl" # every opened level, read as the code a nested shell would run
     n=0
     while [ "$n" -lt 6 ] && quoted "$lvl"; do
       next="$(printf '%s\n' "$lvl" | LC_ALL=C awk -v out=B -v nomask=1 -v relevel=1 -f "$here/lib/shell-words.awk" 2>/dev/null)" || cant_read
       [ "$next" = "$lvl" ] && break
       segs="$segs"$'\n'"$next"
+      code="$code"$'\n'"$next"
       lvl="$next"
       n=$((n + 1))
     done
     if [ "$n" -ge 6 ] && quoted "$lvl"; then
       kitchen_door "refusing quotes nested deeper than the guard reads; run the inner command itself."
     fi
+
+    # Brace lists and globs, as the shell expands them before it runs a word (lib/expand.awk): a line
+    # it would expand is read again, expanded, with a glob read as the name of hers it could match
+    # (git, git-push, a protected branch, .git/hooks). The command itself is read quote-exact (a
+    # quoted brace is text); every opened level as code. A glob group (bash's @(…) under extglob,
+    # zsh's (a|b)) is read in readings of its own, when a ( follows a word's character or $'…' could
+    # hide one. An expansion too large to read in time is refused.
+    top="$(printf '%s\n' "$cmd" | LC_ALL=C awk -v out=A -v qmark=1 -f "$here/lib/shell-words.awk" 2>/dev/null)" || cant_read
+    if printf '%s' "$cmd" | grep -qE "[^[:space:]\$();&|<>\`]\(|\\$'"; then
+      xw="$(printf '%s\n' "$cmd" | LC_ALL=C awk -v out=A -v qmark=1 -v xglob=1 -f "$here/lib/shell-words.awk" 2>/dev/null)" || cant_read
+      top="$top"$'\n'"$xw"
+      xl="$(printf '%s\n' "$cmd" | LC_ALL=C awk -v out=B -v xglob=1 -f "$here/lib/shell-words.awk" 2>/dev/null)" || cant_read
+      code="$code"$'\n'"$xl"
+      n=0
+      while [ "$n" -lt 6 ] && quoted "$xl"; do
+        xw="$(printf '%s\n' "$xl" | LC_ALL=C awk -v out=B -v nomask=1 -v relevel=1 -v xglob=1 -f "$here/lib/shell-words.awk" 2>/dev/null)" || cant_read
+        [ "$xw" = "$xl" ] && break
+        code="$code"$'\n'"$xw"
+        xl="$xw"
+        n=$((n + 1))
+      done
+    fi
+    grown="$(printf '%s\n%s\n' "$top" "${code//$'\016'/?}" | LC_ALL=C awk -f "$here/lib/expand.awk" 2>/dev/null)"
+    case $? in
+      0) segs="$segs"$'\n'"$grown" ;;
+      3) too_long "a brace list or a glob expands to more than it can read before the hook times out." ;;
+      *) unread "the brace and glob reader (awk) failed" ;;
+    esac
     runs_git() { printf '%s\n' "$segs" | grep -qE "${GIT}[a-z]"; }
     RD=$'\002' # the mark shell-words.awk puts before a redirection the shell performs
 

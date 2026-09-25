@@ -8,6 +8,14 @@
 #   add -v nomask=1                   to mask nothing (the guard reads B's own output again, so a
 #                                     quote nested in a quoted string is removed too); with
 #                                     -v relevel=1, the \002 marks that output carries are dropped
+#   add -v qmark=1                    to mark each quoted character that brace expansion or a glob
+#                                     would treat as special ({ } , . $ * ? [ ( ) | @ + !) with a
+#                                     \016 before it, for lib/expand.awk (a \016 in the command is ?)
+#   add -v xglob=1                    to keep a glob group inside its word: a ( that follows a
+#                                     character of the word (bash's @(…) with extglob on, zsh's
+#                                     (a|b)) runs to its ), whitespace in it a \001; in B, ( ) and |
+#                                     inside a word stay. Only the expander reads this: a ( there is
+#                                     otherwise a syntax error, or a subshell the other readings see
 #
 # A redirection the shell performs prints with a \002 mark before it (\0022> x), which no word can
 # carry (a \002 in a word prints as ?): a quoted '>' or an escaped 2\>x is a value, not a
@@ -48,6 +56,7 @@ function S(i, len,   j, m, r) {
   return (m ? sp[1] : "")
 }
 function wadd(t) { if (t != "") wp[++np] = t } # a piece of the word being read
+function qm(t) { if (qmark) gsub(/[[{},.$*?()|@+!]/, "\016&", t); return t } # a quoted piece
 function wstr(   m, i) { # the word so far: its pieces joined pairwise, then kept as one piece
   while (np > 1) {
     m = 0
@@ -94,7 +103,7 @@ function heredoc_at(i,   t, h, d, body, p, rest, e, after) {
 
 # $'…' as bash decodes it: a NUL ends the string (bash drops the rest), and a byte beyond ASCII,
 # which cannot spell a flag or a ref, stays a placeholder. Returns the index of the escape's last char.
-function put(t) { if (!cut) wadd(t) }
+function put(t) { if (!cut) wadd(qm(t)) }
 function chr(v) { if (v == 0) { cut = 1; return "" } return (v < 128 ? sprintf("%c", v) : "?") }
 function ansi_c(i,   nx, j, v, m, d, h, codes) {
   nx = ch[i + 1]
@@ -141,43 +150,54 @@ function msgflag(t, kind) {
 END {
   if (substr(s, length(s)) == "\n") s = substr(s, 1, length(s) - 1) # as reading by lines would
   if (relevel) gsub(sprintf("%c", 2), "", s) # the marks on redirections this reading printed before
+  if (qmark) gsub(/\016/, "?", s)
   gsub(/\$\{IFS\}|\$IFS/, " ", s)
   n = split(s, ch, ""); s = ""
-  state = 0; np = 0; q = 0; pre = ""; esc = 0; k = 0; sync = 1; cut = 0
+  state = 0; np = 0; q = 0; pre = ""; esc = 0; k = 0; sync = 1; cut = 0; gd = 0
   for (i = 1; i <= n; i++) {
     c = ch[i]; nx = ch[i + 1]
+    if (state == 0 && gd) { # in a glob group (xglob): the word goes on to its ), a line ends it
+      if (c == "\n") gd = 0
+      else if (c != "\\" && c != "'" && c != "\"" && !(c == "$" && (nx == "'" || nx == "\""))) {
+        if (c == "(") gd++
+        else if (c == ")") gd--
+        wadd(c == " " || c == "\t" ? "\001" : c)
+        continue
+      }
+    }
     if (state == 0) {
       # $( ` ${ $[ <( >( and << open what this reading does not follow: from here on its quoting may
       # part from the shell's, so nothing more is masked.
       if ((c == "$" && (nx == "(" || nx == "[" || (nx == "{" && !plainparam(i)))) || c == "`" || ((c == "<" || c == ">") && nx == "(") || (c == "<" && nx == "<")) sync = 0
-      if (c == "\\") { i++; if (nx != "\n") { wadd(nx); esc = 1 } }
+      if (c == "\\") { i++; if (nx != "\n") { wadd(qm(nx)); esc = 1 } }
       else if ((c == ">" || c == "<") && (nx == "|" || nx == "&" || (c == "<" && nx == ">"))) { redir(c == "<" && nx == ">" ? ">" : c); i++ } # >| >& <& <>: one redirection
       else if (c == "&" && nx == ">") { endword(); sep(">"); i++ } # &> and &>>: a redirection, not a separator
       else if (c == "'") { if (!q) pre = wstr(); q = 1; state = 1 }
       else if (c == "\"") {
         if (!q) pre = wstr()
         q = 1
-        if (sync && (e = heredoc_at(i))) { wadd(hd); i = e } else state = 2
+        if (sync && (e = heredoc_at(i))) { wadd(qm(hd)); i = e } else state = 2
       }
       else if (c == "$" && nx == "'") { if (!q) pre = wstr(); q = 1; state = 3; cut = 0; i++ }
       else if (c == "$" && nx == "\"") { if (!q) pre = wstr(); q = 1; state = 2; i++ }
       else if (c == "#" && np == 0 && !q) { while (i < n && ch[i + 1] != "\n") i++ }
       else if (c == " " || c == "\t") endword()
+      else if (xglob && c == "(" && (np || q) && ch[i - 1] != "$") { gd = 1; wadd(c) }
       else if (c == "<" || c == ">") redir(c)
       else if (c ~ /[;&|()`\n]/) { endword(); sep(c) }
       else wadd(c)
     } else if (state == 1) {
-      if (c == "'") state = 0; else wadd(c)
+      if (c == "'") state = 0; else wadd(qm(c))
     } else if (state == 3) {
       if (c == "\\") i = ansi_c(i)
       else if (c == "'") state = 0
       else put(c)
     } else {
-      if (c == "\\" && (nx == "\"" || nx == "\\" || nx == "$" || nx == "`" || nx == "\n")) { i++; if (nx != "\n") wadd(nx) }
+      if (c == "\\" && (nx == "\"" || nx == "\\" || nx == "$" || nx == "`" || nx == "\n")) { i++; if (nx != "\n") wadd(qm(nx)) }
       else if (c == "\"") state = 0
       else {
         if (c == "`" || (c == "$" && (nx == "(" || nx == "[" || (nx == "{" && !plainparam(i))))) sync = 0
-        wadd(c)
+        wadd(qm(c))
       }
     }
   }
@@ -237,6 +257,7 @@ END {
     if (x == "" && tq[j]) x = "''" # an empty quoted word is still a word (git config k '' sets k)
     gsub(/\002/, "?", x)
     if (out == "A") gsub(/[ \t\n]/, "\001", x)
+    else if (xglob) gsub(/[;&`\n]/, "\n", x)
     else gsub(/[;&|()`\n]/, "\n", x)
     printf "%s%s", (first ? "" : " "), x
     first = 0

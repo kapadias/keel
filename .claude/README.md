@@ -58,6 +58,7 @@ discipline is **enforced by code, not prose**. Start with [`../CLAUDE.md`](../CL
   `SessionStart` context never reaches them; silent in a standalone checkout). Shared logic in
   `lib/` (`json.sh`, `secret-patterns.sh`, `core.sh` — harness root, the mode, the carrier, the
   context emitter; `shell-words.awk` — how the shell will read a command, for the branch guard;
+  `expand.awk` — its brace lists and globs, as the shell expands them;
   `tests.sh` — the test command, runner and failure digest; `lite.md` — lite's house
   rules; `ladder.sh` — whether another plugin already states the ladder); plugin wiring in
   `hooks.json`, asserted equivalent to `settings.json` by the linter.
