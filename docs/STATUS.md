@@ -108,6 +108,11 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
   the start of a command (or after `sh -c`), so a search for `export NONNA_MODE` passes. In the
   project a Grep glob is judged by the secret files there, a sample name no longer decides. A fuzz
   of 700 heredoc messages under bash 3.2 and 5.2 finds no command the guard lets through. 776 tests.
+  Fifth review round (both request changes): git 2.45's `--comment` takes the next word as its
+  value, so a read flag counts only after read-safe options, and a digit with a space before `>` is
+  an argument, not a file descriptor (`git config core.hooksPath 2 >/dev/null` writes). An assignment
+  that carries a value counts wherever it stands again (after `builtin`, `command`, a redirection,
+  `nice env`, or in a `trap` string); anchoring had let those through. 792 tests.
 
 - **2026-09-25** — 2.0 packaging, the first unit of the launch plan (#17). Both manifests say 2.0.0;
   the plugin shows as "Nonna" and declares two install options, `run_tests` and `mode`. The hooks
