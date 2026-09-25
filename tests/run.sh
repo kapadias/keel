@@ -1292,6 +1292,12 @@ check "off: ...or editing her git hooks with the file tools" 2 "$(printf '{"tool
 check "off: a force push is not hers to stop" 0 "$(off_gb 'git push --force origin main')"
 check "off: nor is --no-verify" 0 "$(off_gb 'git commit --no-verify -m x')"
 check "off: an edit on main is not warned about" 0 "$(off_rc guard-branch.sh '{"tool_name":"Edit","tool_input":{"file_path":"app.py"}}')"
+OFFBIG="$(python3 -c 'print("cat > big.txt <<EOF\n" + "x" * 300000 + "\nEOF")')"
+check "off: a command too long to read passes when it names nothing of hers" 0 "$(off_gb "$OFFBIG")"
+OFFJS="$(python3 -c 'import json; print("curl -d " + chr(39) + json.dumps([{"a": i, "b": i} for i in range(20)], separators=(",", ":")) + chr(39) + " https://example.com")')"
+check "off: so does one whose expansion is too large to read" 0 "$(off_gb "$OFFJS")"
+check "off: a command too long to read that names her settings is still refused" 2 "$(off_gb "$OFFBIG
+git config nonna.testCmd true")"
 rm -rf "$OFF"
 
 echo "== session-start.sh (SessionStart) =="

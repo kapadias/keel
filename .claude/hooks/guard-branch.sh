@@ -56,12 +56,21 @@ kitchen_door() { # <technical reason>: the git hooks are the gate
   exit 2
 }
 
+# Could what the guard cannot read touch her settings? Git or nonna in it however quoted, a $'…'
+# escape, or a run inside her /nonna directory. While she is off, only such a command is refused
+# for being unreadable; she keeps her settings then, and nothing else.
+could_be_hers() { # <raw text>
+  local bsnl=$'\\\n' # a continued line: the shell joins g\<newline>it into git
+  [ "${in_hers:-0}" = 1 ] || printf '%s' "${1//"$bsnl"/}" | grep -qiE "g[\\'\"]*i[\\'\"]*t|n[\\'\"]*o[\\'\"]*n[\\'\"]*n[\\'\"]*a|\\$'"
+}
 unread() { # <what could not be read>: fail closed, never guess
+  [ "$off" = 0 ] || could_be_hers "${cmd:-$payload}" || exit 0
   echo "✗ Nonna: I can't taste what I can't read. (branch guard: $1, so it is refused, not guessed at.)" >&2
   echo "  Run it again; if this repeats, check that awk and jq work in this shell." >&2
   exit 2
 }
 too_long() { # <reason>: a hook that outruns its timeout does not block, so what it cannot read in time is refused
+  [ "$off" = 0 ] || could_be_hers "${cmd:-$payload}" || exit 0
   echo "✗ Nonna: that's too much to taste in one bite. (branch guard: $1)" >&2
   echo "  Write the content with the Write tool, or split the command." >&2
   exit 2
@@ -97,6 +106,8 @@ case "$tool" in
     cmd="$(printf '%s' "$payload" | nonna_json_field '.tool_input.command')"
     [ -n "$cmd" ] || ! has_field command || unread "the command could not be read"
     [ -n "$cmd" ] || exit 0
+    cwd="$(printf '%s' "$payload" | nonna_json_field '.cwd')" # where the Bash tool will run it
+    case "/$cwd/" in */skills/nonna/*) in_hers=1 ;; *) in_hers=0 ;; esac
     [ "${#cmd}" -le 262144 ] || too_long "the command is over 256 KB, too long to read before the hook times out."
     # How the shell will see it (lib/shell-words.awk). Readings, checked together: A keeps each word
     # whole, so a quoted value with a space cannot shift the words after it; B exposes what a quoted
@@ -109,10 +120,7 @@ case "$tool" in
     words() { printf '%s\n' "$cmd" | LC_ALL=C awk -v out="$1" -f "$here/lib/shell-words.awk" 2>/dev/null; }
     quoted() { case "$1" in *[\'\"\\]*) return 0 ;; esac; return 1; }
     cant_read() {
-      local bsnl=$'\\\n' # a continued line: the shell joins g\<newline>it into git
-      if printf '%s' "${cmd//"$bsnl"/}" | grep -qiE "g[\\'\"]*i[\\'\"]*t|n[\\'\"]*o[\\'\"]*n[\\'\"]*n[\\'\"]*a|\\$'"; then
-        unread "the command reader (awk) failed"
-      fi
+      could_be_hers "$cmd" && unread "the command reader (awk) failed"
       exit 0
     }
     lvl="$(words B)" || cant_read
@@ -129,6 +137,7 @@ case "$tool" in
       n=$((n + 1))
     done
     if [ "$n" -ge 6 ] && quoted "$lvl"; then
+      [ "$off" = 0 ] || could_be_hers "$cmd" || exit 0
       kitchen_door "refusing quotes nested deeper than the guard reads; run the inner command itself."
     fi
 
@@ -241,12 +250,10 @@ case "$tool" in
     # refused, however the two are joined. A shell runs as a command (sh, bash, source, ., exec, or
     # a *.sh as the command) or through one that runs another (env, sudo, xargs, find -exec, …);
     # a shell's name as a word to grep for runs nothing, and reading, linting or staging is fine.
-    cwd="$(printf '%s' "$payload" | nonna_json_field '.cwd')"
     HERS='(^|[^A-Za-z0-9_.-])(skills/nonna|nonna/scripts|nonna\.sh)([^A-Za-z0-9_-]|$)'
     SH='([^[:space:]]*/)?(sh|bash|zsh|dash|ksh|mksh|yash|fish|busybox)'
     WRAP='([^[:space:]]*/)?(env|sudo|doas|xargs|nohup|exec|command|builtin|nice|timeout|time|stdbuf|setsid|ionice|chrt|taskset|flock|unbuffer|parallel|watch)|-(exec|execdir|ok|okdir)'
     SHELLS="${AT}(${SH}|source|\\.|exec|[^[:space:]]*\\.sh)([[:space:]]|$)|(^|[[:space:]])(${WRAP})[[:space:]](.*[[:space:]])?${SH}([[:space:]]|$)"
-    case "/$cwd/" in */skills/nonna/*) in_hers=1 ;; *) in_hers=0 ;; esac
     if { [ "$in_hers" = 1 ] || printf '%s\n' "$segs" | grep -qiE "$HERS"; } \
       && printf '%s\n' "$segs" | grep -qiE "$SHELLS"; then
       recipe "refusing to run her /nonna scripts: they change her settings."
