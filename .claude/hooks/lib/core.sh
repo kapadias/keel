@@ -18,7 +18,16 @@ nonna_harness_root() {
   fi
 }
 
-# nonna_mode
+# nonna_config <key>
+#   The key from the repo's own git config, else from the user's global one: never from a file
+#   those merely include, a `git -c` flag or GIT_CONFIG_* variables, which whoever runs git can
+#   set for one command. Set to "" prints "" and succeeds, because empty means off.
+nonna_config() {
+  git config --local --no-includes --get "$1" 2>/dev/null \
+    || git config --global --no-includes --get "$1" 2>/dev/null
+}
+
+# nonna_mode [git-hook]
 #   Prints off, lite or full: what Nonna enforces in the repo in the current directory.
 #   Precedence: NONNA_MODE > git config nonna.mode (repo, then global) > the plugin's `mode`
 #   option > nonna.defaultMode > the install (a copy-in install is full, a plugin install lite).
@@ -26,11 +35,15 @@ nonna_harness_root() {
 #   clone cannot carry it. nonna.mode is the user's alone; what Nonna records (the plugin option,
 #   for git hooks that cannot see it, or install.sh --mode) goes in nonna.defaultMode, below it, so
 #   a global off still reaches every repo. A value nobody meant (a typo) fails closed to full.
+#   A git hook passes `git-hook`: it runs in the environment of whoever ran git, which may be the
+#   agent's own command, so it takes nothing from the environment. Claude Code's hooks run in
+#   Claude Code's environment, which the user set.
 nonna_mode() {
-  local m="${NONNA_MODE:-}"
-  [ -n "$m" ] || m="$(git config --get nonna.mode 2>/dev/null || true)"
-  [ -n "$m" ] || m="${CLAUDE_PLUGIN_OPTION_MODE:-}"
-  [ -n "$m" ] || m="$(git config --get nonna.defaultMode 2>/dev/null || true)"
+  local m=""
+  [ "${1:-}" = git-hook ] || m="${NONNA_MODE:-}"
+  [ -n "$m" ] || m="$(nonna_config nonna.mode)"
+  [ -n "$m" ] || [ "${1:-}" = git-hook ] || m="${CLAUDE_PLUGIN_OPTION_MODE:-}"
+  [ -n "$m" ] || m="$(nonna_config nonna.defaultMode)"
   if [ -z "$m" ]; then
     if [ -f .claude/hooks/require-status-sync.sh ]; then m=full; else m=lite; fi
   fi

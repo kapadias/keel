@@ -22,7 +22,7 @@ here="$(cd "$(dirname "$self")" && pwd)"
 . "$here/lib/secret-patterns.sh"
 # shellcheck source=/dev/null
 . "$here/lib/core.sh"
-[ "$(nonna_mode)" = off ] && exit 0 # off means off: nothing enforced, nothing said
+[ "$(nonna_mode git-hook)" = off ] && exit 0 # off means off: nothing enforced, nothing said
 
 fail=0
 

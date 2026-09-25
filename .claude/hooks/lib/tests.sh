@@ -8,7 +8,8 @@
 #                  the plugin's run_tests option allows it (the default): session-start.sh records the
 #                  command in the repo's own git config, which is never committed and never cloned,
 #                  and says so. So the Stop hook and the git pre-push hook run one command, and the
-#                  user can see and change it.
+#                  user can see and change it. The pre-push hook passes `git-hook`: it ignores
+#                  NONNA_TEST_CMD, which the command that runs git could set.
 # nonna_detect_test_cmd  prints the command detection finds here: pytest config/tests,
 #                  package.json's "test" script, go.mod or Cargo.toml.
 # nonna_run_tests  runs it with a timeout (NONNA_TEST_TIMEOUT seconds, default 600); exit status is
@@ -18,13 +19,16 @@
 #                  secret replaced, because this text is shown to the agent and to the user.
 # shellcheck shell=bash
 
-nonna_test_cmd() {
-  if [ "${NONNA_TEST_CMD+set}" = set ]; then
+# shellcheck source=/dev/null
+command -v nonna_config >/dev/null 2>&1 || . "$(dirname "${BASH_SOURCE[0]}")/core.sh"
+
+nonna_test_cmd() { # [git-hook]: a git hook takes nothing from the environment (lib/core.sh)
+  if [ "${1:-}" != git-hook ] && [ "${NONNA_TEST_CMD+set}" = set ]; then
     printf '%s' "$NONNA_TEST_CMD"
     return 0
   fi
   local cfg
-  if cfg="$(git config --get nonna.testCmd 2>/dev/null)"; then
+  if cfg="$(nonna_config nonna.testCmd)"; then
     printf '%s' "$cfg"
     return 0
   fi

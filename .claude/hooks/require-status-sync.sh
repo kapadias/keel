@@ -21,7 +21,7 @@ here="$(cd "$(dirname "$self")" && pwd)"
 . "$here/lib/secret-patterns.sh"
 # shellcheck source=/dev/null
 . "$here/lib/core.sh"
-mode="$(nonna_mode)"
+mode="$(nonna_mode git-hook)" # a git hook takes nothing from the environment (lib/core.sh)
 [ "$mode" = off ] && exit 0 # off means off: nothing enforced, nothing said
 
 # What is being pushed: every commit the remote does not have yet, never "since a local branch" (a
@@ -148,12 +148,12 @@ if class="$(added_lines "$tmp/patch" | nonna_scan_secrets)"; then
 fi
 
 # "Done" means the suite passes: a code push runs the project's own tests (lib/tests.sh). No test
-# command (none recorded or detected, or NONNA_TEST_CMD="") means this check does not apply. The suite runs in the working tree, so it must BE what is pushed: HEAD, with no uncommitted
+# command (none recorded or detected, or an empty recorded one) means this check does not apply. The suite runs in the working tree, so it must BE what is pushed: HEAD, with no uncommitted
 # change to a tracked file that could hide a broken commit.
 if [ -n "$code_touched" ] && [ -f "$here/lib/tests.sh" ]; then
   # shellcheck source=/dev/null
   . "$here/lib/tests.sh"
-  cmd="$(nonna_test_cmd)"
+  cmd="$(nonna_test_cmd git-hook)"
   if [ -n "$cmd" ]; then
     head="$(git rev-parse HEAD 2>/dev/null)"
     at_head=""
@@ -176,14 +176,14 @@ if [ -n "$code_touched" ] && [ -f "$here/lib/tests.sh" ]; then
       if [ "$rc" = 124 ]; then
         {
           echo "✗ Nonna: the tests never finished, so they did not say yes. (pre-push: \`$(nonna_shown_cmd "$cmd")\` timed out after ${NONNA_TEST_TIMEOUT:-600}s.)"
-          echo "  Raise NONNA_TEST_TIMEOUT, or set NONNA_TEST_CMD to a faster suite."
+          echo "  Raise NONNA_TEST_TIMEOUT, or point git config nonna.testCmd at a faster suite."
         } >&2
         fail=1
       elif [ "$rc" != 0 ]; then
         {
           echo "✗ Nonna: you said done; the tests say no. (pre-push: \`$(nonna_shown_cmd "$cmd")\` failed.)"
           printf '%s\n' "${NONNA_TEST_TAIL:-}" | sed 's/^/    /'
-          echo "  Fix it, or set NONNA_TEST_CMD if that is not your test command."
+          echo "  Fix it, or set git config nonna.testCmd if that is not your test command."
         } >&2
         fail=1
       fi

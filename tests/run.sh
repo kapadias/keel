@@ -142,16 +142,24 @@ mkdir -p "$TMP/docs"; echo 'S' > "$TMP/docs/STATUS.md"; "${GIT[@]}" -C "$TMP" ad
 mkdir -p "$TMP/src"; echo 'def f(): return 1' > "$TMP/src/app.py"
 "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m "code, no status"
 ( cd "$TMP" && "$RS" ); check "blocks code push without STATUS update" 1 "$?"
-( cd "$TMP" && NONNA_MODE=lite "$RS" ); check "pre-push: in lite mode a stale STATUS does not block" 0 "$?"
+git -C "$TMP" config nonna.mode lite; ( cd "$TMP" && "$RS" ); check "pre-push: in lite mode a stale STATUS does not block" 0 "$?"
+git -C "$TMP" config nonna.mode full
+# A git hook runs in the environment of whoever ran git, the agent's own command included: the mode
+# comes from git config alone.
+( cd "$TMP" && NONNA_MODE=lite "$RS" ) 2>/dev/null; check "pre-push: NONNA_MODE in the push's environment does not change its mode" 1 "$?"
 mv "$TMP/docs/STATUS.md" "$TMP/docs/STATUS.bak"
 ( cd "$TMP" && "$RS" ); check "pre-push: full mode without docs/STATUS.md has no STATUS gate" 0 "$?"
 mv "$TMP/docs/STATUS.bak" "$TMP/docs/STATUS.md"
 echo 'changed' > "$TMP/docs/STATUS.md"
 "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q -m "update STATUS"
 ( cd "$TMP" && "$RS" ); check "allows code push with STATUS update" 0 "$?"
-out="$(cd "$TMP" && NONNA_TEST_CMD=false "$RS" 2>&1)"; check "pre-push: a red test suite blocks the push" 1 "$?"
-contains "pre-push: names the failing command" "NONNA_TEST_CMD" "$out"
-( cd "$TMP" && NONNA_TEST_CMD=true "$RS" ); check "pre-push: a green test suite lets it through" 0 "$?"
+git -C "$TMP" config nonna.testCmd false
+out="$(cd "$TMP" && "$RS" 2>&1)"; check "pre-push: a red test suite blocks the push" 1 "$?"
+contains "pre-push: says where the test command is set" "git config nonna.testCmd" "$out"
+( cd "$TMP" && NONNA_TEST_CMD=true "$RS" ) 2>/dev/null; check "pre-push: NONNA_TEST_CMD in the push's environment cannot swap in a passing command" 1 "$?"
+( cd "$TMP" && NONNA_TEST_CMD='' "$RS" ) 2>/dev/null; check "pre-push: nor turn the test gate off" 1 "$?"
+git -C "$TMP" config nonna.testCmd true
+( cd "$TMP" && "$RS" ); check "pre-push: a green test suite lets it through" 0 "$?"
 # The pushed range comes from git's pre-push stdin, so a branch's first push is gated too.
 "${GIT[@]}" -C "$TMP" checkout -q -b feature/new
 echo 'def g(): return 2' >> "$TMP/src/app.py"; echo 'again' >> "$TMP/docs/STATUS.md"
@@ -159,26 +167,31 @@ echo 'def g(): return 2' >> "$TMP/src/app.py"; echo 'again' >> "$TMP/docs/STATUS
 PS="$(mktemp)"  # outside the repo: an untracked file there is a dirty tree
 ZERO=0000000000000000000000000000000000000000; NEWSHA="$("${GIT[@]}" -C "$TMP" rev-parse HEAD)"
 printf 'refs/heads/feature/new %s refs/heads/feature/new %s\n' "$NEWSHA" "$ZERO" > "$PS"
-( cd "$TMP" && NONNA_TEST_CMD='exit 1' "$RS" origin "$BARE" < "$PS" ) 2>/dev/null; check "pre-push: a branch's first push runs the test gate" 1 "$?"
-( cd "$TMP" && NONNA_TEST_CMD='exit 1' "$RS" < /dev/null ) 2>/dev/null; check "pre-push: no stdin, no upstream: the range falls back to the base branch" 1 "$?"
-( cd "$TMP" && NONNA_TEST_CMD=true "$RS" origin "$BARE" < "$PS" ); check "pre-push: a green first push goes through" 0 "$?"
+git -C "$TMP" config nonna.testCmd 'exit 1'
+( cd "$TMP" && "$RS" origin "$BARE" < "$PS" ) 2>/dev/null; check "pre-push: a branch's first push runs the test gate" 1 "$?"
+( cd "$TMP" && "$RS" < /dev/null ) 2>/dev/null; check "pre-push: no stdin, no upstream: the range falls back to the base branch" 1 "$?"
+git -C "$TMP" config nonna.testCmd true
+( cd "$TMP" && "$RS" origin "$BARE" < "$PS" ); check "pre-push: a green first push goes through" 0 "$?"
 # The suite must taste what is pushed, not an uncommitted fix sitting on top of it.
 echo '# uncommitted' >> "$TMP/src/app.py"
-out="$(cd "$TMP" && NONNA_TEST_CMD=true "$RS" origin "$BARE" < "$PS" 2>&1)"; check "pre-push: refuses to vouch for a push from a dirty tree" 1 "$?"
+out="$(cd "$TMP" && "$RS" origin "$BARE" < "$PS" 2>&1)"; check "pre-push: refuses to vouch for a push from a dirty tree" 1 "$?"
 contains "pre-push: says to commit or stash first" "commit or stash" "$out"
 "${GIT[@]}" -C "$TMP" checkout -q -- src/app.py
 echo 'import helper' > "$TMP/src/forgot.py"
-( cd "$TMP" && NONNA_TEST_CMD=true "$RS" origin "$BARE" < "$PS" ) 2>/dev/null; check "pre-push: an untracked file is a dirty tree too (the forgotten git add)" 1 "$?"
+( cd "$TMP" && "$RS" origin "$BARE" < "$PS" ) 2>/dev/null; check "pre-push: an untracked file is a dirty tree too (the forgotten git add)" 1 "$?"
 rm -f "$TMP/src/forgot.py"
 # A tag and a delete are not code "done"; refusing them only teaches --no-verify, which drops the scan.
 "${GIT[@]}" -C "$TMP" tag -a v1 -m v1; TAGSHA="$("${GIT[@]}" -C "$TMP" rev-parse v1)"
 printf 'refs/tags/v1 %s refs/tags/v1 %s\n' "$TAGSHA" "$ZERO" > "$PS"
-( cd "$TMP" && NONNA_TEST_CMD=true "$RS" origin "$BARE" < "$PS" ); check "pre-push: an annotated tag push is not refused as foreign" 0 "$?"
+( cd "$TMP" && "$RS" origin "$BARE" < "$PS" ); check "pre-push: an annotated tag push is not refused as foreign" 0 "$?"
+git -C "$TMP" config nonna.testCmd false
 printf '(delete) %s refs/heads/old %s\n' "$ZERO" "$NEWSHA" > "$PS"
-( cd "$TMP" && NONNA_TEST_CMD=false "$RS" origin "$BARE" < "$PS" ); check "pre-push: a delete-only push runs nothing and passes" 0 "$?"
+( cd "$TMP" && "$RS" origin "$BARE" < "$PS" ); check "pre-push: a delete-only push runs nothing and passes" 0 "$?"
 printf 'refs/heads/feature/new %s refs/heads/feature/new %s\n' "$NEWSHA" "$ZERO" > "$PS"
-out="$(cd "$TMP" && NONNA_TEST_TIMEOUT=1 NONNA_TEST_CMD='sleep 5' "$RS" origin "$BARE" < "$PS" 2>&1)"; check "pre-push: a suite that times out blocks the push" 1 "$?"
+git -C "$TMP" config nonna.testCmd 'sleep 5'
+out="$(cd "$TMP" && NONNA_TEST_TIMEOUT=1 "$RS" origin "$BARE" < "$PS" 2>&1)"; check "pre-push: a suite that times out blocks the push" 1 "$?"
 contains "pre-push: says the suite timed out" "timed out" "$out"
+git -C "$TMP" config --unset nonna.testCmd
 rm -f "$PS"
 "${GIT[@]}" -C "$TMP" checkout -q feature/y
 echo 'KEY = "'"$FAKE_AWS"'"' > "$TMP/src/leak.py"
@@ -390,6 +403,25 @@ echo 'x' > "$TMP/.env.example"; "${GIT[@]}" -C "$TMP" add -A
 printf 'a\n' > "$TMP/src/deleted.pem"; "${GIT[@]}" -C "$TMP" add -A; "${GIT[@]}" -C "$TMP" commit -q --no-verify -m pem
 "${GIT[@]}" -C "$TMP" rm -q src/deleted.pem
 "${GIT[@]}" -C "$TMP" commit -q -m "remove pem" 2>/dev/null; check "pre-commit: deleting a secret file is allowed" 0 "$?"
+# A git hook runs in the environment of whoever ran git, which may be the agent's own command: no
+# environment variable, `-c` flag or included file switches it off. The repo's own git config and
+# the user's global config do.
+cp "$HOOKS/lib/core.sh" "$TMP/.claude/hooks/lib/"
+printf 'STRIPE=sk_live_%s\n' '0123456789abcdefABCD' > "$TMP/src/pay.py"; "${GIT[@]}" -C "$TMP" add -A
+NONNA_MODE=off "${GIT[@]}" -C "$TMP" commit -q -m k 2>/dev/null; check "pre-commit: NONNA_MODE=off in the command's environment does not switch it off" 1 "$?"
+CLAUDE_PLUGIN_OPTION_MODE=off "${GIT[@]}" -C "$TMP" commit -q -m k 2>/dev/null; check "pre-commit: nor does CLAUDE_PLUGIN_OPTION_MODE=off" 1 "$?"
+"${GIT[@]}" -C "$TMP" -c nonna.mode=off commit -q -m k 2>/dev/null; check "pre-commit: nor does git -c nonna.mode=off" 1 "$?"
+GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=nonna.mode GIT_CONFIG_VALUE_0=off "${GIT[@]}" -C "$TMP" commit -q -m k 2>/dev/null
+check "pre-commit: nor does nonna.mode in GIT_CONFIG_* variables" 1 "$?"
+INC="$(mktemp)"; printf '[nonna]\n\tmode = off\n' > "$INC"; git -C "$TMP" config include.path "$INC"
+"${GIT[@]}" -C "$TMP" commit -q -m k 2>/dev/null; check "pre-commit: nor does nonna.mode in a file the repo config includes" 1 "$?"
+git -C "$TMP" config --unset include.path
+check "pre-commit: none of those attempts committed the key" "remove pem" "$(git -C "$TMP" log -1 --format=%s)"
+GIT_CONFIG_GLOBAL="$INC" "${GIT[@]}" -C "$TMP" commit -q -m k 2>/dev/null; check "pre-commit: the user's global nonna.mode off does switch it off" 0 "$?"
+printf 'STRIPE=sk_live_%s\n' '1123456789abcdefABCD' > "$TMP/src/pay2.py"; "${GIT[@]}" -C "$TMP" add -A
+git -C "$TMP" config nonna.mode off
+"${GIT[@]}" -C "$TMP" commit -q -m k2 2>/dev/null; check "pre-commit: so does the repo's own nonna.mode off" 0 "$?"
+git -C "$TMP" config --unset nonna.mode; rm -f "$INC"
 "${GIT[@]}" -C "$TMP" checkout -q --detach
 echo c >> "$TMP/src/a.py"; "${GIT[@]}" -C "$TMP" add -A
 "${GIT[@]}" -C "$TMP" commit -q -m detached 2>/dev/null; check "pre-commit: a detached HEAD is not a protected branch" 0 "$?"
@@ -789,6 +821,12 @@ git -C "$TMP" config nonna.mode lite
 check "mode: repo git config beats global git config" lite "$(mode_of CLAUDE_PLUGIN_OPTION_MODE=full)"
 check "mode: NONNA_MODE beats repo git config" full "$(mode_of NONNA_MODE=full)"
 check "mode: an unknown value fails closed to full" full "$(mode_of NONNA_MODE=ful)"
+# Only a git config the user wrote counts: never a file it merely includes, which a command can add.
+git -C "$TMP" config --unset nonna.mode; git config --file "$MODE_HOME/gitconfig" --unset nonna.mode
+printf '[nonna]\n\tmode = off\n' > "$MODE_HOME/included"; git -C "$TMP" config include.path "$MODE_HOME/included"
+check "mode: nonna.mode in an included file is not read" full "$(mode_of)"
+check "mode: a git hook ignores NONNA_MODE" full "$(cd "$TMP" && env NONNA_MODE=off GIT_CONFIG_GLOBAL="$MODE_HOME/gitconfig" bash -c '. "$1/lib/core.sh"; nonna_mode git-hook' _ "$HOOKS")"
+check "mode: and CLAUDE_PLUGIN_OPTION_MODE" full "$(cd "$TMP" && env CLAUDE_PLUGIN_OPTION_MODE=off GIT_CONFIG_GLOBAL="$MODE_HOME/gitconfig" bash -c '. "$1/lib/core.sh"; nonna_mode git-hook' _ "$HOOKS")"
 rm -rf "$TMP" "$MODE_HOME"
 # Off means off: every hook exits 0 and says nothing, even facing what it would otherwise block
 # (on main, a staged key, code changed with a red suite and a stale STATUS).
@@ -804,8 +842,10 @@ off_rc() { # <hook> <stdin>: 0 when, with NONNA_MODE=off, the hook exits 0 and p
 check "off: guard-branch lets a commit on main through, silently" 0 "$(off_rc guard-branch.sh '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}')"
 check "off: secret-scan lets a key-shaped write through, silently" 0 "$(off_rc secret-scan.sh "{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"a.py\",\"content\":\"k = '$FAKE_AWS'\"}}")"
 check "off: stop-dod lets a red, STATUS-stale turn end, silently" 0 "$(off_rc stop-dod.sh '{}')"
+git -C "$OFF" config nonna.mode off  # git hooks take the mode from git config alone
 check "off: pre-commit lets a staged key on main through, silently" 0 "$(off_rc pre-commit.sh '')"
 check "off: pre-push lets the push through, silently" 0 "$(off_rc require-status-sync.sh '')"
+git -C "$OFF" config --unset nonna.mode
 check "off: format stays silent" 0 "$(off_rc format.sh '{"tool_input":{"file_path":"app.py"}}')"
 check "off: session-start says nothing and wires nothing" 0 "$(off_rc session-start.sh '{}')"
 if [ -e "$OFF/.git/hooks/pre-push" ]; then rc=1; else rc=0; fi; check "off: session-start installs no git hook" 0 "$rc"
@@ -1260,6 +1300,9 @@ rm -rf "$TMP" "$STUB"
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; git -C "$TMP" config nonna.testCmd "make check"
 got="$(cd "$TMP" && unset NONNA_TEST_CMD && . "$HOOKS/lib/tests.sh" && nonna_test_cmd)"; check "tests.sh: reads the command recorded in git config" "make check" "$got"
 got="$(cd "$TMP" && export NONNA_TEST_CMD="pytest -x" && . "$HOOKS/lib/tests.sh" && nonna_test_cmd)"; check "tests.sh: NONNA_TEST_CMD beats git config" "pytest -x" "$got"
+got="$(cd "$TMP" && . "$HOOKS/lib/tests.sh" && NONNA_TEST_CMD=true nonna_test_cmd git-hook)"; check "tests.sh: a git hook ignores NONNA_TEST_CMD" "make check" "$got"
+got="$(cd "$TMP" && export GIT_CONFIG_PARAMETERS="'nonna.testcmd'='true'" && . "$HOOKS/lib/tests.sh" && nonna_test_cmd git-hook)"
+check "tests.sh: nor a git -c flag's config" "make check" "$got"
 mkdir -p "$TMP/.claude/hooks/lib"; : > "$TMP/.claude/hooks/lib/tests.sh"; printf '{"scripts":{"test":"node t.js"}}\n' > "$TMP/package.json"
 git -C "$TMP" config nonna.testCmd ""
 got="$(cd "$TMP" && unset NONNA_TEST_CMD && . "$HOOKS/lib/tests.sh" && nonna_test_cmd)"; check "tests.sh: an empty git config command turns off even copy-in detection" "" "$got"

@@ -106,7 +106,7 @@ if [ ! -f .claude/hooks/lib/tests.sh ] && [ -n "$nonna_root" ] && git rev-parse 
   case "${CLAUDE_PLUGIN_OPTION_RUN_TESTS:-true}" in
     false | False | FALSE | 0 | no | off) : ;;
     *)
-      if ! git config --get nonna.testCmd >/dev/null 2>&1 && [ -f "$nonna_root/hooks/lib/tests.sh" ]; then
+      if ! nonna_config nonna.testCmd >/dev/null && [ -f "$nonna_root/hooks/lib/tests.sh" ]; then
         # shellcheck source=/dev/null
         . "$nonna_root/hooks/lib/tests.sh"
         detected="$(nonna_detect_test_cmd)"
@@ -158,7 +158,7 @@ ${core}"
 #    did here: a plugin that edits .git/hooks and .git/config without saying so would be right to be
 #    distrusted. Claude Code shows a systemMessage to the user.
 user_msg=""
-if [ "$(git config --get nonna.announced 2>/dev/null)" != 2 ] && git rev-parse --git-dir >/dev/null 2>&1; then
+if [ "$(nonna_config nonna.announced)" != 2 ] && git rev-parse --git-dir >/dev/null 2>&1; then
   user_msg="Nonna is on here (${mode})."
   if [ -n "$gate" ]; then
     user_msg="$user_msg Before the agent can say done, Nonna runs: ${gate}."
