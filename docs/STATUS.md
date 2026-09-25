@@ -134,6 +134,10 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
   Tenth review round: both approve. The one LOW is the declared trade: quoted text is expanded as
   code, so a minified JSON array in one word is refused as too large to read from 16 two-field
   objects (fewer with more fields; ADR-0011 §4).
+  Two follow-ups, found while planning `/nonna`. The guard now knows a branch before its first
+  commit; it had let the first commit onto a new, empty `main` through. And a git hook link is hers
+  only when it leads to her own script. A user's own `scripts/pre-commit.sh` link had been taken
+  for hers, which left her gate off without a word. 859 tests.
 
 - **2026-09-25** — 2.0 packaging, the first unit of the launch plan (#17). Both manifests say 2.0.0;
   the plugin shows as "Nonna" and declares two install options, `run_tests` and `mode`. The hooks
