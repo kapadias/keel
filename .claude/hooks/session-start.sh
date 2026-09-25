@@ -55,9 +55,10 @@ wired=()
 hook_warns=()
 wire_hook() { # <git hook name> <script name>
   local dest="$hooks_dir/$1" target="$hooks_src/$2"
-  if [ -L "$dest" ] && [ ! -e "$dest" ]; then # dangling: repair it only if it was ours
+  if [ -L "$dest" ] && [ ! -e "$dest" ]; then # dangling: repair it only if it was ours (Keel was her name)
     case "$(readlink "$dest")" in
-      */plugins/cache/nonna/* | */plugins/data/nonna* | */.claude/hooks/"$2") rm -f "$dest" ;;
+      */plugins/cache/nonna/* | */plugins/cache/keel/* | */plugins/data/nonna* | */plugins/data/keel* \
+        | */.claude/hooks/"$2") rm -f "$dest" ;;
     esac
   fi
   if [ ! -e "$dest" ] && [ ! -L "$dest" ]; then
@@ -68,8 +69,10 @@ wire_hook() { # <git hook name> <script name>
     [ -e "$dest" ] || hook_warns+=("could not install $dest, so that gate is NOT enforced")
   else
     case "$(readlink "$dest" 2>/dev/null)" in
-      */"$2") ;; # ours: a link to her script
-      *) grep -Eqs "$2|Nonna" "$dest" \
+      */"$2") # a link to her script, which git skips without a word if it points at nothing
+        [ -e "$dest" ] || hook_warns+=("$dest points at nothing, so her $1 gate is NOT enforced")
+        ;;
+      *) grep -qsF "$2" "$dest" \
         || hook_warns+=("$dest is not Nonna's, so her $1 gate is NOT enforced; chain $target from it") ;;
     esac
   fi

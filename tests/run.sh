@@ -920,6 +920,24 @@ if [ -e "$TMP/.git/hooks/pre-push" ]; then rc=0; else rc=1; fi; check "plugin: a
 check "plugin: a dangling hook that is not ours is left alone" /gone/husky/pre-commit "$(readlink "$TMP/.git/hooks/pre-commit")"
 contains "plugin: ...and reported" ".git/hooks/pre-commit is not Nonna's" "$out"
 rm -rf "$TMP" "$PD"
+# The plugin used to be Keel: its links point into a cache that is gone. They are ours, repaired.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; PD="$(mktemp -d)"
+ln -s /gone/.claude/plugins/cache/keel/keel/1.0.0/hooks/require-status-sync.sh "$TMP/.git/hooks/pre-push"
+CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh" "$PD/data" >/dev/null
+check "plugin: a dangling Keel-era link is repaired" "$PD/data/current/hooks/require-status-sync.sh" "$(readlink "$TMP/.git/hooks/pre-push")"
+rm -rf "$TMP" "$PD"
+# Any other link to her script that points at nothing is not a gate: git skips it without a word.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+ln -s /gone/elsewhere/require-status-sync.sh "$TMP/.git/hooks/pre-push"
+out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
+contains "plugin: a dangling link to her script is reported, not taken for a gate" ".git/hooks/pre-push points at nothing" "$out"
+rm -rf "$TMP"
+# A foreign hook is hers only if it runs her script; mentioning her name is not enough.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+printf '#!/bin/sh\n# thanks, Nonna\nexit 0\n' > "$TMP/.git/hooks/pre-push"; chmod +x "$TMP/.git/hooks/pre-push"
+out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
+contains "plugin: a foreign hook that only names her is reported" ".git/hooks/pre-push is not Nonna's" "$out"
+rm -rf "$TMP"
 # A hook manager (core.hooksPath) owns the hooks: say where to point it, write nothing.
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; git -C "$TMP" config core.hooksPath .husky
 out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
