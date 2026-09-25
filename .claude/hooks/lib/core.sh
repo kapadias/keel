@@ -39,6 +39,19 @@ nonna_config() {
     || git config --global --no-includes --get "$1" 2>/dev/null
 }
 
+# nonna_hook_is_hers <link target> <script> [<her link now>]
+#   True when a git hook's link leads to her own <script>: the link she would make now, one into her
+#   plugin's cache or data (a version since removed; Keel was her name), or a copy-in's
+#   .claude/hooks/<script>. A user's own script that shares the name is not hers.
+nonna_hook_is_hers() {
+  [ -n "${3:-}" ] && [ "$1" = "$3" ] && return 0
+  case "$1" in
+    */plugins/cache/nonna/*/"$2" | */plugins/cache/keel/*/"$2" | */plugins/data/nonna*/"$2" \
+      | */plugins/data/keel*/"$2" | */.claude/hooks/"$2") return 0 ;;
+  esac
+  return 1
+}
+
 # nonna_mode [git-hook]
 #   Prints off, lite or full: what Nonna enforces in the repo in the current directory.
 #   Precedence: NONNA_MODE > git config nonna.mode (repo, then global) > the plugin's `mode`

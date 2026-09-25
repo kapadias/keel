@@ -55,11 +55,8 @@ wired=()
 hook_warns=()
 wire_hook() { # <git hook name> <script name>
   local dest="$hooks_dir/$1" target="$hooks_src/$2"
-  if [ -L "$dest" ] && [ ! -e "$dest" ]; then # dangling: repair it only if it was ours (Keel was her name)
-    case "$(readlink "$dest")" in
-      */plugins/cache/nonna/* | */plugins/cache/keel/* | */plugins/data/nonna* | */plugins/data/keel* \
-        | */.claude/hooks/"$2") rm -f "$dest" ;;
-    esac
+  if [ -L "$dest" ] && [ ! -e "$dest" ] && nonna_hook_is_hers "$(readlink "$dest")" "$2"; then
+    rm -f "$dest" # dangling and hers: repaired below
   fi
   if [ ! -e "$dest" ] && [ ! -L "$dest" ]; then
     # Never create a dangling link: git would skip it without a word.
@@ -68,13 +65,13 @@ wire_hook() { # <git hook name> <script name>
     mkdir -p "$hooks_dir" 2>/dev/null && ln -s "$target" "$dest" 2>/dev/null && wired+=("$1")
     [ -e "$dest" ] || hook_warns+=("could not install $dest, so that gate is NOT enforced")
   else
-    case "$(readlink "$dest" 2>/dev/null)" in
-      */"$2") # a link to her script, which git skips without a word if it points at nothing
-        [ -e "$dest" ] || hook_warns+=("$dest points at nothing, so her $1 gate is NOT enforced")
-        ;;
-      *) grep -qsF "$2" "$dest" \
-        || hook_warns+=("$dest is not Nonna's, so her $1 gate is NOT enforced; chain $target from it") ;;
-    esac
+    if nonna_hook_is_hers "$(readlink "$dest" 2>/dev/null)" "$2" "$target"; then
+      # Hers, but git skips a link that points at nothing without a word.
+      [ -e "$dest" ] || hook_warns+=("$dest points at nothing, so her $1 gate is NOT enforced")
+    else # the user's own, even when it shares her script's name, unless it runs hers
+      grep -qsF "$2" "$dest" \
+        || hook_warns+=("$dest is not Nonna's, so her $1 gate is NOT enforced; chain $target from it")
+    fi
   fi
 }
 if ! git rev-parse --git-dir >/dev/null 2>&1; then

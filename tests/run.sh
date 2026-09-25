@@ -1289,11 +1289,19 @@ ln -s /gone/.claude/plugins/cache/keel/keel/1.0.0/hooks/require-status-sync.sh "
 CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh" "$PD/data" >/dev/null
 check "plugin: a dangling Keel-era link is repaired" "$PD/data/current/hooks/require-status-sync.sh" "$(readlink "$TMP/.git/hooks/pre-push")"
 rm -rf "$TMP" "$PD"
-# Any other link to her script that points at nothing is not a gate: git skips it without a word.
+# A link elsewhere that only shares her script's name is not a gate of hers: git skips a dangling
+# one without a word, and a live one runs the user's script, not hers.
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 ln -s /gone/elsewhere/require-status-sync.sh "$TMP/.git/hooks/pre-push"
 out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
-contains "plugin: a dangling link to her script is reported, not taken for a gate" ".git/hooks/pre-push points at nothing" "$out"
+contains "plugin: a dangling link elsewhere, named like her script, is reported, not taken for a gate" ".git/hooks/pre-push is not Nonna's" "$out"
+rm -rf "$TMP"
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; mkdir -p "$TMP/scripts"
+printf '#!/bin/sh\nexit 0\n' > "$TMP/scripts/pre-commit.sh"; chmod +x "$TMP/scripts/pre-commit.sh"
+ln -s ../../scripts/pre-commit.sh "$TMP/.git/hooks/pre-commit"
+out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
+contains "plugin: the user's own scripts/pre-commit.sh hook is reported as not hers" ".git/hooks/pre-commit is not Nonna's" "$out"
+check "plugin: ...and left as it was" ../../scripts/pre-commit.sh "$(readlink "$TMP/.git/hooks/pre-commit")"
 rm -rf "$TMP"
 # A foreign hook is hers only if it runs her script; mentioning her name is not enough.
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
