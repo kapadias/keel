@@ -61,7 +61,10 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
   gate. The linter enforces the quoting in both files, and a golden test runs every wired command
   from such a path. SessionStart receives the plugin data dir, and the Stop and SessionStart
   spinners name Nonna. The CHANGELOG's `[Unreleased]` section is now `[2.0.0]`, with an upgrade
-  block. Issue templates and a code of conduct are added. 383 tests.
+  block. Issue templates and a code of conduct are added.
+  Review round: the linter now holds every hook command to one exact form (quoted root, script,
+  nothing after it), because a `|| true` tail in one install mode would turn a gate's block into a
+  pass and still lint clean. The only argument allowed is SessionStart's plugin data dir. 389 tests.
 
 - **2026-09-24** — README answers an outside review. A bridge sentence says the 8 of 8 task is
   the worst case (a third of runs on average); the break-even is a four-row table so readers can pick
