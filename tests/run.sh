@@ -1319,6 +1319,17 @@ ln -s "$TMP/x/plugins/cache/nonna/evil/pre-commit.sh" "$TMP/.git/hooks/pre-commi
 out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
 contains "plugin: a link shaped like her cache but elsewhere is not hers" ".git/hooks/pre-commit is not Nonna's" "$out"
 rm -rf "$TMP"
+# Her paths read as paths: nothing climbs back out of them, and a doubled or symlinked prefix is hers.
+hers() { # <link target> [env args]: 0 when nonna_hook_is_hers takes it for her pre-commit.sh
+  local t="$1"; shift
+  env "$@" bash -c '. "$1/lib/core.sh"; nonna_hook_is_hers "$2" pre-commit.sh; echo $?' _ "$HOOKS" "$t"
+}
+check "plugin: a link that climbs out of her cache with .. is not hers" 1 "$(hers "$CLAUDE_CONFIG_DIR/plugins/cache/nonna/../../../../tmp/x/pre-commit.sh")"
+H="$(cd "$(mktemp -d)" && pwd -P)"
+check "plugin: her cache link is hers when HOME ends in a slash" 0 "$(hers "$H/.claude/plugins/cache/nonna/nonna/1.0.0/hooks/pre-commit.sh" -u CLAUDE_CONFIG_DIR HOME="$H/")"
+mkdir -p "$H/real/plugins"; ln -s "$H/real" "$H/cfg"
+check "plugin: her cache link is hers through a symlinked config directory" 0 "$(hers "$H/real/plugins/cache/nonna/nonna/1.0.0/hooks/pre-commit.sh" CLAUDE_CONFIG_DIR="$H/cfg")"
+rm -rf "$H"
 # A foreign hook is hers only if it runs her script; mentioning her name is not enough.
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 printf '#!/bin/sh\n# thanks, Nonna\nexit 0\n' > "$TMP/.git/hooks/pre-push"; chmod +x "$TMP/.git/hooks/pre-push"

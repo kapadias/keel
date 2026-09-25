@@ -43,14 +43,21 @@ nonna_config() {
 #   True when a git hook's link leads to her own <script>: the link she would make now, one into her
 #   plugin's cache or data under the plugins directory Claude Code uses (a version since removed;
 #   Keel was her name), or a copy-in's ../../.claude/hooks/<script>. A user's own script that
-#   shares the name, or a path merely shaped like hers, is not hers.
+#   shares the name, a path merely shaped like hers, or one that climbs back out of hers with ..,
+#   is not hers. The plugins directory is read as written (a doubled slash squeezed, as a HOME
+#   ending in / gives) and as resolved.
 nonna_hook_is_hers() {
-  local plugins="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins"
+  local p plugins real
   [ -n "${3:-}" ] && [ "$1" = "$3" ] && return 0
-  case "$1" in
-    "$plugins"/cache/nonna/*/"$2" | "$plugins"/cache/keel/*/"$2" | "$plugins"/data/nonna*/"$2" \
-      | "$plugins"/data/keel*/"$2" | ../../.claude/hooks/"$2") return 0 ;;
-  esac
+  [ "$1" = "../../.claude/hooks/$2" ] && return 0
+  case "$1" in */../* | */..) return 1 ;; esac
+  plugins="$(printf '%s' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins" | tr -s /)"
+  real="$(cd "$plugins" 2>/dev/null && pwd -P)"
+  for p in "$plugins" ${real:+"$real"}; do
+    case "$1" in
+      "$p"/cache/nonna/*/"$2" | "$p"/cache/keel/*/"$2" | "$p"/data/nonna*/"$2" | "$p"/data/keel*/"$2") return 0 ;;
+    esac
+  done
   return 1
 }
 
