@@ -60,14 +60,16 @@ lighter mode to select". A plugin user's first day is that use.
    Nonna had been.)
 4. **A model does not switch off its own gates.** The branch guard reads each command the way the
    shell will run it (`.claude/hooks/lib/shell-words.awk`: quotes, escapes including `$'…'`,
-   comments, continued lines, subshells): each word kept whole, every quoted string opened, and that
-   opened text read again until no quote is left in it, as a nested `sh -c` or `eval` would read it.
-   A match in any reading refuses. Abbreviated options count. A message is set aside only where the
+   comments, continued lines, subshells, redirections): each word kept whole, every quoted string
+   opened, and that opened text read again until no quote is left in it, as a nested `sh -c` or
+   `eval` would read it; nesting deeper than six reads is refused. A match in any reading refuses. Abbreviated options count. A message is set aside only where the
    reading is sure to be the shell's: the value of `-m`, `--message`, `-F` or `--file` in
    `git commit`, `merge`, `tag`, `stash` and `notes`, and a `gh pr|issue|release` title or body,
    before any `$(`, backtick or heredoc whose nested quoting the reader does not follow, and only
    where no earlier option takes the flag as its own value. Claude Code's `"$(cat <<'EOF' … EOF)"`
-   message is one quoted word only where it ends where bash ends it. Anything else stays in view. It
+   message is one quoted word only where it ends where bash ends it and its body holds no `"`, `$`,
+   backtick or backslash: macOS `/bin/bash` 3.2 ends the `$(` early and reads the rest as
+   double-quoted text, where nothing else can run. Anything else stays in view. It
    refuses the agent's writes to `nonna.*`, includes, aliases, `core.hooksPath` and forced refspecs,
    whether through `git config`, `-c` or `--config-env`. It also refuses the variables the gates
    read, and hand edits of `.git/config` and the git hooks. It is a speed bump, not a sandbox: a

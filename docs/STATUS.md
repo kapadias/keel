@@ -99,6 +99,15 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
   a read. Assignments count after `{`, `then`, `eval` and `time`, and through `export NAME`,
   `printf -v`, `read` and `sudo`. A copy's target is found past a redirection or `-t`. A Grep glob is
   judged by the secret files it would read. 745 tests.
+  Fourth review round (security approved; code found four holes): a heredoc message is set aside
+  only when its body holds no `"`, `$`, backtick or backslash, because macOS `/bin/bash` 3.2 ends the
+  `$(` inside the body. `&>` is one redirection. An empty quoted word stays a word, a config read is
+  one dotted key with only read-safe options before it, and an abbreviated `--rem` is an action.
+  `--attr-source` and `--shallow-file` take a value, a git command inside a value (`GIT_EDITOR=…`,
+  `--exec=…`) is read, and nesting deeper than six reads is refused. Assignment rules hold only at
+  the start of a command (or after `sh -c`), so a search for `export NONNA_MODE` passes. In the
+  project a Grep glob is judged by the secret files there, a sample name no longer decides. A fuzz
+  of 700 heredoc messages under bash 3.2 and 5.2 finds no command the guard lets through. 776 tests.
 
 - **2026-09-25** — 2.0 packaging, the first unit of the launch plan (#17). Both manifests say 2.0.0;
   the plugin shows as "Nonna" and declares two install options, `run_tests` and `mode`. The hooks
