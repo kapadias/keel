@@ -42,13 +42,31 @@ nonna_mode() {
 #   under 9,000 chars against the 10,000 cap, because an overrun truncates silently.
 #   A standalone checkout already loads rules/ natively — print nothing, never
 #   double-pay. Runs from the project directory.
+#   What rides depends on the mode: lite carries the short house rules (hooks/lib/lite.md), full
+#   carries the constitution, off carries nothing. In full mode, when another plugin already states
+#   the decision ladder (lib/ladder.sh), the constitution's copy is dropped rather than said twice.
 nonna_core_carrier() {
-  local root core
+  local root mode file core
   [ -f ".claude/rules/00-core.md" ] && return 0
   root="$(nonna_harness_root)"
-  [ -n "$root" ] && [ -f "$root/rules/00-core.md" ] || return 0
-  core="$(cat "$root/rules/00-core.md" 2>/dev/null)"
+  [ -n "$root" ] || return 0
+  mode="$(nonna_mode)"
+  case "$mode" in
+    lite) file="$root/hooks/lib/lite.md" ;;
+    full) file="$root/rules/00-core.md" ;;
+    *) return 0 ;;
+  esac
+  [ -f "$file" ] || return 0
+  core="$(cat "$file" 2>/dev/null)"
   [ -n "$core" ] || return 0
+  if [ "$mode" = lite ]; then
+    printf '%s\n' "$core"
+    return 0
+  fi
+  # shellcheck source=/dev/null
+  if . "$root/hooks/lib/ladder.sh" 2>/dev/null && nonna_ladder_elsewhere; then
+    core="$(printf '%s\n' "$core" | nonna_drop_ladder)"
+  fi
   printf '%s\n\n%s\n' \
     "Nonna's operating rules are NOT loaded in this install (plugin installs cannot carry .claude/rules/ — see ADR-0007). The constitution follows; the full rules are readable at ${root}/rules/." \
     "$core"

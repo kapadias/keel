@@ -396,6 +396,8 @@ for rel, phrase in (
 # one place their names appear. Everything the harness ships stays brand-free. The
 # term is assembled at runtime so this file cannot trip its own check.
 EXTERNAL_NAMES = ("pony" + "tail",)
+# The credit line, and the one helper that must name the plugin to detect it (lib/ladder.sh).
+EXTERNAL_ALLOWED = {"README.md", ".claude/hooks/lib/ladder.sh"}
 EXTERNAL = re.compile("|".join(re.escape(t) for t in EXTERNAL_NAMES), re.IGNORECASE)
 SCAN_EXT = re.compile(r"\.(md|sh|py|json|ya?ml|txt)$")
 # os.walk, not glob: glob("**") skips dot-directories, and .claude/ is one.
@@ -404,7 +406,7 @@ for dirpath, dirnames, filenames in os.walk(ROOT):
     for name in filenames:
         path = os.path.join(dirpath, name)
         rel = os.path.relpath(path, ROOT)
-        if rel == "README.md" or not SCAN_EXT.search(name):
+        if rel in EXTERNAL_ALLOWED or not SCAN_EXT.search(name):
             continue
         with open(path, encoding="utf-8", errors="replace") as fh:
             for n, line in enumerate(fh, 1):
@@ -436,6 +438,33 @@ for rel in (".claude/rules/00-core.md", ".claude/skills/lean/SKILL.md"):
             bad(
                 f"{rel}: ladder rung '{rung}' missing — 00-core.md and the lean skill must agree (ADR-0008)"
             )
+
+# --- lite.md: the house rules every lite session and subagent carries ---
+# It rides additionalContext on every lite SessionStart and SubagentStart, so it has a budget, and
+# it must keep a line for each never-list item lite mode inherits: without one, lite would stop
+# saying what its own gates enforce.
+MAX_LITE_WORDS = 150
+LITE_COVERS = (  # (never-list wording in 00-core.md, phrase lite.md must keep)
+    ("force-push", "never force-push"),
+    ("Put a secret", "Never put a secret"),
+    ("with failing tests", "whole test suite passes"),
+    ("no test that would have failed before it", "fails before the fix"),
+    ("Override a gate", "do not work around it"),
+)
+lite_path = os.path.join(ROOT, ".claude/hooks/lib/lite.md")
+if not os.path.isfile(lite_path):
+    bad("lite mode: missing .claude/hooks/lib/lite.md")
+else:
+    with open(lite_path, encoding="utf-8") as fh:
+        lite = " ".join(fh.read().split())
+    if len(lite.split()) > MAX_LITE_WORDS:
+        bad(f".claude/hooks/lib/lite.md is {len(lite.split())} words, over its {MAX_LITE_WORDS}-word budget (it rides every lite session and subagent)")
+    with open(os.path.join(ROOT, ".claude/rules/00-core.md"), encoding="utf-8") as fh:
+        core_text = fh.read()
+    never = " ".join(core_text.split("## Never", 1)[-1].split("\n## ", 1)[0].split())
+    for item, phrase in LITE_COVERS:
+        if item in never and phrase not in lite:
+            bad(f".claude/hooks/lib/lite.md: no line for the never-list item '{item}' (keep '{phrase}')")
 
 # --- debt gate wiring: /review gates the delta, /sync prints the ledger (ADR-0008) ---
 for cmd in ("review", "sync"):

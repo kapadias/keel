@@ -21,6 +21,8 @@ FAIL=0
 # A fake AWS key id, split so this file never holds a key-shaped literal (the push gate scans it).
 FAKE_AWS="AKIA""1234567890ABCDEF"
 GIT=(git -c user.email=nonna@test -c user.name=nonna-test -c init.defaultBranch=main -c commit.gpgsign=false)
+# The hooks read the user's Claude Code settings (which plugins are enabled); never the developer's own.
+CLAUDE_CONFIG_DIR="$(mktemp -d)"; export CLAUDE_CONFIG_DIR
 
 check() { # <desc> <expected_exit> <actual_exit>
   if [ "$2" = "$3" ]; then
@@ -776,11 +778,34 @@ if [ -e "$TMP/.git/hooks/pre-push" ]; then rc=0; else rc=1; fi; check "unlocatab
 rm -rf "$TMP"
 # Plugin install: rules/ never loads (no `rules` plugin component, ADR-0007), so the
 # constitution must ride additionalContext or the user gets agents with no policy.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; git -C "$TMP" config nonna.mode full
+out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
+contains "plugin install, full: carries the constitution in additionalContext" "The three principles" "$out"
+contains "plugin install, full: says the rules are not loaded" "NOT loaded" "$out"
+contains "plugin install, full: carries the never-list" "Mark work done" "$out"
+contains "plugin install, full: carries the ladder" "## Before writing code" "$out"
+rm -rf "$TMP"
+# Lite, the plugin's default: the short house rules, not the constitution.
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
-contains "plugin install: carries the constitution in additionalContext" "The three principles" "$out"
-contains "plugin install: says the rules are not loaded" "NOT loaded" "$out"
-contains "plugin install: carries the never-list" "Mark work done" "$out"
+contains "plugin install, lite: carries the house rules" "Nonna is on (lite)" "$out"
+printf '%s' "$out" | grep -q "The three principles"; check "plugin install, lite: does not carry the constitution" 1 "$?"
+rm -rf "$TMP"
+# A companion plugin that states the same ladder: full mode drops Nonna's copy rather than say it twice.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; git -C "$TMP" config nonna.mode full
+printf '{"enabledPlugins":{"pony%s@pony%s":true}}\n' tail tail > "$CLAUDE_CONFIG_DIR/settings.json"
+out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
+printf '%s' "$out" | grep -q "Before writing code"; check "plugin install, full: drops the ladder when the companion plugin is on" 1 "$?"
+contains "plugin install, full: keeps the rest of the constitution" "Mark work done" "$out"
+out="$(NONNA_LADDER=on CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
+contains "plugin install, full: NONNA_LADDER=on keeps the ladder anyway" "## Before writing code" "$out"
+mkdir -p "$TMP/.claude"; printf '{"enabledPlugins":{"pony%s@pony%s":false}}\n' tail tail > "$TMP/.claude/settings.local.json"
+out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
+contains "plugin install, full: a project that turns the companion off keeps the ladder" "## Before writing code" "$out"
+rm -f "$CLAUDE_CONFIG_DIR/settings.json"; rm -rf "$TMP"
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; git -C "$TMP" config nonna.mode full
+out="$(NONNA_LADDER=off CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
+printf '%s' "$out" | grep -q "Before writing code"; check "plugin install, full: NONNA_LADDER=off drops the ladder" 1 "$?"
 rm -rf "$TMP"
 # Plugin install: consent to run the repo's tests is the plugin's run_tests option (default on). The
 # first session records the detected command in the repo's own git config (never committed, never
@@ -1075,6 +1100,9 @@ echo "== subagent-start.sh (SubagentStart: the constitution reaches subagents) =
 # standalone checkout loads rules/ natively for subagents too and must not double-pay.
 SA="$HOOKS/subagent-start.sh"
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+out="$(printf '{"agent_type":"implementer"}' | CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$SA")"
+contains "subagent-start: plugin install, lite, carries the house rules" "Nonna is on (lite)" "$out"
+git -C "$TMP" config nonna.mode full
 out="$(printf '{"agent_type":"implementer"}' | CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$SA")"; check "subagent-start: plugin install exits 0" 0 "$?"
 contains "subagent-start: plugin install emits SubagentStart context" '"hookEventName":"SubagentStart"' "$out"
 contains "subagent-start: plugin install carries the constitution" "The three principles" "$out"
@@ -1086,25 +1114,25 @@ for b in bash sh env cat grep sed head tr dirname awk; do
   p="$(command -v "$b" 2>/dev/null || true)"
   if [ -n "$p" ]; then ln -s "$p" "$NOJQ/$b" 2>/dev/null || true; fi
 done
-out="$(printf '{}' | PATH="$NOJQ" CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$SA")"
+out="$(printf '{}' | PATH="$NOJQ" NONNA_MODE=full CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$SA")"
 printf '%s' "$out" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; check "subagent-start: no-jq fallback is still valid JSON" 0 "$?"
 contains "subagent-start: no-jq fallback still carries the constitution" "The three principles" "$out"
 # Without awk the escaper cannot run: emit nothing rather than an empty (valid, silent) carrier.
 rm -f "$NOJQ/awk"
-out="$(printf '{}' | PATH="$NOJQ" CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$SA" 2>/dev/null)"; check "subagent-start: no-jq, no-awk exits 0" 0 "$?"
+out="$(printf '{}' | PATH="$NOJQ" NONNA_MODE=full CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$SA" 2>/dev/null)"; check "subagent-start: no-jq, no-awk exits 0" 0 "$?"
 check "subagent-start: no-jq, no-awk emits nothing instead of an empty carrier" "" "$out"
 # Backslashes and quotes in the carrier must survive the awk escaper on any awk.
 ln -sf "$(command -v awk)" "$NOJQ/awk"
 BQ="$(mktemp -d)"; mkdir -p "$BQ/hooks" "$BQ/rules"; cp "$HOOKS/require-status-sync.sh" "$BQ/hooks/"
 printf '# Core\nsay "hi" and C:\\path\\ end\\\n' > "$BQ/rules/00-core.md"
-out="$(printf '{}' | PATH="$NOJQ" CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$BQ" "$SA")"
+out="$(printf '{}' | PATH="$NOJQ" NONNA_MODE=full CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$BQ" "$SA")"
 dec="$(printf '%s' "$out" | python3 -c 'import json,sys; print(json.load(sys.stdin)["hookSpecificOutput"]["additionalContext"])' 2>/dev/null)"; check "subagent-start: no-jq fallback with backslashes and quotes is valid JSON" 0 "$?"
 contains "subagent-start: no-jq fallback round-trips a backslash and a quote" "say \"hi\" and C:\\path\\ end\\" "$dec"
 rm -rf "$BQ"
 # A control character in the carrier must not break the JSON.
 CTL="$(mktemp -d)"; mkdir -p "$CTL/hooks" "$CTL/rules"; cp "$HOOKS/require-status-sync.sh" "$CTL/hooks/"
 printf '# Core\x01 with\x1b control\n' > "$CTL/rules/00-core.md"; ln -sf "$(command -v awk)" "$NOJQ/awk"
-out="$(printf '{}' | PATH="$NOJQ" CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$CTL" "$SA")"
+out="$(printf '{}' | PATH="$NOJQ" NONNA_MODE=full CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$CTL" "$SA")"
 printf '%s' "$out" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; check "subagent-start: no-jq fallback survives control characters" 0 "$?"
 rm -rf "$CTL"
 rm -rf "$NOJQ" "$TMP"
@@ -1121,7 +1149,7 @@ for b in bash sh env cat grep sed head tr dirname ln cp readlink pwd mkdir awk; 
   p="$(command -v "$b" 2>/dev/null || true)"
   if [ -n "$p" ]; then ln -s "$p" "$NOJQ/$b" 2>/dev/null || true; fi
 done
-out="$(PATH="$NOJQ" CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
+out="$(PATH="$NOJQ" NONNA_MODE=full CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
 printf '%s' "$out" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; check "session-start: no-jq plugin-mode output is valid JSON" 0 "$?"
 rm -rf "$NOJQ" "$TMP"
 
@@ -1485,6 +1513,24 @@ rm "$FX/.claude/hooks/format.sh"
 out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a wired hook script that is missing" 1 "$?"
 contains "lint: settings.json names the missing script" "settings.json: wired hook missing on disk: .claude/hooks/format.sh" "$out"
 contains "lint: hooks.json names the missing script" "hooks.json: wired hook missing on disk: hooks/format.sh" "$out"
+rm -rf "$FX"
+# lite.md rides every lite session and subagent: it has a word budget, and it must keep a line for
+# each never-list item it inherits (tests, branches, secrets, gates).
+FX="$(lint_fixture)"
+python3 -c 'import sys; open(sys.argv[1], "a").write("\n" + "filler " * 200 + "\n")' "$FX/.claude/hooks/lib/lite.md"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a lite.md over its word budget" 1 "$?"
+contains "lint: names the lite.md budget" "lite.md is" "$out"
+rm -rf "$FX"
+FX="$(lint_fixture)"
+sed -i 's/, and never force-push//' "$FX/.claude/hooks/lib/lite.md"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a lite.md that drops a never-list item" 1 "$?"
+contains "lint: names the dropped never-list item" "force-push" "$out"
+rm -rf "$FX"
+# The companion plugin's name is allowed in exactly one harness file: the helper that detects it.
+FX="$(lint_fixture)"
+printf '# pony%s\n' tail >> "$FX/.claude/hooks/lib/core.sh"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: the external name stays out of every other hook file" 1 "$?"
+contains "lint: names the hook file carrying the external name" "lib/core.sh" "$out"
 rm -rf "$FX"
 # Nothing may follow the script: `|| true` turns the gate's block (exit 2) into a pass, in one mode only.
 FX="$(lint_fixture)"
