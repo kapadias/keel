@@ -84,7 +84,11 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
   as written, and full mode refuses a turn or push that deletes it. "Where's the test?" asks once per
   set of changes. The suite's output is quoted as the repository's words. The secret guard covers
   Grep, symlinks and case. The suite runs on its own git config. Per-repository test consent stays
-  plugin-wide by the maintainer's decision (ADR-0011). 644 tests.
+  plugin-wide by the maintainer's decision (ADR-0011).
+  Second review round (code approved; security found the message masking could hide a command): the
+  guard now tokenizes a command the way the shell does (lib/shell-words.awk) and checks two readings,
+  words whole and quoted strings opened. Grep globs are matched as patterns, and "where's the test?"
+  remembers the code, not the file names. A macOS CI job is a follow-up (#17). 675 tests.
 
 - **2026-09-25** — 2.0 packaging, the first unit of the launch plan (#17). Both manifests say 2.0.0;
   the plugin shows as "Nonna" and declares two install options, `run_tests` and `mode`. The hooks

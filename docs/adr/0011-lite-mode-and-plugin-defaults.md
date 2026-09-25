@@ -59,8 +59,11 @@ lighter mode to select". A plugin user's first day is that use.
    recorded `nonna.mode` on first sight, which would have outranked the global switch everywhere
    Nonna had been.)
 4. **A model does not switch off its own gates.** The branch guard reads each command the way the
-   shell will run it: quotes removed, continued lines joined, subshells opened, abbreviated options
-   expanded. It refuses the agent's writes to `nonna.*`, includes, aliases, `core.hooksPath` and
+   shell will run it (`.claude/hooks/lib/shell-words.awk`: quotes, escapes, comments, continued
+   lines, subshells), twice: each word kept whole, and every quoted string opened. A match in either
+   refuses. Abbreviated options count. A commit message is set aside only in a plain `git` command,
+   where the quoting is unambiguous; anything else stays in view. It refuses the agent's writes to
+   `nonna.*`, includes, aliases, `core.hooksPath` and
    forced refspecs, whether through `git config`, `-c` or `--config-env`. It also refuses the
    variables the gates read, and hand edits of `.git/config` and the git hooks. It is a speed bump,
    not a sandbox: a script file gets past it. Branch protection on the server is the wall.
