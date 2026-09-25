@@ -26,13 +26,16 @@ branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '')"
 
 is_protected() { case "$1" in main | master | develop) return 0 ;; *) return 1 ;; esac; }
 
-# `git` (optionally path-prefixed) + any run of global options, up to a subcommand. A command starts
-# a line, or follows a space, `{`, `!` or `=` (a command in a value: GIT_EDITOR=…, --exec=…).
-GIT='(^|[[:space:]{!=])([^[:space:]]*/)?git([[:space:]]+(-C[[:space:]]+[^[:space:]]+|-c[[:space:]]+[^[:space:]]+|--(git-dir|work-tree|namespace|exec-path|super-prefix|config-env|attr-source|shallow-file)(=[^[:space:]]*|[[:space:]]+[^[:space:]]+)|--[A-Za-z][A-Za-z-]*(=[^[:space:]]*)?|-[A-Za-z]))*[[:space:]]+'
+# `git` (optionally path-prefixed) + any run of global options, up to a subcommand, or git's own
+# binary for one (git-push, in git --exec-path). A command starts a line, or follows a space, `{`,
+# `!` or `=` (a command in a value: GIT_EDITOR=…, --exec=…). Matched without case, as macOS's disk
+# finds /usr/bin/GIT, git-PUSH and RM.
+GIT='(^|[[:space:]{!=])([^[:space:]]*/)?git(-|([[:space:]]+(-C[[:space:]]+[^[:space:]]+|-c[[:space:]]+[^[:space:]]+|--(git-dir|work-tree|namespace|exec-path|super-prefix|config-env|attr-source|shallow-file)(=[^[:space:]]*|[[:space:]]+[^[:space:]]+)|--[A-Za-z][A-Za-z-]*(=[^[:space:]]*)?|-[A-Za-z]))*[[:space:]]+)'
 # Config keys that are Nonna's own switches, and keys that can route git around her hooks: an
-# include, an alias, a hooks path, a mirror or forced push refspec. Matched without case.
+# include, an alias, a hooks path, a mirror, a push refspec or push.default (either can make a plain
+# git push push a protected branch, or every branch). Matched without case.
 NKEY='nonna([.[:space:]=]|$)'
-RKEY='(include(if)?\.|alias\.|core\.hookspath|remote\.[^[:space:]]*\.(mirror|push[=[:space:]]+\+))'
+RKEY='(include(if)?\.|alias\.|core\.hookspath|remote\.[^[:space:]]*\.(mirror|push)|push\.default)'
 
 recipe() { # <technical reason>: her settings are the user's
   echo "✗ Nonna: only the cook changes the recipe. (branch guard: $1)" >&2
@@ -147,7 +150,7 @@ case "$tool" in
       3) too_long "a brace list or a glob expands to more than it can read before the hook times out." ;;
       *) unread "the brace and glob reader (awk) failed" ;;
     esac
-    runs_git() { printf '%s\n' "$segs" | grep -qE "${GIT}[a-z]"; }
+    runs_git() { printf '%s\n' "$segs" | grep -qiE "${GIT}[a-z]"; }
     RD=$'\002' # the mark shell-words.awk puts before a redirection the shell performs
 
     # What her gates read is the user's to set: an environment variable can switch a git hook off
@@ -166,10 +169,10 @@ case "$tool" in
     AT="^[[:space:]]*((${KW}|${ASSIGN}|${RD}?[0-9]*[<>]+([[:space:]]+${RD}?[<>]+)*[[:space:]]*[^[:space:]]+)[[:space:]]+)*"
     DECL='(export|declare|typeset|readonly|local)([[:space:]]+-[A-Za-z]+)*'
     assigns() { # <name regex>
-      printf '%s\n' "$segs" | grep -qE \
+      printf '%s\n' "$segs" | grep -qiE \
         -e "${AT}$1\+?=" \
         -e "(^|[[:space:]])${DECL}([[:space:]]+${ASSIGN})*[[:space:]]+$1\+?=" \
-        -e "(^|[[:space:]])(env|sudo)[[:space:]](.*[[:space:]])?$1\+?=" \
+        -e "(^|[[:space:]])([^[:space:]]*/)?(env|sudo)[[:space:]](.*[[:space:]])?$1\+?=" \
         -e "${AT}${DECL}([[:space:]]+[A-Za-z_][A-Za-z0-9_]*(\+?=[^[:space:]]*)?)*[[:space:]]+$1([[:space:]]|$)" \
         -e "${AT}printf[[:space:]]+(-[^[:space:]]+[[:space:]]+)*-v[[:space:]]*$1([[:space:]]|$)" \
         -e "${AT}(read|readarray|mapfile)[[:space:]](.*[[:space:]])?$1([[:space:]]|$)" \
@@ -185,7 +188,7 @@ case "$tool" in
       recipe "refusing to change Nonna's own git config."
     fi
     if printf '%s\n' "$segs" | grep -qiE "(^|[[:space:]{!=])([^[:space:]]*/)?git[[:space:]](.*[[:space:]])?(-c[[:space:]]+|--config-env[=[:space:]]+)${RKEY}"; then
-      kitchen_door "refusing an include, alias, hooks path or forced refspec on the command line; the git hooks are the gate."
+      kitchen_door "refusing an include, alias, hooks path, push refspec or push.default on the command line; the git hooks are the gate."
     fi
 
     # git config: a read is fine: --get*, --list, -l, the get/list subcommand, or one key (it has a
@@ -196,17 +199,17 @@ case "$tool" in
     ROPT='[[:space:]]+(--(local|global|system|worktree|show-origin|show-scope|includes|no-includes|null|name-only|bool|int|bool-or-int|path|expiry-date)|-z|--type=[a-z-]+|--(file|blob)=[^[:space:]]+|(-f|--file|--blob|--type)[[:space:]]+[^-[:space:]][^[:space:]]*)'
     # Only the lines that run git config: one grep for the whole command, not processes per line (a
     # long heredoc must not outrun the hook's timeout, which would let the command run unguarded).
-    cfg="$(printf '%s\n' "$segs" | grep -E "${GIT}config([[:space:]]|$)")"
+    cfg="$(printf '%s\n' "$segs" | grep -iE "${GIT}config([[:space:]]|$)")"
     [ "$?" -le 1 ] || unread "a check could not run"
     while IFS= read -r seg; do
       [ -n "$seg" ] || continue
-      printf '%s' "$seg" | grep -qE "${GIT}config(${ROPT})*[[:space:]]+(--get[a-z-]*|--list|-l)([[:space:]=]|$)" && continue
-      printf '%s' "$seg" | grep -qE "${GIT}config(${ROPT})*[[:space:]]+(get|list)([[:space:]]|$)" && continue
+      printf '%s' "$seg" | grep -qiE "${GIT}config(${ROPT})*[[:space:]]+(--get[a-z-]*|--list|-l)([[:space:]=]|$)" && continue
+      printf '%s' "$seg" | grep -qiE "${GIT}config(${ROPT})*[[:space:]]+(get|list)([[:space:]]|$)" && continue
       printf '%s' "$seg" | sed -E "s/[[:space:]]+${RD}[0-9]*[<>]+([[:space:]]+${RD}[<>]+)*[[:space:]]+[^[:space:]]+//g" \
-        | grep -qE "${GIT}config(${ROPT})*[[:space:]]+[^-[:space:]'][^[:space:]]*\.[^[:space:]]*[[:space:]]*$" && continue
+        | grep -qiE "${GIT}config(${ROPT})*[[:space:]]+[^-[:space:]'][^[:space:]]*\.[^[:space:]]*[[:space:]]*$" && continue
       printf '%s' "$seg" | grep -qiE "(^|[[:space:]])${NKEY}" && recipe "refusing to change Nonna's own git config."
       if printf '%s' "$seg" | grep -qiE "(^|[[:space:]])(${RKEY}|(-e|--edit|edit)([[:space:]]|$))"; then
-        kitchen_door "refusing a config change that can route git around her hooks (include, alias, core.hooksPath, a forced refspec, --edit)."
+        kitchen_door "refusing a config change that can route git around her hooks (include, alias, core.hooksPath, a push refspec or push.default, --edit)."
       fi
     done <<<"$cfg"
 
@@ -214,42 +217,45 @@ case "$tool" in
     # (cat, grep, sed -n, awk, cp from) is fine. A copy's target is its last word once redirections
     # are set aside, or the directory given to -t / --target-directory.
     GITF='(^|[^A-Za-z0-9_.-])\.git/(hooks([/[:space:]]|$)|config([[:space:]]|$))'
-    if printf '%s\n' "$segs" | grep -qE '>[[:space:]]*[^[:space:]]*\.git/(hooks|config)' \
-      || printf '%s\n' "$segs" | grep -E "$GITF" \
-      | grep -qE '(^|[[:space:]])(rm|unlink|chmod|chown|truncate|touch|shred|patch|ed|ex|vi|vim|nano|emacs|python3?|ruby|node|perl|tee|dd)([[:space:]]|$)|(^|[[:space:]])(sed|awk|gawk)[[:space:]](.*[[:space:]])?(-[A-Za-z]*i|--in-place)' \
-      || printf '%s\n' "$segs" | grep -E '(^|[[:space:]])(cp|mv|ln|install|rsync)[[:space:]]' \
+    if printf '%s\n' "$segs" | grep -qiE '>[[:space:]]*[^[:space:]]*\.git/(hooks|config)' \
+      || printf '%s\n' "$segs" | grep -iE "$GITF" \
+      | grep -qiE '(^|[[:space:]])(rm|unlink|chmod|chown|truncate|touch|shred|patch|ed|ex|vi|vim|nano|emacs|python3?|ruby|node|perl|tee|dd)([[:space:]]|$)|(^|[[:space:]])(sed|awk|gawk)[[:space:]](.*[[:space:]])?(-[A-Za-z]*i|--in-place)' \
+      || printf '%s\n' "$segs" | grep -iE '(^|[[:space:]])(cp|mv|ln|install|rsync)[[:space:]]' \
       | sed -E "s/[[:space:]]+${RD}[0-9]*[<>]+([[:space:]]+${RD}[<>]+)*[[:space:]]+[^[:space:]]+//g" \
-      | grep -qE '(^|[^A-Za-z0-9_.-])\.git/(hooks(/[^[:space:]]*)?|config)[[:space:]]*$|(^|[[:space:]])(-[A-Za-z]*t[[:space:]]*|--ta[a-z-]*[=[:space:]]+)[^[:space:]]*\.git/(hooks|config)'; then
+      | grep -qiE '(^|[^A-Za-z0-9_.-])\.git/(hooks(/[^[:space:]]*)?|config)[[:space:]]*$|(^|[[:space:]])(-[A-Za-z]*t[[:space:]]*|--ta[a-z-]*[=[:space:]]+)[^[:space:]]*\.git/(hooks|config)'; then
       recipe "refusing to change .git/config or .git/hooks by hand."
     fi
 
     # The git hooks are the gate for a commit and a push, so skipping them is refused: --no-verify
-    # (and its abbreviations) and commit's -n, alone or in a cluster of flags that take no value.
-    if printf '%s\n' "$segs" | grep -qE "${GIT}(commit|push|merge|am|rebase|cherry-pick|revert|pull)([[:space:]].*)?[[:space:]]--no-veri[a-z]*([=[:space:]]|$)" \
-      || printf '%s\n' "$segs" | grep -qE "${GIT}commit([[:space:]].*)?[[:space:]]-[aeiopqsvz]*n"; then
+    # (and its abbreviations), commit's -n, alone or in a cluster of flags that take no value, and
+    # git's plumbing pushes, send-pack and http-push, which run no hook at all.
+    if printf '%s\n' "$segs" | grep -qiE "${GIT}(commit|push|merge|am|rebase|cherry-pick|revert|pull)([[:space:]].*)?[[:space:]]--no-veri[a-z]*([=[:space:]]|$)" \
+      || printf '%s\n' "$segs" | grep -qiE "${GIT}commit([[:space:]].*)?[[:space:]]-[aeiopqsvz]*n" \
+      || printf '%s\n' "$segs" | grep -qiE "${GIT}(send-pack|http-push)([[:space:]]|$)"; then
       kitchen_door "refusing --no-verify and hook overrides; the git hooks are the gate."
     fi
 
     # Commit/merge while sitting on a protected branch.
-    if is_protected "$branch" && printf '%s\n' "$segs" | grep -qE "${GIT}(commit|merge)([[:space:]]|$)"; then
+    if is_protected "$branch" && printf '%s\n' "$segs" | grep -qiE "${GIT}(commit|merge)([[:space:]]|$)"; then
       echo "✗ Nonna: not in my kitchen, tesoro. Make a branch. (branch guard: refusing to commit on protected branch '$branch'.)" >&2
       echo "  Never commit to main/master/develop (rules/git-workflow.md). Branch first:" >&2
       echo "    git checkout -b feature/<id>-<slug>" >&2
       exit 2
     fi
 
-    # Push handling, on the push commands alone.
-    push="$(printf '%s\n' "$segs" | grep -E "${GIT}push([[:space:]]|$)" || true)"
+    # Push handling, on the push commands alone: git push, and git subtree push.
+    push="$(printf '%s\n' "$segs" | grep -iE "${GIT}(push|subtree([[:space:]].*)?[[:space:]]push)([[:space:]]|$)" || true)"
     if [ -n "$push" ]; then
-      # --all / --mirror push (or delete) every local ref, incl. protected ones.
-      if printf '%s\n' "$push" | grep -qE '[[:space:]]--(al|all|mi|mir|mirr|mirro|mirror)([=[:space:]]|$)'; then
-        echo "✗ Nonna: one pot at a time. (branch guard: refusing 'git push --all/--mirror' — it pushes (or deletes) protected refs.)" >&2
+      # --all / --mirror push (or delete) every local ref, incl. protected ones; so does a : refspec
+      # (every branch the remote shares) and a wildcard (refs/heads/*).
+      if printf '%s\n' "$push" | grep -qiE '[[:space:]]--(al|all|mi|mir|mirr|mirro|mirror)([=[:space:]]|$)|[[:space:]]\+?:([[:space:]]|$)|\*'; then
+        echo "✗ Nonna: one pot at a time. (branch guard: refusing a push of every branch: --all, --mirror, a : refspec or a wildcard — it pushes (or deletes) protected refs.)" >&2
         echo "  Push one branch explicitly: git push origin <feature-branch> (rules/git-workflow.md)." >&2
         exit 2
       fi
       # Force pushes: --force and --force-with-lease (git takes any unique abbreviation, from --for),
       # and -f alone or in a cluster of flags that take no value (-uf). --follow-tags is not one.
-      if printf '%s\n' "$push" | grep -qE '(^|[[:space:]{,])(--for[a-z-]*(=[^[:space:]]*)?|-[unvqd46]*f)'; then
+      if printf '%s\n' "$push" | grep -qiE '(^|[[:space:]{,])(--for[a-z-]*(=[^[:space:]]*)?|-[unvqd46]*f)'; then
         echo "✗ Nonna: we don't force things in this house. (branch guard: refusing a force push.)" >&2
         echo "  Push a new commit instead (rules/git-workflow.md)." >&2
         exit 2
@@ -261,7 +267,7 @@ case "$tool" in
         exit 2
       fi
       # On a protected branch, or naming a protected ref as the target (main:feature only reads main).
-      if is_protected "$branch" || printf '%s\n' "$push" | grep -qE '(^|[[:space:]:/{,])(main|master|develop)([[:space:]},]|$)'; then
+      if is_protected "$branch" || printf '%s\n' "$push" | grep -qiE '(^|[[:space:]:/{,])(main|master|develop)([[:space:]},]|$)'; then
         echo "✗ Nonna: nobody pushes to main in my house. Open a PR. (branch guard: refusing to push to a protected branch.)" >&2
         echo "  Promote via PR (feature -> develop -> main), not a direct push (rules/git-workflow.md)." >&2
         exit 2
