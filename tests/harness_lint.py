@@ -672,7 +672,7 @@ REQUIRED_GATES = {
         "hooks/guard-branch.sh",
         "hooks/secret-scan.sh",
     ),
-    ("PreToolUse", "Read"): ("hooks/secret-scan.sh",),
+    ("PreToolUse", "Read|Grep"): ("hooks/secret-scan.sh",),
     ("Stop", "*"): ("hooks/stop-dod.sh",),
     ("SessionStart", "*"): ("hooks/session-start.sh",),
 }
@@ -692,26 +692,31 @@ for rel, wiring in (
             if script not in wired:
                 bad(f"{rel}: {event} '{matcher}' must run {script} (a core gate)")
 
-# --- every Read settings.json denies, the Read hook refuses too ---
+# --- every Read settings.json denies, the Read hook refuses too, for Read and for Grep ---
 # A plugin install cannot carry permissions.deny: the hook is all it has. Each deny glob becomes a
-# sample path, and secret-scan.sh must refuse to Read it.
+# sample path, and secret-scan.sh must refuse to Read it, and to Grep it (Claude Code applies Read
+# denies to Grep).
 for rule in (settings.get("permissions") or {}).get("deny", []):
     m = re.fullmatch(r"Read\((.+)\)", rule)
     if not m:
         continue
     sample = m.group(1).replace("**", "x").replace("*", "a")
-    payload = json.dumps({"tool_name": "Read", "tool_input": {"file_path": sample}})
-    rc = subprocess.run(
-        ["bash", os.path.join(ROOT, ".claude/hooks/secret-scan.sh")],
-        input=payload,
-        capture_output=True,
-        text=True,
-        env={**os.environ, "NONNA_MODE": "full", "CLAUDE_PROJECT_DIR": ROOT},
-    ).returncode
-    if rc != 2:
-        bad(
-            f".claude/hooks/secret-scan.sh lets the agent Read {sample}, which settings.json denies ({rule}); a plugin install has only the hook"
-        )
+    for tool, tool_input in (
+        ("Read", {"file_path": sample}),
+        ("Grep", {"pattern": ".", "path": sample}),
+    ):
+        payload = json.dumps({"tool_name": tool, "tool_input": tool_input})
+        rc = subprocess.run(
+            ["bash", os.path.join(ROOT, ".claude/hooks/secret-scan.sh")],
+            input=payload,
+            capture_output=True,
+            text=True,
+            env={**os.environ, "NONNA_MODE": "full", "CLAUDE_PROJECT_DIR": ROOT},
+        ).returncode
+        if rc != 2:
+            bad(
+                f".claude/hooks/secret-scan.sh lets the agent {tool} {sample}, which settings.json denies ({rule}); a plugin install has only the hook"
+            )
 
 if offenders:
     print("Harness lint FAILED:")

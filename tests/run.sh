@@ -83,6 +83,21 @@ out="$(printf '%s' '{"tool_name":"Read","tool_input":{"file_path":"config/secret
 contains "Read block is in her voice" "that drawer is private" "$out"
 printf '%s' '{"tool_name":"Read","tool_input":{"file_path":".env.example"}}' | "$SS"; check "allows Read of .env.example" 0 "$?"
 printf '%s' '{"tool_name":"Read","tool_input":{"file_path":"src/environment.py"}}' | "$SS"; check "allows Read of an ordinary file" 0 "$?"
+# Grep reads file contents too: Claude Code applies Read denies to it, so the hook must as well.
+printf '%s' '{"tool_name":"Grep","tool_input":{"pattern":".","path":".env","output_mode":"content"}}' | "$SS" 2>/dev/null; check "blocks Grep of .env" 2 "$?"
+printf '%s' '{"tool_name":"Grep","tool_input":{"pattern":"AKIA","path":".aws"}}' | "$SS" 2>/dev/null; check "blocks Grep of a secret directory" 2 "$?"
+printf '%s' '{"tool_name":"Grep","tool_input":{"pattern":".","glob":"**/.env*","output_mode":"content"}}' | "$SS" 2>/dev/null; check "blocks Grep whose glob picks .env files" 2 "$?"
+printf '%s' '{"tool_name":"Grep","tool_input":{"pattern":"BEGIN","glob":"*.pem"}}' | "$SS" 2>/dev/null; check "blocks Grep whose glob picks key files" 2 "$?"
+printf '%s' '{"tool_name":"Grep","tool_input":{"pattern":"def ","path":"src","glob":"*.py"}}' | "$SS"; check "allows an ordinary Grep" 0 "$?"
+printf '%s' '{"tool_name":"Grep","tool_input":{"pattern":"X","path":".env.example"}}' | "$SS"; check "allows Grep of .env.example" 0 "$?"
+# A name is not the file: case-folding file systems and symlinks reach a secret under another name.
+printf '%s' '{"tool_name":"Read","tool_input":{"file_path":".ENV"}}' | "$SS" 2>/dev/null; check "blocks Read of .ENV (a case-folding file system reads .env)" 2 "$?"
+LNK="$(mktemp -d)"; mkdir -p "$LNK/docs"; printf 'K=1\n' > "$LNK/.env"; ln -s ../.env "$LNK/docs/setup.txt"; printf 'x\n' > "$LNK/docs/real.txt"
+printf '{"tool_name":"Read","tool_input":{"file_path":"docs/setup.txt"}}' | CLAUDE_PROJECT_DIR="$LNK" "$SS" 2>/dev/null; check "blocks Read of a harmless name that links to .env" 2 "$?"
+printf '{"tool_name":"Read","tool_input":{"file_path":"%s/docs/setup.txt"}}' "$LNK" | CLAUDE_PROJECT_DIR="$LNK" "$SS" 2>/dev/null; check "...by its absolute path too" 2 "$?"
+ln -s "$LNK/docs/real.txt" "$LNK/docs/alias.txt"
+printf '{"tool_name":"Read","tool_input":{"file_path":"docs/alias.txt"}}' | CLAUDE_PROJECT_DIR="$LNK" "$SS"; check "allows a link to an ordinary file" 0 "$?"
+rm -rf "$LNK"
 
 echo "== guard-branch.sh (PreToolUse branch gate) =="
 GB="$HOOKS/guard-branch.sh"
@@ -1883,6 +1898,17 @@ FX="$(lint_fixture)"
 sed -i 's# | \*/kubeconfig##' "$FX/.claude/hooks/secret-scan.sh"
 out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a Read deny the hook does not refuse" 1 "$?"
 contains "lint: names the deny the hook lets through" "kubeconfig" "$out"
+rm -rf "$FX"
+FX="$(lint_fixture)"
+python3 - "$FX/.claude/hooks/secret-scan.sh" <<'EOPY'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+s = s.replace('"(Read|Grep)"', '"Read"')
+open(p, "w").write(s)
+EOPY
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a Read deny the hook lets Grep through" 1 "$?"
+contains "lint: names the Grep it lets through" "lets the agent Grep" "$out"
 rm -rf "$FX"
 # lite.md rides every lite session and subagent: it has a word budget, and it must keep a line for
 # each never-list item it inherits (tests, branches, secrets, gates).

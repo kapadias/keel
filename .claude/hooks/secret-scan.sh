@@ -18,26 +18,51 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 payload="$(cat 2>/dev/null || true)"
 [ -n "$payload" ] || exit 0
 
-# Read branch: the same secret files settings.json's permissions.deny refuses to Read. A plugin
-# cannot carry permissions, so without this a plugin user's agent could read .env into its context.
-# Templates (.env.example, .sample, .template) are for reading. The lint proves every Read deny in
-# settings.json is refused here too.
-if printf '%s' "$payload" | grep -qE '"tool_name"[[:space:]]*:[[:space:]]*"Read"'; then
+# Read and Grep branch: the same secret files settings.json's permissions.deny refuses (Claude Code
+# applies Read denies to Grep as well). A plugin cannot carry permissions, so without this a plugin
+# user's agent could read .env into its context. A name is not the file: each path is matched
+# lowercased too (a case-folding file system reads .ENV as .env) and with its symlinks followed.
+# Grep's path may be a directory, and its glob picks files by name. Templates (.env.example,
+# .sample, .template) are for reading. The lint proves every Read deny in settings.json is refused
+# here, for Read and for Grep.
+if printf '%s' "$payload" | grep -qE '"tool_name"[[:space:]]*:[[:space:]]*"(Read|Grep)"'; then
   # shellcheck source=/dev/null
   . "$here/lib/json.sh"
-  p="$(printf '%s' "$payload" | nonna_json_field '.tool_input.file_path')"
-  [ -n "$p" ] || exit 0
-  case "$p" in *.env.example | *.env.sample | *.env.template) exit 0 ;; esac
-  case "/${p#./}" in
-    */.env | */.env.* | */secrets/* | *.pem | *.key | *.p12 | *.p8 | *.pfx | *.jks \
-      | */id_rsa* | */.ssh/* | */.aws/* | */.npmrc | */kubeconfig | */credentials)
-      {
-        echo "✗ Nonna: that drawer is private. (secret-scan: blocked reading $p.)"
-        echo "  Secret files stay out of the context; reference an env var instead (rules/safety.md)."
-      } >&2
-      exit 2
-      ;;
-  esac
+  secret_file() { # <path>: 0 when the path names a file the Read deny list covers
+    local p
+    p="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    case "$p" in *.env.example | *.env.sample | *.env.template) return 1 ;; esac
+    case "/${p#./}" in
+      */.env | */.env.* | */secrets/* | *.pem | *.key | *.p12 | *.p8 | *.pfx | *.jks \
+        | */id_rsa* | */.ssh/* | */.aws/* | */.npmrc | */kubeconfig | */credentials) return 0 ;;
+      */secrets | */.ssh | */.aws) return 0 ;; # the directory itself, which Grep can search
+    esac
+    return 1
+  }
+  resolved() { # <path>: where it leads, its symlinks followed as far as they go (no GNU tools)
+    local p="$1" l n=0 d
+    while [ -L "$p" ] && [ "$n" -lt 40 ]; do
+      l="$(readlink "$p")" || break
+      case "$l" in /*) p="$l" ;; *) p="$(dirname "$p")/$l" ;; esac
+      n=$((n + 1))
+    done
+    if d="$(cd "$(dirname "$p")" 2>/dev/null && pwd -P)"; then printf '%s/%s' "$d" "$(basename "$p")"; else printf '%s' "$p"; fi
+  }
+  f="$(printf '%s' "$payload" | nonna_json_field '.tool_input.file_path')"
+  d="$(printf '%s' "$payload" | nonna_json_field '.tool_input.path')"
+  g="$(printf '%s' "$payload" | nonna_json_field '.tool_input.glob')"
+  paths=()
+  [ -z "$f" ] || paths+=("$f")
+  [ -z "$d" ] || paths+=("${d%/}")
+  [ -z "$g" ] || paths+=("$(printf '%s' "$g" | sed 's/\*//g; s/?/a/g')" "$(printf '%s' "$g" | sed 's/\*\*/x/g; s/\*/a/g; s/?/a/g')")
+  for p in ${paths[@]+"${paths[@]}"}; do
+    secret_file "$p" || secret_file "$(cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null && resolved "$p")" || continue
+    {
+      echo "✗ Nonna: that drawer is private. (secret-scan: blocked reading ${f:-${d:-$g}}.)"
+      echo "  Secret files stay out of the context; reference an env var instead (rules/safety.md)."
+    } >&2
+    exit 2
+  done
   exit 0
 fi
 
