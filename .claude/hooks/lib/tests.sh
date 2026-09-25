@@ -42,8 +42,10 @@ nonna_detect_test_cmd() {
     [ -f "$t" ] && has_py_tests=1 && break
   done
   if [ -f pytest.ini ] || [ -f tox.ini ] || [ -f conftest.py ] || [ "$has_py_tests" = 1 ]; then
-    # Only when pytest is there: "No module named pytest" is not a red suite.
-    python3 -c 'import pytest' >/dev/null 2>&1 && printf 'python3 -m pytest -q'
+    # Only when pytest is there: "No module named pytest" is not a red suite. Found, not imported,
+    # and never from the repository's own directory: a pytest.py it ships must not run.
+    python3 -c 'import sys; sys.path[:] = [p for p in sys.path if p not in ("", ".")]; import importlib.util; sys.exit(importlib.util.find_spec("pytest") is None)' >/dev/null 2>&1 \
+      && printf 'python3 -m pytest -q'
   elif [ -f package.json ] && grep -qE '"test"[[:space:]]*:' package.json && ! grep -q 'no test specified' package.json; then
     printf 'npm test --silent'
   elif [ -f go.mod ]; then

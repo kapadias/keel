@@ -1616,6 +1616,13 @@ out="$(ns "$TMP")"
 contains "/nonna: a branch with no commits yet is named" " on main" "$out"
 printf '%s\n' "$out" | head -n 1 | grep -qE 'on HEAD|\?'; check "/nonna: ...with nothing unknown in its first line" 1 "$?"
 rm -rf "$TMP"
+# Detection looks for pytest without importing anything from the repository: a pytest.py it ships
+# does not run.
+TMP="$(mktemp -d)"; mkdir -p "$TMP/tests"; : > "$TMP/tests/test_x.py"
+printf 'open("ran", "w").write("x")\n' > "$TMP/pytest.py"
+(cd "$TMP" && bash -c '. "$1/lib/tests.sh"; nonna_detect_test_cmd' _ "$HOOKS" >/dev/null 2>&1)
+if [ -e "$TMP/ran" ] || [ -e /ran ]; then rc=1; else rc=0; fi; check "detection does not run a pytest.py the repository ships" 0 "$rc"
+rm -rf "$TMP"
 # A suite Stop saw pass on this exact tree shows as green; a changed tree does not.
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; "${GIT[@]}" -C "$TMP" commit -q --allow-empty -m init --no-verify
 git -C "$TMP" config nonna.testCmd true
