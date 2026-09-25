@@ -260,6 +260,9 @@ def check_hook_forms(rel: str, cfg: dict) -> None:
 with open(f"{ROOT}/.claude/settings.json", encoding="utf-8") as fh:
     settings = json.load(fh)
 check_hook_forms(".claude/settings.json", settings)
+# One settings key turns every hook off at once; pinning each gate means nothing if it is set.
+if settings.get("disableAllHooks"):
+    bad(".claude/settings.json: disableAllHooks is set, which turns every Nonna gate off")
 
 # --- cross-links: intra-repo markdown links must resolve ---
 LINK = re.compile(r"\]\(([^)]+)\)")

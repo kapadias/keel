@@ -1414,6 +1414,12 @@ set_hook_key "$FX/.claude/hooks/hooks.json" Stop timeout 30
 out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a gate timed differently in the two install modes" 1 "$?"
 contains "lint: names the event whose timeout differs" "hook wiring: 'Stop' differs" "$out"
 rm -rf "$FX"
+# One settings key turns every gate off at once.
+FX="$(lint_fixture)"
+python3 -c 'import json,sys; p=sys.argv[1]; c=json.load(open(p)); c["disableAllHooks"]=True; json.dump(c,open(p,"w"),indent=2)' "$FX/.claude/settings.json"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks disableAllHooks in settings.json" 1 "$?"
+contains "lint: names the kill switch" "disableAllHooks is set" "$out"
+rm -rf "$FX"
 # Arguments after the script (SessionStart gets the plugin data dir) are not part of the gate's identity.
 FX="$(lint_fixture)"
 set_hook_cmd "$FX/.claude/settings.json" Stop '"$CLAUDE_PROJECT_DIR"/.claude/hooks/format.sh'
