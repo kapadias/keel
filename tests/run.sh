@@ -407,6 +407,7 @@ BADAWK="$(mktemp -d)"; printf '#!/bin/sh\nexit 1\n' > "$BADAWK/awk"; chmod +x "$
 check "a failing awk: an ANSI-C force push is refused" 2 "$(gbp "$BADAWK:$PATH" "git push \$'--force' origin feature/x")"
 check "a failing awk: a push continued onto a second line is refused" 2 "$(gbp "$BADAWK:$PATH" "$(printf 'git push \\\n  --force origin feature/x')")"
 check "a failing awk: any git command is refused" 2 "$(gbp "$BADAWK:$PATH" 'git status')"
+check "a failing awk: git split by a continued line is refused" 2 "$(gbp "$BADAWK:$PATH" "$(printf 'g\\\nit push --force origin feature/x')")"
 check "a failing awk: a command without git passes" 0 "$(gbp "$BADAWK:$PATH" 'ls -la')"
 BADJQ="$(mktemp -d)"; printf '#!/bin/sh\nexit 1\n' > "$BADJQ/jq"; chmod +x "$BADJQ/jq"
 check "a failing jq: a force push is refused" 2 "$(gbp "$BADJQ:$PATH" 'git push --force origin feature/x')"

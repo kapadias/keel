@@ -91,7 +91,8 @@ case "$tool" in
     words() { printf '%s\n' "$cmd" | awk -v out="$1" -f "$here/lib/shell-words.awk" 2>/dev/null; }
     quoted() { case "$1" in *[\'\"\\]*) return 0 ;; esac; return 1; }
     cant_read() {
-      if printf '%s' "$cmd" | grep -qiE "g[\\'\"]*i[\\'\"]*t|n[\\'\"]*o[\\'\"]*n[\\'\"]*n[\\'\"]*a|\\$'"; then
+      local bsnl=$'\\\n' # a continued line: the shell joins g\<newline>it into git
+      if printf '%s' "${cmd//"$bsnl"/}" | grep -qiE "g[\\'\"]*i[\\'\"]*t|n[\\'\"]*o[\\'\"]*n[\\'\"]*n[\\'\"]*a|\\$'"; then
         unread "the command reader (awk) failed"
       fi
       exit 0
