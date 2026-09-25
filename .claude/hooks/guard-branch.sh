@@ -98,19 +98,21 @@ case "$tool" in
 
     # What her gates read is the user's to set: an environment variable can switch a git hook off
     # or swap its test command, GIT_CONFIG_* and a borrowed HOME can hand git a config of their own.
-    # Only a way of setting one counts: an assignment at the start of a command (after others, or
-    # after { ! if then do else elif while until time eval coproc), a name given to export, declare
-    # and the like (with or without a value), env or sudo, printf -v or read, or an assignment right
-    # before git inside a quoted string (B). A grep for the name, or an echo of it, sets nothing.
+    # Only a way of setting one counts, at the start of a command (after { ! if then do else elif
+    # while until time eval coproc, or after sh -c and its kind, whose text B puts on the same line):
+    # an assignment, a name given to export, declare and the like (with or without a value), env or
+    # sudo, printf -v or read; or anywhere, an assignment right before git. A grep for the name, or an
+    # echo of it, sets nothing.
     ASSIGN='[A-Za-z_][A-Za-z0-9_]*\+?=[^[:space:]]*'
-    KW='(\{|!|if|then|do|else|elif|while|until|time([[:space:]]+-p)?|eval|coproc)'
+    KW='(\{|!|if|then|do|else|elif|while|until|time([[:space:]]+-p)?|eval|coproc|[^[:space:]]*(sh|bash|zsh|dash|ksh)([[:space:]]+-[A-Za-z]+)*[[:space:]]+-[A-Za-z]*c)'
+    AT="^[[:space:]]*(${KW}[[:space:]]+)*(${ASSIGN}[[:space:]]+)*"
     assigns() { # <name regex>
       printf '%s\n' "$segs" | grep -qE \
-        -e "^[[:space:]]*(${KW}[[:space:]]+)*(${ASSIGN}[[:space:]]+)*$1\+?=" \
-        -e "(^|[[:space:]])(export|declare|typeset|readonly|local)([[:space:]]+-[A-Za-z]+)*([[:space:]]+[A-Za-z_][A-Za-z0-9_]*(\+?=[^[:space:]]*)?)*[[:space:]]+$1(\+?=|[[:space:]]|$)" \
-        -e "(^|[[:space:]])(env|sudo)[[:space:]](.*[[:space:]])?$1\+?=" \
-        -e "(^|[[:space:]])printf[[:space:]]+(-[^[:space:]]+[[:space:]]+)*-v[[:space:]]*$1([[:space:]]|$)" \
-        -e "(^|[[:space:]])(read|readarray|mapfile)[[:space:]](.*[[:space:]])?$1([[:space:]]|$)" \
+        -e "${AT}$1\+?=" \
+        -e "${AT}(export|declare|typeset|readonly|local)([[:space:]]+-[A-Za-z]+)*([[:space:]]+[A-Za-z_][A-Za-z0-9_]*(\+?=[^[:space:]]*)?)*[[:space:]]+$1(\+?=|[[:space:]]|$)" \
+        -e "${AT}(env|sudo)[[:space:]](.*[[:space:]])?$1\+?=" \
+        -e "${AT}printf[[:space:]]+(-[^[:space:]]+[[:space:]]+)*-v[[:space:]]*$1([[:space:]]|$)" \
+        -e "${AT}(read|readarray|mapfile)[[:space:]](.*[[:space:]])?$1([[:space:]]|$)" \
         -e "(^|[^A-Za-z0-9_])$1\+?=[^[:space:]]*[[:space:]]+(${ASSIGN}[[:space:]]+)*([^[:space:]]*/)?git([[:space:]]|$)"
     }
     if assigns '(NONNA_MODE|NONNA_TEST_CMD|CLAUDE_PLUGIN_OPTION_[A-Za-z0-9_]+|GIT_CONFIG[A-Za-z0-9_]*)' \
@@ -119,27 +121,26 @@ case "$tool" in
     fi
 
     # Config on the command line (-c, --config-env) that switches her off or routes git around her.
-    if printf '%s\n' "$segs" | grep -qiE "(^|[[:space:]{!])([^[:space:]]*/)?git[[:space:]](.*[[:space:]])?(-c[[:space:]]+|--config-env[=[:space:]]+)${NKEY}"; then
+    if printf '%s\n' "$segs" | grep -qiE "(^|[[:space:]{!=])([^[:space:]]*/)?git[[:space:]](.*[[:space:]])?(-c[[:space:]]+|--config-env[=[:space:]]+)${NKEY}"; then
       recipe "refusing to change Nonna's own git config."
     fi
-    if printf '%s\n' "$segs" | grep -qiE "(^|[[:space:]{!])([^[:space:]]*/)?git[[:space:]](.*[[:space:]])?(-c[[:space:]]+|--config-env[=[:space:]]+)${RKEY}"; then
+    if printf '%s\n' "$segs" | grep -qiE "(^|[[:space:]{!=])([^[:space:]]*/)?git[[:space:]](.*[[:space:]])?(-c[[:space:]]+|--config-env[=[:space:]]+)${RKEY}"; then
       kitchen_door "refusing an include, alias, hooks path or forced refspec on the command line; the git hooks are the gate."
     fi
 
-    # git config: a read is fine (--get*, --list or -l among the options before the key, the
-    # get/list subcommand, or one key alone with no action); a write to her keys, or to one that
-    # reroutes git, is refused in any command of a compound line. git config nonna.mode off --get
-    # writes, and so does anything after -- (git config core.hooksPath -- -x).
+    # git config: a read is fine: --get*, --list or -l among the options before the key (git refuses a
+    # second action beside them), the get/list subcommand, or one key (it has a dot) with nothing
+    # after it and only read-safe options before it. Every word after the key is a value to git, an
+    # empty one ('') or one that looks like an option included, and git takes an abbreviated action
+    # (--rem). A write to her keys, or to one that reroutes git, is refused in any command.
     COPT='[[:space:]]+-([^-[:space:]]|-[^[:space:]])[^[:space:]]*' # an option, not --
+    ROPT='[[:space:]]+(--(local|global|system|worktree|show-origin|show-scope|includes|no-includes|null|name-only|bool|int|bool-or-int|path|expiry-date)|-z|--type=[a-z-]+|--(file|blob)=[^[:space:]]+|(-f|--file|--blob|--type)[[:space:]]+[^-[:space:]][^[:space:]]*)'
     while IFS= read -r seg; do
       printf '%s' "$seg" | grep -qE "${GIT}config([[:space:]]|$)" || continue
       printf '%s' "$seg" | grep -qE "${GIT}config(${COPT})*[[:space:]]+(--get[a-z-]*|--list|-l)([[:space:]=]|$)" && continue
       printf '%s' "$seg" | grep -qE "${GIT}config(${COPT})*[[:space:]]+(get|list)([[:space:]]|$)" && continue
-      if ! printf '%s' "$seg" | grep -qE -- '(^|[[:space:]])(--unset[a-z-]*|--add|--replace-all|--remove-section|--rename-section|--edit|-e)([[:space:]=]|$)' \
-        && printf '%s' "$seg" | sed -E 's/[[:space:]]+[0-9]*[[:space:]]*[<>]+[[:space:]]*[^[:space:]]*//g' \
-        | grep -qE "${GIT}config(${COPT})*[[:space:]]+[^-[:space:]][^[:space:]]*(${COPT})*[[:space:]]*$"; then
-        continue
-      fi
+      printf '%s' "$seg" | sed -E 's/[[:space:]]+[0-9]*[[:space:]]*[<>]+[[:space:]]*[^[:space:]]*//g' \
+        | grep -qE "${GIT}config(${ROPT})*[[:space:]]+[^-[:space:]'][^[:space:]]*\.[^[:space:]]*[[:space:]]*$" && continue
       printf '%s' "$seg" | grep -qiE "(^|[[:space:]])${NKEY}" && recipe "refusing to change Nonna's own git config."
       if printf '%s' "$seg" | grep -qiE "(^|[[:space:]])(${RKEY}|(-e|--edit|edit)([[:space:]]|$))"; then
         kitchen_door "refusing a config change that can route git around her hooks (include, alias, core.hooksPath, a forced refspec, --edit)."

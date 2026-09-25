@@ -281,6 +281,15 @@ check "blocks a >| write into .git/config" 2 "$(gb 'echo x >| .git/config')"
 check "blocks a >& write into .git/config" 2 "$(gb 'echo x >& .git/config')"
 check "blocks unsetting a Nonna key" 2 "$(gb 'git config --unset nonna.mode')"
 check "blocks a hooks path set after --" 2 "$(gb 'git config core.hooksPath -- -hooks')"
+# One key alone reads it; anything after the key is a value, an empty one included, and an
+# abbreviated action is still an action.
+check "blocks an empty hooks path" 2 "$(gb "git config core.hooksPath ''")"
+check "blocks an empty test command" 2 "$(gb 'git config nonna.testCmd ""')"
+check "blocks an empty Nonna mode" 2 "$(gb "git config nonna.mode ''")"
+check "blocks a hooks path that looks like an option" 2 "$(gb 'git config core.hooksPath -x')"
+check "blocks an abbreviated --remove-section" 2 "$(gb 'git config --rem nonna')"
+check "blocks --remove-sec" 2 "$(gb 'git config --remove-sec nonna')"
+check "blocks git config edit" 2 "$(gb 'git config edit')"
 # &> and &>> are one redirection: the flags after them are still the push's.
 check "blocks a force flag after &>" 2 "$(gb 'git push &>/dev/null --force origin feature/x')"
 check "blocks a protected target after &>" 2 "$(gb 'git push origin &>/dev/null main')"
@@ -296,6 +305,9 @@ check "blocks a hooks path set by the commit editor" 2 "$(gb 'GIT_EDITOR="git co
 check "blocks a force push run by rebase --exec=" 2 "$(gb 'git rebase --exec="git push --force origin feature/x" develop')"
 # Quotes nested deeper than the guard reads are refused, not waved through.
 check "blocks a push nested in four sh -c" 2 "$(gb $'sh -c \'sh -c \'"\'"\'sh -c \'"\'"\'"\'"\'"\'"\'"\'"\'sh -c \'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'git push --fo\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'r\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'ce origin feature/x\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'\'"\'"\'"\'"\'"\'"\'"\'"\'\'"\'"\'\'')"
+# An assignment inside sh -c is still at the start of a command.
+check "blocks export of GIT_CONFIG_GLOBAL inside sh -c" 2 "$(gb "sh -c 'export GIT_CONFIG_GLOBAL=/tmp/x; git push origin feature/x'")"
+check "blocks GIT_CONFIG_GLOBAL set and exported inside bash -c" 2 "$(gb "bash -c 'GIT_CONFIG_GLOBAL=/tmp/x; export GIT_CONFIG_GLOBAL; git push origin feature/x'")"
 check "blocks a push hidden behind a quote in a comment" 2 "$(gb "$(printf 'true # -m %s\ngit push --force origin feature/x\n%s' "'" "'")")"
 check "blocks a config write followed by a comment that says -l" 2 "$(gb 'git config core.hooksPath /dev/null # -l')"
 check "blocks a Nonna config write followed by a comment that says --list" 2 "$(gb 'git config nonna.mode off # --list')"
@@ -329,6 +341,9 @@ check "allows reading an alias: git config --global alias.co" 0 "$(gb 'git confi
 check "allows a message with a plain \${VAR}" 0 "$(gb 'git commit -m "feat: add ${VAR} docs for -n"')"
 check "allows a message after if" 0 "$(gb 'if git commit -m "fix: -n"; then echo ok; fi')"
 check "allows a heredoc message with apostrophes, parens and #" 0 "$(gb "$(printf 'git commit -m "$(cat <<%sEOF%s\nfix(guard): don%st refuse -n (see #17)\nEOF\n)"' "'" "'" "'")")"
+check "allows a search for export NONNA_MODE" 0 "$(gb "grep -rn 'export NONNA_MODE' docs/")"
+check "allows a search for declare NONNA_TEST_CMD" 0 "$(gb "rg 'declare NONNA_TEST_CMD' .")"
+check "allows a search for export HOME before git" 0 "$(gb "grep -n 'export HOME' ~/.bashrc; git status")"
 out="$(printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push --force origin feature/x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB" 2>&1)"
 contains "force-push refusal is in her voice" "we don't force things in this house" "$out"
 # Nor may the agent edit her settings or her git hooks with the file tools.
