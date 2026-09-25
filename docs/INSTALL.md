@@ -23,11 +23,11 @@ Using another agent, or want the gates to travel with the repo for your whole te
 |                                                                                               | lite (default)                                              | full                                                           |
 | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------- |
 | Test gate: the whole suite before a turn that changed code can end, and before a push         | ✓                                                           | ✓                                                              |
-| "Where's the test?": code changed and no test did, asked once per turn end                    | ✓                                                           | ✓                                                              |
+| "Where's the test?": code changed and no test did, asked once per set of changes              | ✓                                                           | ✓                                                              |
 | Branch guard: no commit or push on `main`/`master`/`develop`, no force push, no `--no-verify` | ✓                                                           | ✓                                                              |
-| Secret guard: writes, reads of secret files, commits, pushes                                  | ✓                                                           | ✓                                                              |
+| Secret guard: writes, reads and searches of secret files, commits, pushes                     | ✓                                                           | ✓                                                              |
 | What rides into the session                                                                   | six house rules ([`lite.md`](../.claude/hooks/lib/lite.md)) | the constitution ([`00-core.md`](../.claude/rules/00-core.md)) |
-| `docs/STATUS.md` must change with the code, at turn end and pre-push                          |                                                             | ✓, if the file exists                                          |
+| `docs/STATUS.md` must change with the code (and stay), at turn end and pre-push               |                                                             | ✓, if the file exists                                          |
 
 `off` enforces nothing and says nothing, git hooks included. Nonna's agents and workflows (`/plan`,
 `/tdd`, `/review`, `/ship`…) are there in both modes; lite tells the agent to run them only when you
@@ -38,11 +38,18 @@ Switch with git config, which your repository never commits and a clone never ca
 ```bash
 git config nonna.mode full            # this repository (lite, full or off)
 git config --global nonna.mode off    # every repository without its own setting
-NONNA_MODE=off claude                 # one session
+NONNA_MODE=off claude                 # one session's Claude Code hooks
 ```
 
-The `mode` option is the default for repositories where you have set nothing. These switches are
-yours: the branch guard refuses an agent that tries to change Nonna's settings.
+The `mode` option is the default for repositories where you have set nothing. The git hooks read
+git config alone, never the environment, a `git -c` flag or a file the config includes: a command
+cannot switch them off for itself.
+
+These switches are yours. The branch guard refuses an agent that tries to change Nonna's settings,
+edit `.git/config` or the git hooks, force a push, or skip the hooks, and it reads each command the
+way the shell will run it, quotes and all. It is still a speed bump, not a sandbox: an agent that
+writes a script and runs it is past it. The wall is on the server: protect `main` with a branch
+protection rule.
 
 ## The test gate
 
@@ -52,8 +59,8 @@ hook runs the suite again, for the agent and for you.
 A green tree is remembered, so an idle turn end costs nothing. A suite slower than the Stop budget
 (240 s, `NONNA_TEST_TIMEOUT`) is not called red there; pre-push still runs it in full.
 
-The command comes from, in order: `NONNA_TEST_CMD` (empty turns the gate off), then
-`git config nonna.testCmd` (empty turns it off). A plugin install fills in the second one for you:
+The command comes from, in order: `NONNA_TEST_CMD` (empty turns the gate off; Claude Code's hooks
+only), then `git config nonna.testCmd` (empty turns it off). A plugin install fills in the second one for you:
 the first session in a repository, when `run_tests` is on, detects `pytest`, `npm test`, `go test`
 or `cargo test` and records it. That is the consent: nothing runs your repository's code unless
 `run_tests` allowed it or you set the command yourself, and a repository cannot choose the command,
@@ -72,19 +79,26 @@ The pre-push test gate tastes what you push. It runs in the working tree, so it 
 the tree differs from `HEAD`, untracked files included. A pushed branch that is not checked out gets
 a warning that its tests did not run; tags and deletes run nothing.
 
+What the suite prints is shown to the agent quoted, as the repository's words, never as Nonna's:
+a test cannot hand the agent instructions in her voice. "Where's the test?" asks once for a set of
+changes; an answer that the change needs none holds until more code changes.
+
 ## What Nonna changes on your machine
 
 In each repository where a session runs, and nowhere else:
 
 - **`.git/hooks/pre-push` and `.git/hooks/pre-commit`**, links to Nonna's scripts through the
   plugin's data directory (`~/.claude/plugins/data/…/current`), which each session points at the
-  running version, so the hooks survive plugin updates. An existing hook is never overwritten and a
-  hook manager's directory (`core.hooksPath`) is never written: both are reported instead.
+  running version, so the hooks survive plugin updates. They are Nonna's own scripts, never scripts
+  a repository ships: git refuses to let a clone install hooks, and so does she. An existing hook is
+  never overwritten and a hook manager's directory (`core.hooksPath`) is never written: both are
+  reported, and so is a hook that points at nothing.
 - **`.git/config`**: `nonna.testCmd` (above), `nonna.defaultMode` (the `mode` option, which git
   hooks cannot read, mirrored for them; your own `nonna.mode` always outranks it) and
   `nonna.announced` (the notice was shown).
 - **`.git/nonna/`**: where each session began, so work committed during a session cannot dodge the
-  test gate. Pruned after a week. **`.git/nonna-green`**: the last tree the suite passed on.
+  test gate, and which changes were already asked for a test. Pruned after a week.
+  **`.git/nonna-green`**: the last tree the suite passed on.
 
 Nothing is committed, nothing is written outside `.git/`, and Nonna's hooks make no network calls.
 
@@ -125,7 +139,8 @@ own copy out rather than say it twice. `NONNA_LADDER=on` or `off` decides it you
 ## Optional: Claude Code's own deny-list
 
 A plugin cannot bring `settings.json` permissions into your project. Nonna's hooks cover what they
-were for (the branch guard refuses force pushes; the secret guard refuses reads of secret files),
+were for (the branch guard refuses force pushes; the secret guard refuses reads and searches of
+secret files, by any name that leads to one),
 so this is belt and braces: Claude Code itself refuses too. Copy the block, kept in sync with
 [`.claude/settings.json`](../.claude/settings.json), into your project's `.claude/settings.json`:
 
@@ -169,7 +184,8 @@ curl -fsSL https://raw.githubusercontent.com/kapadias/nonna/main/install.sh | ba
 hooks, with the house rules for hosts that read a rules file. `--mode full`, today's default, brings
 the whole harness: the rules, agents, workflows and a blank `docs/STATUS.md`. The mode is recorded
 as the repository's `nonna.defaultMode`; a copy-in install detects the test command each time
-instead of recording it.
+instead of recording it. A clone has no `.git/config` of its own to carry that record, so it goes
+by what the repository carries: the hooks and the rules run full, the hooks alone run lite.
 
 For another agent, name it (several at once: `--host cursor,agents`):
 

@@ -39,9 +39,10 @@ discipline is **enforced by code, not prose**. Start with [`../CLAUDE.md`](../CL
 - **`hooks/`** — the gates, now **blocking**. Each reads the mode first (`nonna_mode`: `off`, `lite`
   or `full`, ADR-0011) and `off` is silent. `guard-branch.sh` (blocks commits/pushes to
   `main`/`master`/`develop`, `--all`/`--mirror`, force pushes in `+refspec` and flag form,
-  `--no-verify` and hook-path overrides, and the agent's own writes to `git config nonna.*`),
-  `secret-scan.sh` (blocks writes that introduce a secret, and reads of secret files by Read or
-  Bash — parity with the Read deny list, linted), `format.sh` (post-edit auto-format),
+  `--no-verify` and hook-path overrides, and the agent's own changes to her settings or git hooks;
+  it reads a command the way the shell will run it), `secret-scan.sh` (blocks writes that introduce
+  a secret, and reads of secret files by Read, Grep or Bash, by any name that leads to one — parity
+  with the Read deny list, linted), `format.sh` (post-edit auto-format),
   `require-status-sync.sh` (pre-push: the test suite, a strict secret scan — no fixture exemption at
   push time; use placeholder-classed values — and in full mode the Definition-of-Done),
   `pre-commit.sh` (git pre-commit: no commit on a protected branch, no staged secret),
@@ -89,7 +90,7 @@ that load only when needed, and delegate fan-out so the main thread keeps conclu
   (warns on edits there). It tolerates `git -C`/`--git-dir`/path-prefixed git and blocks
   `push --all/--mirror`, force pushes and `--no-verify`.
 - **Secrets:** `secret-scan.sh` **blocks** any edit/write introducing a high-confidence secret, and
-  reads/copies of secret files (Read, or `cat .env`); it fails closed when `jq` is absent. The
+  reads/copies of secret files (Read, Grep, or `cat .env`); it fails closed when `jq` is absent. The
   pre-push hook re-scans the pushed range with no fixture exemption.
 - **Tests:** `stop-dod.sh` runs the suite when a turn changed code and sends the agent back once on
   red; the git `pre-push` hook runs it again.

@@ -35,7 +35,7 @@ descriptions (5,600-char budget), both enforced by the linter.
 - **Hooks ×10** — each reads the mode first; `off` is silent. `guard-branch` (blocks protected-branch
   commits/pushes, `--all`/`--mirror`, force pushes, `--no-verify`, hook-path overrides, and the
   agent's writes to Nonna's own git config), `secret-scan` (blocks secret writes + reads of secret
-  files, Read or Bash), `format`, `require-status-sync` (pre-push: the test suite, a strict secret
+  files, Read, Grep or Bash), `format`, `require-status-sync` (pre-push: the test suite, a strict secret
   scan, and in full mode the DoD), `pre-commit` (no commit on a protected branch, no staged secret),
   `session-start` (wires both git hooks, through the plugin's data directory under a plugin install;
   records the plugin's test command and mode; carries the mode's rules; tells the user once),
@@ -74,7 +74,17 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
   session began, shows the failing lines with secrets hidden, and asks for a test once when code
   changed and none did. The first session tells the user what Nonna did in their repo. Full mode
   drops the ladder when another plugin already states it. `install.sh --mode lite|full`.
-  `INSTALL.md` leads with the plugin. 538 tests.
+  `INSTALL.md` leads with the plugin.
+  Review round (code and security, both request changes, all addressed but one). The git hooks read
+  git config alone, never the environment, `git -c` or an included file, so a command cannot switch
+  them off for itself. The branch guard reads a command the way the shell will run it (quotes,
+  continued lines, subshells, abbreviated flags) and refuses changes to her settings, includes,
+  aliases, hooks path and git hooks. A plugin never sources or wires scripts a repository ships.
+  A hook that points at nothing is reported (Keel-era links are repaired). An untracked STATUS counts
+  as written, and full mode refuses a turn or push that deletes it. "Where's the test?" asks once per
+  set of changes. The suite's output is quoted as the repository's words. The secret guard covers
+  Grep, symlinks and case. The suite runs on its own git config. Per-repository test consent stays
+  plugin-wide by the maintainer's decision (ADR-0011). 644 tests.
 
 - **2026-09-25** — 2.0 packaging, the first unit of the launch plan (#17). Both manifests say 2.0.0;
   the plugin shows as "Nonna" and declares two install options, `run_tests` and `mode`. The hooks

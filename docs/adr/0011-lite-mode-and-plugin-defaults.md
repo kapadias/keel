@@ -42,37 +42,61 @@ lighter mode to select". A plugin user's first day is that use.
 
 ## Decision
 
-1. **Modes.** `nonna_mode` (`.claude/hooks/lib/core.sh`) resolves `NONNA_MODE` > `git config
-nonna.mode` (repo, then global) > the plugin's `mode` option > `git config nonna.defaultMode` >
-   the install (copy-in full, plugin lite). git config because Claude Code hooks and git hooks can
-   both read it, it is never committed, and a clone cannot carry it. A value nobody meant fails
-   closed to full; it never weakens the gates. In `off` every hook exits 0 and prints nothing.
-2. **`nonna.mode` is the user's alone.** What Nonna records, the `mode` option mirrored each session
-   for git hooks that cannot see it or `install.sh --mode`, goes in `nonna.defaultMode`, below it,
-   so `git config --global nonna.mode off` reaches every repository the user has not set. (The draft
+1. **Modes.** `nonna_mode` (`.claude/hooks/lib/core.sh`) resolves, in order: `NONNA_MODE`, the
+   user's `nonna.mode` (repo, then global), the plugin's `mode` option, `nonna.defaultMode`, and
+   last what the repo carries (its hooks and its rules: full; otherwise lite). The settings live in
+   git config because Claude Code hooks and git hooks can both read it, it is never committed, and a
+   clone cannot carry it. A value nobody meant fails closed to full; it never weakens the gates. In
+   `off` every hook exits 0 and prints nothing.
+2. **The git hooks read git config alone.** A git hook runs in the environment of whoever ran git,
+   and that can be the agent's own command. So pre-commit and pre-push take their mode and test
+   command from the repo's own config, then the user's global config. They ignore a `git -c` flag,
+   `GIT_CONFIG_*`, a file the config merely includes, `NONNA_MODE`, `NONNA_TEST_CMD` and the plugin
+   options. Claude Code's hooks still take the environment, which is Claude Code's, set by the user.
+3. **`nonna.mode` is the user's alone.** What Nonna records goes in `nonna.defaultMode`, below it:
+   the `mode` option, mirrored each session for the git hooks, or `install.sh --mode`. So
+   `git config --global nonna.mode off` reaches every repository the user has not set. (The draft
    recorded `nonna.mode` on first sight, which would have outranked the global switch everywhere
-   Nonna had been.) The branch guard refuses an agent's `git config nonna.*` writes, including
-   inside a heredoc: a model does not switch off its own gates. It is a speed bump, not a sandbox.
-3. **Lite** is the test gate, "where's the test?", the branch guard, the secret guard, the git hooks
+   Nonna had been.)
+4. **A model does not switch off its own gates.** The branch guard reads each command the way the
+   shell will run it: quotes removed, continued lines joined, subshells opened, abbreviated options
+   expanded. It refuses the agent's writes to `nonna.*`, includes, aliases, `core.hooksPath` and
+   forced refspecs, whether through `git config`, `-c` or `--config-env`. It also refuses the
+   variables the gates read, and hand edits of `.git/config` and the git hooks. It is a speed bump,
+   not a sandbox: a script file gets past it. Branch protection on the server is the wall.
+5. **Lite** is the test gate, "where's the test?", the branch guard, the secret guard, the git hooks
    and six house rules (`.claude/hooks/lib/lite.md`, linted to 150 words and to cover the never-list's
    tests, branch and secret lines). **Full** adds the STATUS gate, the constitution and the
    develop-to-main flow. Lite is the plugin's default; copy-in stays full until round 3 decides.
-4. **The plugin's test gate is on, with recorded consent.** The `run_tests` option (on, asked at
-   enable) is the consent. The first session in a repository records the detected command in `git
-config nonna.testCmd` and never overwrites it, an empty one included. The command resolves
-   `NONNA_TEST_CMD` > `nonna.testCmd` > detection, and detection is copy-in only.
-5. **The STATUS gate is full mode's**, and only where `docs/STATUS.md` exists: at Stop and pre-push.
-6. **Plugin git hooks survive updates.** `pre-push` and `pre-commit` link through
-   `${CLAUDE_PLUGIN_DATA}/current`, which each session points at the running version. A dangling
-   link of Nonna's is repaired; a foreign hook is never overwritten; a hook manager is reported.
-7. **The guards live in hooks.** The branch guard refuses force pushes, `--no-verify` and hook-path
-   overrides; the secret guard refuses reads of secret files, linted against `settings.json`'s
-   deny-list so the two cannot drift.
-8. **Two Stop checks were added in both modes.** "Where's the test?" blocks once when source changed
-   and no test did. A per-session base means work committed during the session is still checked.
-9. **The ladder is said once.** In full mode, when another enabled plugin already states the "reuse
-   before you write" ladder, the carrier drops the constitution's copy. Only
-   `.claude/hooks/lib/ladder.sh` names that plugin; `NONNA_LADDER=on|off` overrides it.
+6. **The plugin's test gate is on, with recorded consent.** The `run_tests` option (on, asked at
+   enable) is the consent. The first session in a repository records the detected command in
+   `nonna.testCmd` and never overwrites it, an empty one included. Detection at run time is copy-in
+   only. The consent is per plugin, not per repository, together with Claude Code's folder trust and
+   the first-session notice. The security review asked for per-repository confirmation. The
+   maintainer chose this design, and the review recorded it as an accepted risk.
+7. **The STATUS gate is full mode's**, and only where `docs/STATUS.md` exists, at Stop and pre-push.
+   A repository that keeps one cannot throw it out: in full mode a push that deletes it is refused.
+   So is a turn that changed code and deleted it.
+8. **A plugin runs and wires only its own scripts.** A repository can ship a `.claude/hooks/` of its
+   own. It is the harness only when it is the one running, which is a copy-in install. The plugin
+   sources its own library and links the git hooks to its own scripts, through
+   `${CLAUDE_PLUGIN_DATA}/current`, which each session points at the running version so the hooks
+   survive updates.
+   - A dangling link of Nonna's (or Keel's) is repaired.
+   - A foreign hook is never overwritten, and neither is a hook manager's directory.
+   - A hook that points at nothing is reported. So is a foreign hook, a hook manager, and any gate
+     that could not be wired.
+9. **The guards live in hooks.** The branch guard refuses force pushes, `--no-verify` and hook-path
+   overrides. The secret guard refuses reads and searches (Read, Grep) of secret files by any name
+   that leads to one: case-folded, with symlinks followed. It is linted against `settings.json`'s
+   deny-list, so the two cannot drift.
+10. **Stop tells the truth and asks once.**
+    - A per-session base means work committed during the session is still checked.
+    - "Where's the test?" asks once per set of changed code in a session.
+    - The suite's output reaches the agent quoted, as the repository's words, never as hers.
+11. **The ladder is said once.** In full mode, when another enabled plugin already states the "reuse
+    before you write" ladder, the carrier drops the constitution's copy. Only
+    `.claude/hooks/lib/ladder.sh` names that plugin; `NONNA_LADDER=on|off` overrides it.
 
 ## Consequences
 
@@ -81,10 +105,14 @@ config nonna.testCmd` and never overwrites it, an empty one included. The comman
   where a session ran. That is the point of a gate, and it is announced: the first session tells the
   user what Nonna added, once per repository per major version (`nonna.announced`). The ways out are
   `nonna.mode off` (repo or `--global`) and the removal steps in [INSTALL.md](../INSTALL.md).
+- The environment no longer reaches the git hooks. Anyone who set `NONNA_TEST_CMD` for their own
+  pushes sets `git config nonna.testCmd` instead.
 - State lives in `.git/config`, `.git/hooks` and `.git/nonna/`, never in a commit. Uninstalling the
   plugin leaves the git hooks dangling, which git skips, so the removal steps come first.
 - `run_tests` decides only on first sight. Turning it off later does not reach a repository that
   already recorded a command; `nonna.testCmd` decides there. Revisit if users expect otherwise.
+- A repository's own test command runs with plugin-wide consent (6). If per-repository consent
+  proves wanted, `/nonna setup` is where to ask for it.
 - Lite still loads every agent and skill, because it is one plugin; the house rules tell the agent
   to run them only when asked. Round 3 counts subagent spawns. If unasked reviews show up, the agent
   descriptions become mode-neutral.
