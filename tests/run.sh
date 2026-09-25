@@ -1183,9 +1183,10 @@ out="$(printf '{"session_id":"s-1"}' | NONNA_TEST_CMD=false CLAUDE_PROJECT_DIR="
 contains "stop: a red suite committed this session still blocks" "the tests say no" "$out"
 out="$(printf '{"session_id":"s-other"}' | NONNA_TEST_CMD=false CLAUDE_PROJECT_DIR="$WT" "$SD")"
 printf '%s' "$out" | grep -q '"decision"'; check "stop: another session's base does not apply" 1 "$?"
-touch -d '10 days ago' "$(git -C "$WT" rev-parse --git-path nonna)/base-s-1"
+if [ -s "$WT/.git/nonna/base-s-1" ]; then rc=0; else rc=1; fi; check "session base: SessionStart records where the session began" 0 "$rc"
+touch -d '10 days ago' "$WT/.git/nonna/base-s-1"
 printf '{"session_id":"s-2"}' | CLAUDE_PROJECT_DIR="$WT" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh" >/dev/null
-if [ -e "$(git -C "$WT" rev-parse --git-path nonna)/base-s-1" ]; then rc=1; else rc=0; fi; check "session base: a week-old base is pruned" 0 "$rc"
+if [ -e "$WT/.git/nonna/base-s-1" ]; then rc=1; else rc=0; fi; check "session base: a week-old base is pruned" 0 "$rc"
 rm -rf "$WT"
 # Without jq the block must still be valid JSON, whatever the command and its output contain.
 NOJQ="$(mktemp -d)"
