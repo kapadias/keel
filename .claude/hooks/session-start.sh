@@ -90,13 +90,19 @@ fi
 hook_warn=""
 [ "${#hook_warns[@]}" -eq 0 ] || hook_warn=" WARNING: $(printf '%s; ' "${hook_warns[@]}")"
 
-# 2. Plugin install: record what the git hooks cannot read from the plugin's options, the first time
-#    Nonna meets this repo: the mode, and (when the run_tests option allows it, the default) the test
-#    command detection finds. Both go into the repo's own git config, which is never committed and
-#    never cloned, so a hostile repo cannot plant either. Nothing already set is overwritten: not a
-#    mode the user chose, not a command they set, not an empty one (the gate turned off).
+# 2. Plugin install: record what the git hooks cannot read from the plugin's options, in the repo's
+#    own git config, which is never committed and never cloned, so a hostile repo cannot plant it.
+#    The mode option is mirrored every session into nonna.defaultMode, which ranks below the user's
+#    nonna.mode (repo or global): Nonna never writes nonna.mode. The first time Nonna meets the
+#    repo, and only when the run_tests option allows it (the default), the test command detection
+#    finds is recorded; a command already set is never overwritten, nor an empty one (gate off).
 if [ ! -f .claude/hooks/lib/tests.sh ] && [ -n "$nonna_root" ] && git rev-parse --git-dir >/dev/null 2>&1; then
-  git config --get nonna.mode >/dev/null 2>&1 || git config nonna.mode "$(nonna_mode)" 2>/dev/null || true
+  case "${CLAUDE_PLUGIN_OPTION_MODE:-}" in
+    lite | full)
+      [ "$(git config --local --get nonna.defaultMode 2>/dev/null)" = "$CLAUDE_PLUGIN_OPTION_MODE" ] \
+        || git config nonna.defaultMode "$CLAUDE_PLUGIN_OPTION_MODE" 2>/dev/null || true
+      ;;
+  esac
   case "${CLAUDE_PLUGIN_OPTION_RUN_TESTS:-true}" in
     false | False | FALSE | 0 | no | off) : ;;
     *)

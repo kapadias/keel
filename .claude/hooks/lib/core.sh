@@ -21,13 +21,16 @@ nonna_harness_root() {
 # nonna_mode
 #   Prints off, lite or full: what Nonna enforces in the repo in the current directory.
 #   Precedence: NONNA_MODE > git config nonna.mode (repo, then global) > the plugin's `mode`
-#   option > the install (a copy-in install is full, a plugin install lite). git config is the
-#   per-repo switch because git hooks read it too, it is never committed, and a clone cannot carry
-#   it. A value nobody meant (a typo) fails closed to full, the strictest mode, never to off.
+#   option > nonna.defaultMode > the install (a copy-in install is full, a plugin install lite).
+#   git config is the per-repo switch because git hooks read it too, it is never committed, and a
+#   clone cannot carry it. nonna.mode is the user's alone; what Nonna records (the plugin option,
+#   for git hooks that cannot see it, or install.sh --mode) goes in nonna.defaultMode, below it, so
+#   a global off still reaches every repo. A value nobody meant (a typo) fails closed to full.
 nonna_mode() {
   local m="${NONNA_MODE:-}"
   [ -n "$m" ] || m="$(git config --get nonna.mode 2>/dev/null || true)"
   [ -n "$m" ] || m="${CLAUDE_PLUGIN_OPTION_MODE:-}"
+  [ -n "$m" ] || m="$(git config --get nonna.defaultMode 2>/dev/null || true)"
   if [ -z "$m" ]; then
     if [ -f .claude/hooks/require-status-sync.sh ]; then m=full; else m=lite; fi
   fi

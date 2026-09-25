@@ -219,10 +219,11 @@ link_hook pre-commit pre-commit.sh
 link_hook pre-push require-status-sync.sh
 
 # The mode lives in the repo's own git config, where every hook reads it (never committed, never
-# cloned). Without --mode a copy-in install is full, and nothing is written.
+# cloned), as the repo's default: nonna.mode, in the repo or --global, is the user's and outranks
+# it. Without --mode a copy-in install is full, and nothing is written.
 if [ -n "$mode" ]; then
-  if git config nonna.mode "$mode"; then
-    done_msgs+=("mode: $mode (git config nonna.mode)")
+  if git config nonna.defaultMode "$mode"; then
+    done_msgs+=("mode: $mode (git config nonna.defaultMode)")
   else
     warn_msgs+=("could not record the mode in git config, so she runs as full")
     failed=1

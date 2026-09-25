@@ -437,7 +437,8 @@ out="$(cd "$TMP" && NONNA_SRC="$ROOT" bash "$IN" --mode lite 2>&1)"; check "inst
 rc=0; [ -f "$TMP/.claude/hooks/stop-dod.sh" ] && [ -f "$TMP/.claude/hooks/lib/lite.md" ] && [ -f "$TMP/.claude/settings.json" ] || rc=1; check "install: lite brings the hooks and their wiring" 0 "$rc"
 rc=0; [ ! -e "$TMP/.claude/rules" ] && [ ! -e "$TMP/.claude/agents" ] && [ ! -e "$TMP/.claude/skills" ] && [ ! -e "$TMP/CLAUDE.md" ] && [ ! -e "$TMP/docs/STATUS.md" ] || rc=1
 check "install: lite brings no rules, agents, workflows, CLAUDE.md or STATUS.md" 0 "$rc"
-check "install: lite records the mode" lite "$(git -C "$TMP" config --get nonna.mode)"
+check "install: lite records the mode as the repo's default" lite "$(git -C "$TMP" config --get nonna.defaultMode)"
+git -C "$TMP" config --get nonna.mode >/dev/null; check "install: leaves nonna.mode to the user" 1 "$?"
 rc=0; [ -x "$TMP/.git/hooks/pre-commit" ] && [ -x "$TMP/.git/hooks/pre-push" ] || rc=1; check "install: lite wires the git hooks" 0 "$rc"
 out="$(CLAUDE_PROJECT_DIR="$TMP" "$TMP/.claude/hooks/session-start.sh")"
 contains "install: a lite copy-in carries the house rules at session start" "Nonna is on (lite)" "$out"
@@ -448,7 +449,7 @@ contains "install: lite gives other hosts the house rules" "Nonna (lite)" "$(cat
 rm -rf "$TMP"
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 ( cd "$TMP" && NONNA_SRC="$ROOT" bash "$IN" --mode spicy >/dev/null 2>&1 ); check "install: an unknown mode is refused" 2 "$?"
-( cd "$TMP" && NONNA_SRC="$ROOT" bash "$IN" --mode full >/dev/null 2>&1 ); check "install: --mode full records full" full "$(git -C "$TMP" config --get nonna.mode)"
+( cd "$TMP" && NONNA_SRC="$ROOT" bash "$IN" --mode full >/dev/null 2>&1 ); check "install: --mode full records full" full "$(git -C "$TMP" config --get nonna.defaultMode)"
 rm -rf "$TMP"
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; printf '#!/bin/sh\necho mine\n' > "$TMP/.git/hooks/pre-commit"; chmod +x "$TMP/.git/hooks/pre-commit"
 out="$(cd "$TMP" && NONNA_SRC="$ROOT" bash "$IN" 2>&1)"; check "install: a foreign git hook does not fail the install" 0 "$?"
@@ -755,8 +756,10 @@ rm -f "$TF"
 
 echo "== modes (nonna_mode: off | lite | full) =="
 # One switch per repo, read the same way by Claude Code hooks and by git hooks. Precedence:
-# NONNA_MODE > git config nonna.mode (repo, then global) > the plugin option > the install
-# (copy-in: full, plugin: lite). A value nobody meant fails closed to the strictest mode.
+# NONNA_MODE > git config nonna.mode (repo, then global) > the plugin option > the default Nonna
+# recorded (nonna.defaultMode) > the install (copy-in: full, plugin: lite). Nonna never writes
+# nonna.mode, so a global off reaches every repo the user has not set themselves. A value nobody
+# meant fails closed to the strictest mode.
 MODE_HOME="$(mktemp -d)"; TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 mode_of() { # [VAR=value ...]: the mode in $TMP with only those variables set
   (cd "$TMP" && env -u NONNA_MODE -u CLAUDE_PLUGIN_OPTION_MODE GIT_CONFIG_GLOBAL="$MODE_HOME/gitconfig" "$@" \
@@ -767,8 +770,12 @@ mkdir -p "$TMP/.claude/hooks"; : > "$TMP/.claude/hooks/require-status-sync.sh"
 check "mode: a copy-in install defaults to full" full "$(mode_of)"
 rm -rf "$TMP/.claude"
 check "mode: the plugin option beats the install default" full "$(mode_of CLAUDE_PLUGIN_OPTION_MODE=full)"
+git -C "$TMP" config nonna.defaultMode full
+check "mode: the recorded default beats the install default" full "$(mode_of)"
+check "mode: the live plugin option beats the recorded default" lite "$(mode_of CLAUDE_PLUGIN_OPTION_MODE=lite)"
 git config --file "$MODE_HOME/gitconfig" nonna.mode off
 check "mode: global git config beats the plugin option" off "$(mode_of CLAUDE_PLUGIN_OPTION_MODE=full)"
+check "mode: a global off beats the default Nonna recorded" off "$(mode_of)"
 git -C "$TMP" config nonna.mode lite
 check "mode: repo git config beats global git config" lite "$(mode_of CLAUDE_PLUGIN_OPTION_MODE=full)"
 check "mode: NONNA_MODE beats repo git config" full "$(mode_of NONNA_MODE=full)"
@@ -901,18 +908,23 @@ printf '%s' "$out" | grep -q "Before writing code"; check "plugin install, full:
 rm -rf "$TMP"
 # Plugin install: consent to run the repo's tests is the plugin's run_tests option (default on). The
 # first session records the detected command in the repo's own git config (never committed, never
-# cloned), where the Stop hook and the git pre-push hook both read it, and records the mode the same
-# way so git hooks, which cannot see plugin options, agree with the Claude Code hooks.
+# cloned), where the Stop hook and the git pre-push hook both read it. The plugin's mode option is
+# mirrored the same way, as nonna.defaultMode, so git hooks, which cannot see plugin options, agree
+# with the Claude Code hooks. nonna.mode is the user's alone: Nonna never writes it.
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 printf '{"scripts":{"test":"node t.js"}}\n' > "$TMP/package.json"
-out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
+out="$(CLAUDE_PLUGIN_OPTION_MODE=full CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
 check "plugin: the first session records the detected test command" "npm test --silent" "$(git -C "$TMP" config --get nonna.testCmd)"
-check "plugin: the first session records the mode" lite "$(git -C "$TMP" config --get nonna.mode)"
+check "plugin: the session records the mode option for the git hooks" full "$(git -C "$TMP" config --get nonna.defaultMode)"
+git -C "$TMP" config --get nonna.mode >/dev/null; check "plugin: the session never writes nonna.mode" 1 "$?"
+check "plugin: a git hook, without the option, agrees on the mode" full "$(cd "$TMP" && env -u CLAUDE_PLUGIN_OPTION_MODE -u NONNA_MODE bash -c '. "$1/lib/core.sh"; nonna_mode' _ "$HOOKS")"
 contains "plugin: tells the agent what the test gate runs" "Test gate: npm test --silent" "$out"
+CLAUDE_PLUGIN_OPTION_MODE=lite CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh" >/dev/null
+check "plugin: the recorded mode follows the option when it changes" lite "$(git -C "$TMP" config --get nonna.defaultMode)"
 git -C "$TMP" config nonna.testCmd "make check"; git -C "$TMP" config nonna.mode full
-CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh" >/dev/null
+CLAUDE_PLUGIN_OPTION_MODE=lite CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh" >/dev/null
 check "plugin: never overwrites a test command already set" "make check" "$(git -C "$TMP" config --get nonna.testCmd)"
-check "plugin: never overwrites a mode already set" full "$(git -C "$TMP" config --get nonna.mode)"
+check "plugin: never overwrites a mode the user set" full "$(git -C "$TMP" config --get nonna.mode)"
 git -C "$TMP" config nonna.testCmd ""
 CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh" >/dev/null
 check "plugin: an empty test command (the gate turned off) stays empty" "" "$(git -C "$TMP" config --get nonna.testCmd)"
@@ -952,6 +964,8 @@ printf '{"scripts":{"test":"node t.js"}}\n' > "$TMP/package.json"
 out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"
 git -C "$TMP" config --get nonna.testCmd >/dev/null; check "copy-in: session start records no test command" 1 "$?"
 git -C "$TMP" config --get nonna.mode >/dev/null; check "copy-in: session start records no mode" 1 "$?"
+CLAUDE_PLUGIN_OPTION_MODE=full CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh" >/dev/null
+git -C "$TMP" config --get nonna.defaultMode >/dev/null; check "copy-in: session start records no default mode" 1 "$?"
 contains "copy-in: tells the agent what the test gate runs" "Test gate: npm test --silent" "$out"
 rm -rf "$TMP"
 # Standalone checkout: rules/ loads natively — carrying it again would double-pay.
