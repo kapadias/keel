@@ -414,6 +414,15 @@ check "a failing jq: a force push is refused" 2 "$(gbp "$BADJQ:$PATH" 'git push 
 got="$(printf '%s' '{"a":1,"tool_input":{"command":"a \"b\" c\\d\ne\u0041\/"}}' | PATH="$NJ" bash -c '. "$0"; nonna_json_field .tool_input.command' "$HOOKS/lib/json.sh")"
 check "json.sh without jq: a string is decoded in full (quotes, backslash, newline, \\u, \\/)" "$(printf 'a "b" c\\d\neA/')" "$got"
 rm -rf "$NJ" "$BADAWK" "$BADJQ"
+# The guard answers in time: a hook that outruns Claude Code's timeout does not block, so the command
+# would run unguarded. A long heredoc and a long message are read in linear time, and a command too
+# long to read in time is refused.
+BIG="$(python3 -c 'print("cat > notes.md <<EOF\n" + "\n".join("line %d of the notes" % i for i in range(5000)) + "\nEOF")')"
+start=$SECONDS; gb "$BIG" >/dev/null; check "a 5,000-line heredoc is read in under 10 s" 1 "$((SECONDS - start < 10))"
+BIG="$(python3 -c 'print("git commit -m \"" + "word " * 20000 + "\"")')"
+start=$SECONDS; gb "$BIG" >/dev/null; check "a 100 KB message is read in under 10 s" 1 "$((SECONDS - start < 10))"
+BIG="$(python3 -c 'print("cat > notes.md <<EOF\n" + "x" * 300000 + "\nEOF")')"
+check "a command over 256 KB is refused, not read past the timeout" 2 "$(gb "$BIG")"
 out="$(printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push --force origin feature/x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB" 2>&1)"
 contains "force-push refusal is in her voice" "we don't force things in this house" "$out"
 # Nor may the agent edit her settings or her git hooks with the file tools.

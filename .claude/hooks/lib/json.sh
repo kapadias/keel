@@ -28,32 +28,43 @@ nonna_json_field() {
   case "$key" in
     ''|*[!A-Za-z0-9_]*) return 0 ;;  # not a plain key — refuse to guess
   esac
-  printf '%s' "$payload" | awk -v key="$key" '
-    { s = s (NR > 1 ? "\n" : "") $0 }
+  # In n log n time in any awk (one-true-awk measures and copies a string on every substr() and
+  # append): one record, split once into characters, and the pieces joined pairwise.
+  printf '%s' "$payload" | LC_ALL=C awk -v key="$key" '
+    function join(   m, j) {
+      while (np > 1) {
+        m = 0
+        for (j = 1; j <= np; j += 2) p[++m] = (j < np ? p[j] p[j + 1] : p[j])
+        np = m
+      }
+      return (np ? p[1] : "")
+    }
+    BEGIN { RS = sprintf("%c", 1) }
+    { s = s (NR > 1 ? RS : "") $0 }
     END {
       if (!match(s, "\"" key "\"[ \t\r\n]*:[ \t\r\n]*\"")) exit
-      i = RSTART + RLENGTH; n = length(s); out = ""
+      i = RSTART + RLENGTH; n = split(s, ch, ""); s = ""; np = 0
       while (i <= n) {
-        c = substr(s, i, 1)
-        if (c == "\"") { printf "%s", out; exit }
-        if (c != "\\") { out = out c; i++; continue }
-        e = substr(s, i + 1, 1); i += 2
-        if (e == "n") out = out "\n"
-        else if (e == "t") out = out "\t"
-        else if (e == "r") out = out "\r"
-        else if (e == "b") out = out "\b"
-        else if (e == "f") out = out "\f"
+        c = ch[i]
+        if (c == "\"") { printf "%s", join(); exit }
+        if (c != "\\") { p[++np] = c; i++; continue }
+        e = ch[i + 1]; i += 2
+        if (e == "n") p[++np] = "\n"
+        else if (e == "t") p[++np] = "\t"
+        else if (e == "r") p[++np] = "\r"
+        else if (e == "b") p[++np] = "\b"
+        else if (e == "f") p[++np] = "\f"
         else if (e == "u") {
           v = 0
           for (j = 0; j < 4; j++) {
-            h = index("0123456789abcdef", tolower(substr(s, i + j, 1)))
+            h = (ch[i + j] == "" ? 0 : index("0123456789abcdef", tolower(ch[i + j])))
             if (!h) break
             v = v * 16 + h - 1
           }
           i += j
-          out = out ((j == 4 && v > 0 && v < 128) ? sprintf("%c", v) : "?") # beyond ASCII: a placeholder
+          p[++np] = ((j == 4 && v > 0 && v < 128) ? sprintf("%c", v) : "?") # beyond ASCII: a placeholder
         }
-        else out = out e # \" \\ \/
+        else p[++np] = e # \" \\ \/
       }
     }' 2>/dev/null
 }

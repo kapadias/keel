@@ -50,6 +50,11 @@ unread() { # <what could not be read>: fail closed, never guess
   echo "  Run it again; if this repeats, check that awk and jq work in this shell." >&2
   exit 2
 }
+too_long() { # <reason>: a hook that outruns its timeout does not block, so what it cannot read in time is refused
+  echo "✗ Nonna: that's too much to taste in one bite. (branch guard: $1)" >&2
+  echo "  Write the content with the Write tool, or split the command." >&2
+  exit 2
+}
 # Raw text the parsers could not read: a tool name, or a field that is there with a value.
 raw_tool() { printf '%s' "$payload" | grep -oE '"tool_name"[[:space:]]*:[[:space:]]*"[A-Za-z]+"' | head -n 1 | sed -E 's/.*"([A-Za-z]+)"$/\1/'; }
 has_field() { printf '%s' "$payload" | grep -qE "\"$1\"[[:space:]]*:[[:space:]]*\"[^\"]"; }
@@ -80,6 +85,7 @@ case "$tool" in
     cmd="$(printf '%s' "$payload" | nonna_json_field '.tool_input.command')"
     [ -n "$cmd" ] || ! has_field command || unread "the command could not be read"
     [ -n "$cmd" ] || exit 0
+    [ "${#cmd}" -le 262144 ] || too_long "the command is over 256 KB, too long to read before the hook times out."
     # How the shell will see it (lib/shell-words.awk). Readings, checked together: A keeps each word
     # whole, so a quoted value with a space cannot shift the words after it; B exposes what a quoted
     # string holds, so code in sh -c "…" or "$(…)" is seen; and B read again, masking nothing, while a
@@ -88,7 +94,7 @@ case "$tool" in
     # message is masked only where the reading is sure to be the shell's. A match in any refuses.
     # When the reader fails (awk missing or failing), a command that could touch git or her settings
     # (git or nonna in it, however quoted, or a $'…' escape) is refused; nothing else here reads one.
-    words() { printf '%s\n' "$cmd" | awk -v out="$1" -f "$here/lib/shell-words.awk" 2>/dev/null; }
+    words() { printf '%s\n' "$cmd" | LC_ALL=C awk -v out="$1" -f "$here/lib/shell-words.awk" 2>/dev/null; }
     quoted() { case "$1" in *[\'\"\\]*) return 0 ;; esac; return 1; }
     cant_read() {
       local bsnl=$'\\\n' # a continued line: the shell joins g\<newline>it into git
@@ -102,7 +108,7 @@ case "$tool" in
     segs="$segs"$'\n'"$lvl"
     n=0
     while [ "$n" -lt 6 ] && quoted "$lvl"; do
-      next="$(printf '%s\n' "$lvl" | awk -v out=B -v nomask=1 -v relevel=1 -f "$here/lib/shell-words.awk" 2>/dev/null)" || cant_read
+      next="$(printf '%s\n' "$lvl" | LC_ALL=C awk -v out=B -v nomask=1 -v relevel=1 -f "$here/lib/shell-words.awk" 2>/dev/null)" || cant_read
       [ "$next" = "$lvl" ] && break
       segs="$segs"$'\n'"$next"
       lvl="$next"
@@ -158,8 +164,12 @@ case "$tool" in
     # value to git, an empty one ('') or one that looks like an option included, and git takes an
     # abbreviated action (--rem). A write to her keys, or to one that reroutes git, is refused.
     ROPT='[[:space:]]+(--(local|global|system|worktree|show-origin|show-scope|includes|no-includes|null|name-only|bool|int|bool-or-int|path|expiry-date)|-z|--type=[a-z-]+|--(file|blob)=[^[:space:]]+|(-f|--file|--blob|--type)[[:space:]]+[^-[:space:]][^[:space:]]*)'
+    # Only the lines that run git config: one grep for the whole command, not processes per line (a
+    # long heredoc must not outrun the hook's timeout, which would let the command run unguarded).
+    cfg="$(printf '%s\n' "$segs" | grep -E "${GIT}config([[:space:]]|$)")"
+    [ "$?" -le 1 ] || unread "a check could not run"
     while IFS= read -r seg; do
-      printf '%s' "$seg" | grep -qE "${GIT}config([[:space:]]|$)" || continue
+      [ -n "$seg" ] || continue
       printf '%s' "$seg" | grep -qE "${GIT}config(${ROPT})*[[:space:]]+(--get[a-z-]*|--list|-l)([[:space:]=]|$)" && continue
       printf '%s' "$seg" | grep -qE "${GIT}config(${ROPT})*[[:space:]]+(get|list)([[:space:]]|$)" && continue
       printf '%s' "$seg" | sed -E "s/[[:space:]]+${RD}[0-9]*[<>]+([[:space:]]+${RD}[<>]+)*[[:space:]]+[^[:space:]]+//g" \
@@ -168,7 +178,7 @@ case "$tool" in
       if printf '%s' "$seg" | grep -qiE "(^|[[:space:]])(${RKEY}|(-e|--edit|edit)([[:space:]]|$))"; then
         kitchen_door "refusing a config change that can route git around her hooks (include, alias, core.hooksPath, a forced refspec, --edit)."
       fi
-    done <<<"$segs"
+    done <<<"$cfg"
 
     # The same files by hand: .git/config and the git hooks, as the target of a write. Reading them
     # (cat, grep, sed -n, awk, cp from) is fine. A copy's target is its last word once redirections
