@@ -50,9 +50,10 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
 - **Guards that travel with the plugin.** The branch guard refuses force pushes (`--force`, `-f`,
   `--force-with-lease`, abbreviated or in a cluster), `--no-verify`, hook-path overrides, and an
   agent's changes to Nonna's own settings or git hooks. It reads each command the way the shell will
-  run it, so quoting does not hide a flag. It is a speed bump: branch protection on the server is
-  the wall. The secret guard refuses reads and searches (Read, Grep) of secret files, by any name
-  that leads to one, linted against the `settings.json` deny-list.
+  run it, so quotes, escapes and a nested `sh -c` do not hide a flag; a value computed when the
+  command runs can. It is a speed bump: branch protection on the server is the wall. The secret
+  guard refuses reads and searches (Read, Grep) of secret files, by any name that leads to one,
+  linted against the `settings.json` deny-list.
 - **Plugin git hooks survive updates**, and plugin installs get `pre-commit` too. The links go
   through the plugin's data directory, re-pointed at the running version each session. They lead to
   Nonna's own scripts, never scripts a repository ships. A dangling link of Nonna's is repaired; a

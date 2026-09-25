@@ -48,8 +48,8 @@ cannot switch them off for itself.
 These switches are yours. The branch guard refuses an agent that tries to change Nonna's settings,
 edit `.git/config` or the git hooks, force a push, or skip the hooks, and it reads each command the
 way the shell will run it, quotes and all. It is still a speed bump, not a sandbox: an agent that
-writes a script and runs it is past it. The wall is on the server: protect `main` with a branch
-protection rule.
+writes a script and runs it, or computes a flag when the command runs, is past it. The wall is on
+the server: protect `main` with a branch protection rule.
 
 ## The test gate
 

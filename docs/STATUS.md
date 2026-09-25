@@ -89,6 +89,16 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
   guard now tokenizes a command the way the shell does (lib/shell-words.awk) and checks two readings,
   words whole and quoted strings opened. Grep globs are matched as patterns, and "where's the test?"
   remembers the code, not the file names. A macOS CI job is a follow-up (#17). 675 tests.
+  Third review round (both request changes; security approved the heredoc fix): Claude Code's
+  heredoc message is read as one word only where it opens outside any quote and ends where bash
+  ends it, and it is set aside only as a git message, so a body that `sh -c` or `eval` runs stays in
+  view. A message is masked only in `git commit`, `merge`, `tag`, `stash` and `notes` (and `gh`
+  titles and bodies), before any expansion the reader does not follow, and never where an earlier
+  option takes the flag as its value (`-Fm`, `-t -m`). Quotes nested in `sh -c`, `$'…'` escapes and
+  `>|` no longer hide anything. A config read flag counts only before the key, and one key alone is
+  a read. Assignments count after `{`, `then`, `eval` and `time`, and through `export NAME`,
+  `printf -v`, `read` and `sudo`. A copy's target is found past a redirection or `-t`. A Grep glob is
+  judged by the secret files it would read. 745 tests.
 
 - **2026-09-25** — 2.0 packaging, the first unit of the launch plan (#17). Both manifests say 2.0.0;
   the plugin shows as "Nonna" and declares two install options, `run_tests` and `mode`. The hooks

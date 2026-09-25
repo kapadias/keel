@@ -59,14 +59,20 @@ lighter mode to select". A plugin user's first day is that use.
    recorded `nonna.mode` on first sight, which would have outranked the global switch everywhere
    Nonna had been.)
 4. **A model does not switch off its own gates.** The branch guard reads each command the way the
-   shell will run it (`.claude/hooks/lib/shell-words.awk`: quotes, escapes, comments, continued
-   lines, subshells), twice: each word kept whole, and every quoted string opened. A match in either
-   refuses. Abbreviated options count. A commit message is set aside only in a plain `git` command,
-   where the quoting is unambiguous; anything else stays in view. It refuses the agent's writes to
-   `nonna.*`, includes, aliases, `core.hooksPath` and
-   forced refspecs, whether through `git config`, `-c` or `--config-env`. It also refuses the
-   variables the gates read, and hand edits of `.git/config` and the git hooks. It is a speed bump,
-   not a sandbox: a script file gets past it. Branch protection on the server is the wall.
+   shell will run it (`.claude/hooks/lib/shell-words.awk`: quotes, escapes including `$'…'`,
+   comments, continued lines, subshells): each word kept whole, every quoted string opened, and that
+   opened text read again until no quote is left in it, as a nested `sh -c` or `eval` would read it.
+   A match in any reading refuses. Abbreviated options count. A message is set aside only where the
+   reading is sure to be the shell's: the value of `-m`, `--message`, `-F` or `--file` in
+   `git commit`, `merge`, `tag`, `stash` and `notes`, and a `gh pr|issue|release` title or body,
+   before any `$(`, backtick or heredoc whose nested quoting the reader does not follow, and only
+   where no earlier option takes the flag as its own value. Claude Code's `"$(cat <<'EOF' … EOF)"`
+   message is one quoted word only where it ends where bash ends it. Anything else stays in view. It
+   refuses the agent's writes to `nonna.*`, includes, aliases, `core.hooksPath` and forced refspecs,
+   whether through `git config`, `-c` or `--config-env`. It also refuses the variables the gates
+   read, and hand edits of `.git/config` and the git hooks. It is a speed bump, not a sandbox: a
+   script file, or a value the shell computes when it runs (a variable, `$(…)`'s output, `xargs`),
+   gets past it. Branch protection on the server is the wall.
 5. **Lite** is the test gate, "where's the test?", the branch guard, the secret guard, the git hooks
    and six house rules (`.claude/hooks/lib/lite.md`, linted to 150 words and to cover the never-list's
    tests, branch and secret lines). **Full** adds the STATUS gate, the constitution and the
