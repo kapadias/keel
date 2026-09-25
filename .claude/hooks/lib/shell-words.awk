@@ -26,13 +26,14 @@ function endword() {
 function sep(c) { k++; tok[k] = c; tsep[k] = c; tq[k] = 0 }
 
 # "$(cat <<'DELIM'\n…\nDELIM\n)" -> "MSG": the body of a heredoc with a quoted delimiter is literal.
-# Anything that does not fit that shape exactly is left alone.
+# Anything that does not fit that shape exactly is left alone, <<- included: it strips leading tabs,
+# so the shell would end the heredoc at a tab-indented DELIM this search does not see.
 function literal_heredocs(str,   out, p, tail, hdr, d, body, t, after) {
   out = ""
   while ((p = index(str, "\"$(cat <<")) > 0) {
     out = out substr(str, 1, p)
     tail = substr(str, p + 1)
-    if (!match(tail, /^\$\(cat[ \t]*<<-?[ \t]*'[A-Za-z_][A-Za-z_0-9]*'[ \t]*\n/)) { str = tail; continue }
+    if (!match(tail, /^\$\(cat[ \t]*<<[ \t]*'[A-Za-z_][A-Za-z_0-9]*'[ \t]*\n/)) { str = tail; continue }
     hdr = substr(tail, 1, RLENGTH); body = substr(tail, RLENGTH + 1)
     d = hdr; sub(/^[^']*'/, "", d); sub(/'.*$/, "", d)
     t = index("\n" body, "\n" d "\n")

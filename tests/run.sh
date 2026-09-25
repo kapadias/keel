@@ -210,6 +210,9 @@ check "blocks a command substitution inside a message" 2 "$(gb 'git commit -m "$
 check "blocks a -m that belongs to sh, not git" 2 "$(gb "sh -c -m 'git push -f origin feature/x'")"
 check "blocks sh -cm with a quoted force push" 2 "$(gb 'sh -cm "git push --force origin feature/x"')"
 check "blocks a push hidden behind a quote in a heredoc body" 2 "$(gb "$(printf 'cat <<EOF\nx -m %s\nEOF\ngit push --force origin feature/x\necho %s' "'" "'")")"
+# <<- strips leading tabs, so a tab-indented EOF ends the heredoc early: what follows is code.
+check "blocks a push behind a tab-indented <<- terminator in a commit message" 2 "$(gb "$(printf 'git commit -m "$(cat <<-%sEOF%s\nhello\n\tEOF\ngit push --force origin main\nEOF\n)"' "'" "'")")"
+check "blocks a push behind a tab-indented <<- terminator in any command" 2 "$(gb "$(printf 'echo "$(cat <<-%sEOF%s\nx\n\tEOF\ngit push --force origin main\nEOF\n)"' "'" "'")")"
 check "blocks a push hidden behind a quote in a comment" 2 "$(gb "$(printf 'true # -m %s\ngit push --force origin feature/x\n%s' "'" "'")")"
 check "blocks a config write followed by a comment that says -l" 2 "$(gb 'git config core.hooksPath /dev/null # -l')"
 check "blocks a Nonna config write followed by a comment that says --list" 2 "$(gb 'git config nonna.mode off # --list')"
