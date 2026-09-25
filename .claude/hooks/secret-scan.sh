@@ -11,6 +11,9 @@ set -uo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
 . "$here/lib/secret-patterns.sh"
+# shellcheck source=/dev/null
+. "$here/lib/core.sh"
+[ "$(cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null && nonna_mode)" = off ] && exit 0 # off means off
 
 payload="$(cat 2>/dev/null || true)"
 [ -n "$payload" ] || exit 0

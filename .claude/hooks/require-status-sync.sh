@@ -19,6 +19,9 @@ done
 here="$(cd "$(dirname "$self")" && pwd)"
 # shellcheck source=/dev/null
 . "$here/lib/secret-patterns.sh"
+# shellcheck source=/dev/null
+. "$here/lib/core.sh"
+[ "$(nonna_mode)" = off ] && exit 0 # off means off: nothing enforced, nothing said
 
 # What is being pushed: every commit the remote does not have yet, never "since a local branch" (a
 # commit that only exists locally, say a --no-verify root commit on main, is pushed too). git passes

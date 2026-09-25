@@ -23,6 +23,9 @@ root="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 cd "$root" 2>/dev/null || exit 0
 command -v git >/dev/null 2>&1 || exit 0
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
+# shellcheck source=/dev/null
+. "$here/lib/core.sh"
+[ "$(nonna_mode)" = off ] && exit 0 # off means off: nothing enforced, nothing said
 
 # What changed, ignoring the surfaces that are not "code" for DoD purposes:
 # docs/ (STATUS lives there), and .claude/reviews/ (transient, git-ignored).

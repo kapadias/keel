@@ -16,6 +16,9 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 root="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 cd "$root" 2>/dev/null || exit 0
+# shellcheck source=/dev/null
+. "$here/lib/core.sh"
+[ "$(nonna_mode)" = off ] && exit 0 # off means off: nothing enforced, nothing said
 branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '')"
 
 is_protected() { case "$1" in main | master | develop) return 0 ;; *) return 1 ;; esac; }

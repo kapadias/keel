@@ -13,6 +13,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$here/lib/core.sh"
 root="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 cd "$root" 2>/dev/null || exit 0
+[ "$(nonna_mode)" = off ] && exit 0 # off means off: nothing enforced, nothing said
 
 # 0. Resolve the harness root. A standalone checkout has .claude/ in the repo; a
 #    plugin install has the harness at ${CLAUDE_PLUGIN_ROOT} and NOTHING in the

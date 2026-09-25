@@ -20,6 +20,9 @@ done
 here="$(cd "$(dirname "$self")" && pwd)"
 # shellcheck source=/dev/null
 . "$here/lib/secret-patterns.sh"
+# shellcheck source=/dev/null
+. "$here/lib/core.sh"
+[ "$(nonna_mode)" = off ] && exit 0 # off means off: nothing enforced, nothing said
 
 fail=0
 

@@ -689,6 +689,51 @@ TF="$(mktemp).py"; echo 'x=1' > "$TF"
 printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$TF" | "$HOOKS/format.sh"; check "exits 0 even if no formatter present" 0 "$?"
 rm -f "$TF"
 
+echo "== modes (nonna_mode: off | lite | full) =="
+# One switch per repo, read the same way by Claude Code hooks and by git hooks. Precedence:
+# NONNA_MODE > git config nonna.mode (repo, then global) > the plugin option > the install
+# (copy-in: full, plugin: lite). A value nobody meant fails closed to the strictest mode.
+MODE_HOME="$(mktemp -d)"; TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+mode_of() { # [VAR=value ...]: the mode in $TMP with only those variables set
+  (cd "$TMP" && env -u NONNA_MODE -u CLAUDE_PLUGIN_OPTION_MODE GIT_CONFIG_GLOBAL="$MODE_HOME/gitconfig" "$@" \
+    bash -c '. "$1/lib/core.sh"; nonna_mode' _ "$HOOKS")
+}
+check "mode: a plugin install defaults to lite" lite "$(mode_of)"
+mkdir -p "$TMP/.claude/hooks"; : > "$TMP/.claude/hooks/require-status-sync.sh"
+check "mode: a copy-in install defaults to full" full "$(mode_of)"
+rm -rf "$TMP/.claude"
+check "mode: the plugin option beats the install default" full "$(mode_of CLAUDE_PLUGIN_OPTION_MODE=full)"
+git config --file "$MODE_HOME/gitconfig" nonna.mode off
+check "mode: global git config beats the plugin option" off "$(mode_of CLAUDE_PLUGIN_OPTION_MODE=full)"
+git -C "$TMP" config nonna.mode lite
+check "mode: repo git config beats global git config" lite "$(mode_of CLAUDE_PLUGIN_OPTION_MODE=full)"
+check "mode: NONNA_MODE beats repo git config" full "$(mode_of NONNA_MODE=full)"
+check "mode: an unknown value fails closed to full" full "$(mode_of NONNA_MODE=ful)"
+rm -rf "$TMP" "$MODE_HOME"
+# Off means off: every hook exits 0 and says nothing, even facing what it would otherwise block
+# (on main, a staged key, code changed with a red suite and a stale STATUS).
+OFF="$(mktemp -d)"; "${GIT[@]}" -C "$OFF" init -q
+mkdir -p "$OFF/docs"; printf 'S\n' > "$OFF/docs/STATUS.md"; printf 'x = 1\n' > "$OFF/app.py"
+"${GIT[@]}" -C "$OFF" add -A >/dev/null; "${GIT[@]}" -C "$OFF" commit -qm init --no-verify
+printf 'x = 2\n' > "$OFF/app.py"; printf 'k = "%s"\n' "$FAKE_AWS" > "$OFF/cfg.py"; "${GIT[@]}" -C "$OFF" add cfg.py
+off_rc() { # <hook> <stdin>: 0 when, with NONNA_MODE=off, the hook exits 0 and prints nothing
+  local out rc
+  out="$(cd "$OFF" && printf '%s' "$2" | NONNA_MODE=off NONNA_TEST_CMD=false CLAUDE_PROJECT_DIR="$OFF" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/$1" 2>&1)"; rc=$?
+  if [ "$rc" = 0 ] && [ -z "$out" ]; then echo 0; else echo "1 (rc=$rc: ${out:0:80})"; fi
+}
+check "off: guard-branch lets a commit on main through, silently" 0 "$(off_rc guard-branch.sh '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}')"
+check "off: secret-scan lets a key-shaped write through, silently" 0 "$(off_rc secret-scan.sh "{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"a.py\",\"content\":\"k = '$FAKE_AWS'\"}}")"
+check "off: stop-dod lets a red, STATUS-stale turn end, silently" 0 "$(off_rc stop-dod.sh '{}')"
+check "off: pre-commit lets a staged key on main through, silently" 0 "$(off_rc pre-commit.sh '')"
+check "off: pre-push lets the push through, silently" 0 "$(off_rc require-status-sync.sh '')"
+check "off: format stays silent" 0 "$(off_rc format.sh '{"tool_input":{"file_path":"app.py"}}')"
+check "off: session-start says nothing and wires nothing" 0 "$(off_rc session-start.sh '{}')"
+if [ -e "$OFF/.git/hooks/pre-push" ]; then rc=1; else rc=0; fi; check "off: session-start installs no git hook" 0 "$rc"
+check "off: subagent-start carries nothing" 0 "$(off_rc subagent-start.sh '{}')"
+check "off: subagent-verdict judges nothing" 0 "$(off_rc subagent-verdict.sh '{"agent_type":"code-reviewer","last_assistant_message":"prose, no verdict"}')"
+check "off: post-compact says nothing" 0 "$(off_rc post-compact.sh '{}')"
+rm -rf "$OFF"
+
 echo "== session-start.sh (SessionStart) =="
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 mkdir -p "$TMP/.claude/hooks"; cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"

@@ -18,6 +18,22 @@ nonna_harness_root() {
   fi
 }
 
+# nonna_mode
+#   Prints off, lite or full: what Nonna enforces in the repo in the current directory.
+#   Precedence: NONNA_MODE > git config nonna.mode (repo, then global) > the plugin's `mode`
+#   option > the install (a copy-in install is full, a plugin install lite). git config is the
+#   per-repo switch because git hooks read it too, it is never committed, and a clone cannot carry
+#   it. A value nobody meant (a typo) fails closed to full, the strictest mode, never to off.
+nonna_mode() {
+  local m="${NONNA_MODE:-}"
+  [ -n "$m" ] || m="$(git config --get nonna.mode 2>/dev/null || true)"
+  [ -n "$m" ] || m="${CLAUDE_PLUGIN_OPTION_MODE:-}"
+  if [ -z "$m" ]; then
+    if [ -f .claude/hooks/require-status-sync.sh ]; then m=full; else m=lite; fi
+  fi
+  case "$m" in off | lite | full) printf '%s' "$m" ;; *) printf 'full' ;; esac
+}
+
 # nonna_core_carrier
 #   Plugin install: Claude Code's plugin schema has no `rules` component, so
 #   .claude/rules/ never loads for a plugin user — they would get every agent,
