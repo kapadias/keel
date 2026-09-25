@@ -321,6 +321,8 @@ check "allows a read with output appended to a log" 0 "$(gb 'git config nonna.mo
 check "allows a read with both streams silenced" 0 "$(gb 'git config nonna.mode >/dev/null 2>&1')"
 # The price of refusing export NAME=… wherever it stands: a search for that text is refused too.
 check "refuses a search for an export with a value (the trade for builtin export)" 2 "$(gb "grep -rn 'export NONNA_MODE=' docs/")"
+# A redirection inside a quoted string is text until a shell runs it, so it is not set aside there.
+check "refuses a redirected config read inside sh -c (it is read as text)" 2 "$(gb "sh -c 'git config core.hooksPath 2>/dev/null'")"
 # &> and &>> are one redirection: the flags after them are still the push's.
 check "blocks a force flag after &>" 2 "$(gb 'git push &>/dev/null --force origin feature/x')"
 check "blocks a protected target after &>" 2 "$(gb 'git push origin &>/dev/null main')"
@@ -351,6 +353,10 @@ check "blocks GIT_CONFIG_GLOBAL through timeout and env" 2 "$(gb "timeout 60 env
 check "blocks a hooks path through nice and env" 2 "$(gb 'nice env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null make push')"
 check "blocks a hooks path through nohup and env" 2 "$(gb "nohup env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null bash -c 'git commit -m x'")"
 check "blocks GIT_CONFIG_GLOBAL through exec and env" 2 "$(gb 'exec env GIT_CONFIG_GLOBAL=/tmp/x make push')"
+# A redirection may come first in a command; what follows it is still at the command's start.
+check "blocks a GIT_CONFIG_GLOBAL assignment after >/dev/null" 2 "$(gb 'set -a; >/dev/null GIT_CONFIG_GLOBAL=/tmp/x; git push origin feature/x')"
+check "blocks a GIT_CONFIG_GLOBAL assignment after 2>/dev/null" 2 "$(gb 'set -a; 2>/dev/null GIT_CONFIG_GLOBAL=/tmp/x; git push origin feature/x')"
+check "blocks read and export of GIT_CONFIG_GLOBAL after redirections" 2 "$(gb '</tmp/p read GIT_CONFIG_GLOBAL; >&2 export GIT_CONFIG_GLOBAL; git push origin feature/x')"
 check "blocks a push hidden behind a quote in a comment" 2 "$(gb "$(printf 'true # -m %s\ngit push --force origin feature/x\n%s' "'" "'")")"
 check "blocks a config write followed by a comment that says -l" 2 "$(gb 'git config core.hooksPath /dev/null # -l')"
 check "blocks a Nonna config write followed by a comment that says --list" 2 "$(gb 'git config nonna.mode off # --list')"

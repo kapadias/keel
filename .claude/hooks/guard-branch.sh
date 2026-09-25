@@ -108,7 +108,9 @@ case "$tool" in
     # line). A grep for the name, or an echo of it, sets nothing.
     ASSIGN='[A-Za-z_][A-Za-z0-9_]*\+?=[^[:space:]]*'
     KW='(\{|!|if|then|do|else|elif|while|until|time([[:space:]]+-p)?|eval|coproc|builtin|command([[:space:]]+-[A-Za-z]+)*|[^[:space:]]*(sh|bash|zsh|dash|ksh)([[:space:]]+-[A-Za-z]+)*[[:space:]]+-[A-Za-z]*c)'
-    AT="^[[:space:]]*((${KW}|${ASSIGN}|[0-9]*[<>]+[[:space:]]*[^[:space:]]+)[[:space:]]+)*"
+    # A redirection (marked by shell-words.awk, or bare without awk) may come first; taking more
+    # for a command's start only ever refuses more.
+    AT="^[[:space:]]*((${KW}|${ASSIGN}|${RD}?[0-9]*[<>]+([[:space:]]+${RD}?[<>]+)*[[:space:]]*[^[:space:]]+)[[:space:]]+)*"
     DECL='(export|declare|typeset|readonly|local)([[:space:]]+-[A-Za-z]+)*'
     assigns() { # <name regex>
       printf '%s\n' "$segs" | grep -qE \
