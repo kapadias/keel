@@ -6,7 +6,12 @@
 #                                     ; & | ( ) ` a line break, quoted or not, so code inside a
 #                                     quoted string (sh -c "…", "$(…)") is seen too
 #   add -v nomask=1                   to mask nothing (the guard reads B's own output again, so a
-#                                     quote nested in a quoted string is removed too)
+#                                     quote nested in a quoted string is removed too); with
+#                                     -v relevel=1, the \002 marks that output carries are dropped
+#
+# A redirection the shell performs prints with a \002 mark before it (\0022> x), which no word can
+# carry (a \002 in a word prints as ?): a quoted '>' or an escaped 2\>x is a value, not a
+# redirection, and the guard sets aside only what is marked.
 #
 # The guard checks every reading: a match in any refuses.
 #
@@ -110,6 +115,7 @@ END {
   n = length(s); state = 0; w = ""; q = 0; pre = ""; esc = 0; k = 0; sync = 1; cut = 0
   for (i = 1; i <= n; i++) {
     c = substr(s, i, 1); nx = substr(s, i + 1, 1)
+    if (relevel && c == "\002") continue # the mark on a redirection this reading printed before
     if (state == 0) {
       # $( ` ${ $[ <( >( and << open what this reading does not follow: from here on its quoting may
       # part from the shell's, so nothing more is masked.
@@ -193,12 +199,13 @@ END {
   line = ""
   for (j = 1; j <= k; j++) {
     if (tsep[j] != "") {
-      if (tsep[j] ~ /[<>]/) line = line " " tok[j]
+      if (tsep[j] ~ /[<>]/) line = line " \002" tok[j]
       else { print line; line = "" }
       continue
     }
     x = (j in mask) ? mask[j] : tok[j]
     if (x == "" && tq[j]) x = "''" # an empty quoted word is still a word (git config k '' sets k)
+    gsub(/\002/, "?", x)
     if (out == "A") gsub(/[ \t\n]/, "\001", x)
     else gsub(/[;&|()`\n]/, "\n", x)
     line = (line == "" ? x : line " " x)

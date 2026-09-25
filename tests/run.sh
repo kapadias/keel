@@ -311,6 +311,16 @@ check "blocks --comment taking -l as its value" 2 "$(gb 'git config --comment -l
 check "blocks a hooks path set to 2 before a redirection" 2 "$(gb 'git config core.hooksPath 2 >/dev/null')"
 check "blocks a hooks path set to 0 before a redirection" 2 "$(gb 'git config core.hooksPath 0 </dev/null')"
 check "allows a read with stderr redirected" 0 "$(gb 'git config core.hooksPath 2>/dev/null')"
+# Only a redirection the shell performs is set aside: a quoted or escaped value that looks like one
+# is a value (git stores '>/dev/null', and '>' followed by a value-pattern).
+check "blocks a hooks path set to a quoted >/dev/null" 2 "$(gb "git config core.hooksPath '>/dev/null'")"
+check "blocks a test command set to a quoted >x" 2 "$(gb 'git config nonna.testCmd ">x"')"
+check "blocks a hooks path set to an escaped 2>x" 2 "$(gb 'git config core.hooksPath 2\>x')"
+check "blocks a hooks path set to a quoted > and a pattern" 2 "$(gb "git config core.hooksPath '>' x")"
+check "allows a read with output appended to a log" 0 "$(gb 'git config nonna.mode 2>>log')"
+check "allows a read with both streams silenced" 0 "$(gb 'git config nonna.mode >/dev/null 2>&1')"
+# The price of refusing export NAME=… wherever it stands: a search for that text is refused too.
+check "refuses a search for an export with a value (the trade for builtin export)" 2 "$(gb "grep -rn 'export NONNA_MODE=' docs/")"
 # &> and &>> are one redirection: the flags after them are still the push's.
 check "blocks a force flag after &>" 2 "$(gb 'git push &>/dev/null --force origin feature/x')"
 check "blocks a protected target after &>" 2 "$(gb 'git push origin &>/dev/null main')"

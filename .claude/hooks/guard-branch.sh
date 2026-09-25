@@ -81,7 +81,7 @@ case "$tool" in
     segs="$(words A)"$'\n'"$lvl"
     n=0
     while [ "$n" -lt 6 ] && quoted "$lvl"; do
-      next="$(printf '%s\n' "$lvl" | awk -v out=B -v nomask=1 -f "$here/lib/shell-words.awk" 2>/dev/null)"
+      next="$(printf '%s\n' "$lvl" | awk -v out=B -v nomask=1 -v relevel=1 -f "$here/lib/shell-words.awk" 2>/dev/null)"
       [ "$next" = "$lvl" ] && break
       segs="$segs"$'\n'"$next"
       lvl="$next"
@@ -95,6 +95,7 @@ case "$tool" in
       segs="$(printf '%s\n' "$cmd" | tr -d "\"'\\\\" | tr ';&|()`' '\n\n\n\n\n\n')"
     fi
     runs_git() { printf '%s\n' "$segs" | grep -qE "${GIT}[a-z]"; }
+    RD=$'\002' # the mark shell-words.awk puts before a redirection the shell performs
 
     # What her gates read is the user's to set: an environment variable can switch a git hook off
     # or swap its test command, GIT_CONFIG_* and a borrowed HOME can hand git a config of their own.
@@ -142,7 +143,7 @@ case "$tool" in
       printf '%s' "$seg" | grep -qE "${GIT}config([[:space:]]|$)" || continue
       printf '%s' "$seg" | grep -qE "${GIT}config(${ROPT})*[[:space:]]+(--get[a-z-]*|--list|-l)([[:space:]=]|$)" && continue
       printf '%s' "$seg" | grep -qE "${GIT}config(${ROPT})*[[:space:]]+(get|list)([[:space:]]|$)" && continue
-      printf '%s' "$seg" | sed -E 's/[[:space:]]+[0-9]*[<>]+([[:space:]]+[<>]+)*[[:space:]]*[^[:space:]<>]*//g' \
+      printf '%s' "$seg" | sed -E "s/[[:space:]]+${RD}[0-9]*[<>]+([[:space:]]+${RD}[<>]+)*[[:space:]]+[^[:space:]]+//g" \
         | grep -qE "${GIT}config(${ROPT})*[[:space:]]+[^-[:space:]'][^[:space:]]*\.[^[:space:]]*[[:space:]]*$" && continue
       printf '%s' "$seg" | grep -qiE "(^|[[:space:]])${NKEY}" && recipe "refusing to change Nonna's own git config."
       if printf '%s' "$seg" | grep -qiE "(^|[[:space:]])(${RKEY}|(-e|--edit|edit)([[:space:]]|$))"; then
@@ -158,7 +159,7 @@ case "$tool" in
       || printf '%s\n' "$segs" | grep -E "$GITF" \
       | grep -qE '(^|[[:space:]])(rm|unlink|chmod|chown|truncate|touch|shred|patch|ed|ex|vi|vim|nano|emacs|python3?|ruby|node|perl|tee|dd)([[:space:]]|$)|(^|[[:space:]])(sed|awk|gawk)[[:space:]](.*[[:space:]])?(-[A-Za-z]*i|--in-place)' \
       || printf '%s\n' "$segs" | grep -E '(^|[[:space:]])(cp|mv|ln|install|rsync)[[:space:]]' \
-      | sed -E 's/[[:space:]]+[0-9]*[<>]+([[:space:]]+[<>]+)*[[:space:]]*[^[:space:]<>]*//g' \
+      | sed -E "s/[[:space:]]+${RD}[0-9]*[<>]+([[:space:]]+${RD}[<>]+)*[[:space:]]+[^[:space:]]+//g" \
       | grep -qE '(^|[^A-Za-z0-9_.-])\.git/(hooks(/[^[:space:]]*)?|config)[[:space:]]*$|(^|[[:space:]])(-[A-Za-z]*t[[:space:]]*|--ta[a-z-]*[=[:space:]]+)[^[:space:]]*\.git/(hooks|config)'; then
       recipe "refusing to change .git/config or .git/hooks by hand."
     fi
