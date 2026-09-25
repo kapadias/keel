@@ -113,6 +113,9 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
   an argument, not a file descriptor (`git config core.hooksPath 2 >/dev/null` writes). An assignment
   that carries a value counts wherever it stands again (after `builtin`, `command`, a redirection,
   `nice env`, or in a `trap` string); anchoring had let those through. 792 tests.
+  Sixth review round (security approved; code found one hole): a quoted value that looked like a
+  redirection (`git config core.hooksPath '>/dev/null'`) was set aside as one. The reader now marks
+  each redirection the shell performs, and only marked ones are set aside. 799 tests.
 
 - **2026-09-25** — 2.0 packaging, the first unit of the launch plan (#17). Both manifests say 2.0.0;
   the plugin shows as "Nonna" and declares two install options, `run_tests` and `mode`. The hooks
