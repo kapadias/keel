@@ -68,24 +68,32 @@ case "$tool" in
   Bash)
     cmd="$(printf '%s' "$payload" | nonna_json_field '.tool_input.command')"
     [ -n "$cmd" ] || exit 0
-    # How the shell will see it. A quoted commit message (-m, --message, -F, --file) is masked
-    # first, so a message that mentions --no-verify or main is not read as a flag or a ref; then
-    # quotes and backslashes go, as the shell removes them: "--force", --for"ce", $'-f' and \git
-    # all reach git as plain words.
-    norm="${cmd//$'\\\n'/ }"
-    norm="$(printf '%s' "$norm" | sed -E \
-      -e "s/(^|[[:space:]])(-[A-Za-z]*m|--message|-F|--file)(=|[[:space:]]+)(\"[^\"]*\"|'[^']*')/\\1\\2 MSG/g" \
-      -e "s/[\$]'/'/g")"
-    norm="$(printf '%s' "$norm" | tr -d "\"'\\\\")"
-    # One command per line: ; & | ( ) and backticks each end one.
-    # shellcheck disable=SC2020  # tr maps each of those characters to a newline
-    segs="$(printf '%s\n' "$norm" | tr ';&|()`' '\n\n\n\n\n\n')"
+    # How the shell will see it (lib/shell-words.awk). Two readings, checked together: A keeps each
+    # word whole, so a quoted value with a space cannot shift the words after it; B exposes what a
+    # quoted string holds, so code in sh -c "…" or "$(…)" is seen. A commit message is masked in a
+    # plain git command only. A match in either refuses. Without awk: quotes deleted, nothing
+    # masked, which can only refuse more.
+    words() { printf '%s\n' "$cmd" | awk -v out="$1" -f "$here/lib/shell-words.awk" 2>/dev/null; }
+    segs="$(words A; words B)"
+    if [ -z "${segs//[[:space:]]/}" ]; then
+      # shellcheck disable=SC2020  # tr maps each of those characters to a newline
+      segs="$(printf '%s\n' "$cmd" | tr -d "\"'\\\\" | tr ';&|()`' '\n\n\n\n\n\n')"
+    fi
     runs_git() { printf '%s\n' "$segs" | grep -qE "${GIT}[a-z]"; }
 
     # What her gates read is the user's to set: an environment variable can switch a git hook off
     # or swap its test command, GIT_CONFIG_* and a borrowed HOME can hand git a config of their own.
-    if printf '%s' "$norm" | grep -qE '(^|[^A-Za-z0-9_])(NONNA_MODE|NONNA_TEST_CMD|CLAUDE_PLUGIN_OPTION_[A-Za-z0-9_]+|GIT_CONFIG[A-Za-z0-9_]*)=' \
-      || { printf '%s' "$norm" | grep -qE '(^|[^A-Za-z0-9_])(HOME|XDG_CONFIG_HOME)=' && runs_git; }; then
+    # Only an assignment counts, where one takes effect: at the start of a command (after others),
+    # after export, env, declare and the like, or right before git inside a quoted string (B).
+    # A grep for the name, or an echo of it, is not an assignment.
+    ASSIGN='[A-Za-z_][A-Za-z0-9_]*\+?=[^[:space:]]*'
+    assigns() { # <name regex>
+      printf '%s\n' "$segs" | grep -qE "^[[:space:]]*(${ASSIGN}[[:space:]]+)*$1\+?=" \
+        || printf '%s\n' "$segs" | grep -qE "(^|[[:space:]])(export|env|declare|typeset|readonly|local)([[:space:]]+-[A-Za-z-]+)*([[:space:]]+${ASSIGN})*[[:space:]]+$1\+?=" \
+        || printf '%s\n' "$segs" | grep -qE "(^|[^A-Za-z0-9_])$1\+?=[^[:space:]]*[[:space:]]+(${ASSIGN}[[:space:]]+)*([^[:space:]]*/)?git([[:space:]]|$)"
+    }
+    if assigns '(NONNA_MODE|NONNA_TEST_CMD|CLAUDE_PLUGIN_OPTION_[A-Za-z0-9_]+|GIT_CONFIG[A-Za-z0-9_]*)' \
+      || { assigns '(HOME|XDG_CONFIG_HOME)' && runs_git; }; then
       recipe "refusing to set what her gates read: NONNA_MODE, NONNA_TEST_CMD, CLAUDE_PLUGIN_OPTION_*, GIT_CONFIG_*, or HOME for git."
     fi
 
@@ -109,10 +117,13 @@ case "$tool" in
       fi
     done <<<"$segs"
 
-    # The same files by hand: .git/config and the git hooks.
-    if printf '%s\n' "$segs" | grep -qE '>>?[[:space:]]*[^[:space:]]*\.git/(hooks|config)' \
-      || printf '%s\n' "$segs" | grep -E '(^|[^A-Za-z0-9_.-])\.git/(hooks([/[:space:]]|$)|config([[:space:]]|$))' \
-      | grep -qE '(^|[[:space:]])(rm|mv|cp|ln|chmod|chown|tee|truncate|install|touch|unlink|shred|dd|patch|ed|ex|vi|vim|nano|emacs|sed|perl|python3?|ruby|node|awk)([[:space:]]|$)'; then
+    # The same files by hand: .git/config and the git hooks, as the target of a write. Reading them
+    # (cat, grep, sed -n, awk, cp from) is fine.
+    GITF='(^|[^A-Za-z0-9_.-])\.git/(hooks([/[:space:]]|$)|config([[:space:]]|$))'
+    if printf '%s\n' "$segs" | grep -qE '>[[:space:]]*[^[:space:]]*\.git/(hooks|config)' \
+      || printf '%s\n' "$segs" | grep -E "$GITF" \
+      | grep -qE '(^|[[:space:]])(rm|unlink|chmod|chown|truncate|touch|shred|patch|ed|ex|vi|vim|nano|emacs|python3?|ruby|node|perl|tee|dd)([[:space:]]|$)|(^|[[:space:]])(sed|awk|gawk)[[:space:]](.*[[:space:]])?(-[A-Za-z]*i|--in-place)' \
+      || printf '%s\n' "$segs" | grep -qE '(^|[[:space:]])(cp|mv|ln|install|rsync)[[:space:]].*(^|[^A-Za-z0-9_.-])\.git/(hooks(/[^[:space:]]*)?|config)[[:space:]]*$'; then
       recipe "refusing to change .git/config or .git/hooks by hand."
     fi
 
