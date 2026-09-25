@@ -281,6 +281,21 @@ check "blocks a >| write into .git/config" 2 "$(gb 'echo x >| .git/config')"
 check "blocks a >& write into .git/config" 2 "$(gb 'echo x >& .git/config')"
 check "blocks unsetting a Nonna key" 2 "$(gb 'git config --unset nonna.mode')"
 check "blocks a hooks path set after --" 2 "$(gb 'git config core.hooksPath -- -hooks')"
+# &> and &>> are one redirection: the flags after them are still the push's.
+check "blocks a force flag after &>" 2 "$(gb 'git push &>/dev/null --force origin feature/x')"
+check "blocks a protected target after &>" 2 "$(gb 'git push origin &>/dev/null main')"
+check "blocks a force flag after &>>" 2 "$(gb 'git push &>>/tmp/log --force origin feature/x')"
+# macOS /bin/bash 3.2 ends "$(" at a ) in the heredoc body: a body holding " $ ` or \ is read, not set aside.
+check "blocks a push that bash 3.2 reads out of a heredoc message" 2 "$(gb "$(printf 'git commit -m "$(cat <<%sEOF%s\nx\n)" ; git push --force origin feature/x ; echo "\nEOF\n)"' "'" "'")")"
+check "blocks a \$( ) that bash 3.2 runs past a commented (" 2 "$(gb "$(printf 'git commit -m "$(cat <<%sEOF%s\n# (\n)\n$(git push --force origin feature/x)\nEOF\n)"' "'" "'")")"
+# git's global options that take a value.
+check "blocks a force push behind --attr-source" 2 "$(gb 'git --attr-source HEAD push --force origin feature/x')"
+check "blocks a force push behind --shallow-file" 2 "$(gb 'git --shallow-file x push --force origin feature/x')"
+# A git command inside a value is one git or the shell runs later: an editor, a rebase --exec.
+check "blocks a hooks path set by the commit editor" 2 "$(gb 'GIT_EDITOR="git config core.hooksPath /dev/null #" git commit')"
+check "blocks a force push run by rebase --exec=" 2 "$(gb 'git rebase --exec="git push --force origin feature/x" develop')"
+# Quotes nested deeper than the guard reads are refused, not waved through.
+check "blocks a push nested in four sh -c" 2 "$(gb $'sh -c \'sh -c \'"\'"\'sh -c \'"\'"\'"\'"\'"\'"\'"\'"\'sh -c \'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'git push --fo\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'r\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'ce origin feature/x\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'"\'\'"\'"\'"\'"\'"\'"\'"\'"\'\'"\'"\'\'')"
 check "blocks a push hidden behind a quote in a comment" 2 "$(gb "$(printf 'true # -m %s\ngit push --force origin feature/x\n%s' "'" "'")")"
 check "blocks a config write followed by a comment that says -l" 2 "$(gb 'git config core.hooksPath /dev/null # -l')"
 check "blocks a Nonna config write followed by a comment that says --list" 2 "$(gb 'git config nonna.mode off # --list')"
@@ -313,6 +328,7 @@ check "allows reading one key: git config <key>" 0 "$(gb 'git config nonna.mode'
 check "allows reading an alias: git config --global alias.co" 0 "$(gb 'git config --global alias.co')"
 check "allows a message with a plain \${VAR}" 0 "$(gb 'git commit -m "feat: add ${VAR} docs for -n"')"
 check "allows a message after if" 0 "$(gb 'if git commit -m "fix: -n"; then echo ok; fi')"
+check "allows a heredoc message with apostrophes, parens and #" 0 "$(gb "$(printf 'git commit -m "$(cat <<%sEOF%s\nfix(guard): don%st refuse -n (see #17)\nEOF\n)"' "'" "'" "'")")"
 out="$(printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push --force origin feature/x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB" 2>&1)"
 contains "force-push refusal is in her voice" "we don't force things in this house" "$out"
 # Nor may the agent edit her settings or her git hooks with the file tools.

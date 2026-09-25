@@ -19,8 +19,8 @@
 # stays exposed, which can only refuse more, never less.
 #
 # Claude Code's usual message, "$(cat <<'EOF' … EOF\n)", is literal (a quoted delimiter expands
-# nothing): it is one quoted word, its body, when it opens outside any quote and ends exactly where
-# the shell ends it. $'…' escapes are decoded as bash decodes them. Comments are skipped as the shell
+# nothing): it is one quoted word, its body, when it opens outside any quote, ends exactly where the
+# shell ends it, and its body holds no " $ ` or backslash (see heredoc_at). $'…' escapes are decoded as bash decodes them. Comments are skipped as the shell
 # skips them; $IFS is a space.
 BEGIN { for (v = 32; v < 127; v++) ASCII = ASCII sprintf("%c", v) }
 { s = s (NR > 1 ? "\n" : "") $0 }
@@ -35,6 +35,8 @@ function sep(c) { k++; tok[k] = c; tsep[k] = c; tq[k] = 0; tsync[k] = sync }
 # At a double quote, s[i]: when "$(cat <<'D'<nl>…<nl>D<nl>)" follows, the body is left in hd and the
 # index of the closing quote is returned, else 0. The first line that begins with D must be exactly
 # D, then only blanks up to )": bash 5.2 also ends the heredoc at "D)", and <<- at a tab-indented D.
+# The body may hold no " $ ` or backslash: macOS /bin/bash 3.2 ends the $( at a ) inside the body,
+# and what follows is read as double-quoted text, where only those can run or end anything.
 function heredoc_at(i,   t, h, d, body, p, rest, e, after) {
   t = substr(s, i + 1)
   if (!match(t, /^\$\(cat[ \t]*<<[ \t]*'[A-Za-z_][A-Za-z_0-9]*'[ \t]*\n/)) return 0
@@ -47,6 +49,7 @@ function heredoc_at(i,   t, h, d, body, p, rest, e, after) {
   after = substr(rest, e + 1)
   if (!match(after, /^[ \t\n]*\)"/)) return 0
   hd = (p > 1 ? substr(body, 1, p - 2) : "")
+  if (hd ~ /["$`\\]/) return 0
   return i + h + p + e + RLENGTH - 1
 }
 
@@ -107,6 +110,7 @@ END {
       if ((c == "$" && (nx == "(" || nx == "[" || (nx == "{" && !plainparam(i)))) || c == "`" || ((c == "<" || c == ">") && nx == "(") || (c == "<" && nx == "<")) sync = 0
       if (c == "\\") { i++; if (nx != "\n") w = w nx }
       else if ((c == ">" || c == "<") && (nx == "|" || nx == "&" || (c == "<" && nx == ">"))) { endword(); sep(c == "<" && nx == ">" ? ">" : c); i++ } # >| >& <& <>: one redirection
+      else if (c == "&" && nx == ">") { endword(); sep(">"); i++ } # &> and &>>: a redirection, not a separator
       else if (c == "'") { if (!q) pre = w; q = 1; state = 1 }
       else if (c == "\"") {
         if (!q) pre = w
@@ -158,7 +162,7 @@ END {
     }
     if (kind == "o") { # git -C dir -c k=v …: its options, up to the subcommand
       if (skip) skip = 0
-      else if (t ~ /^(-C|-c|--git-dir|--work-tree|--namespace|--super-prefix|--config-env|--exec-path)$/) skip = 1
+      else if (t ~ /^(-C|-c|--git-dir|--work-tree|--namespace|--super-prefix|--config-env|--exec-path|--attr-source|--shallow-file)$/) skip = 1
       else if (t !~ /^-/) kind = (t ~ /^(commit|tag)$/ ? "c" : (t ~ /^(merge|stash|notes)$/ ? "m" : ""))
       continue
     }
@@ -187,6 +191,7 @@ END {
       continue
     }
     x = (j in mask) ? mask[j] : tok[j]
+    if (x == "" && tq[j]) x = "''" # an empty quoted word is still a word (git config k '' sets k)
     if (out == "A") gsub(/[ \t\n]/, "\001", x)
     else gsub(/[;&|()`\n]/, "\n", x)
     line = (line == "" ? x : line " " x)

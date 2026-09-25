@@ -27,8 +27,8 @@ branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '')"
 is_protected() { case "$1" in main | master | develop) return 0 ;; *) return 1 ;; esac; }
 
 # `git` (optionally path-prefixed) + any run of global options, up to a subcommand. A command starts
-# a line, or follows a space, `{` or `!`.
-GIT='(^|[[:space:]{!])([^[:space:]]*/)?git([[:space:]]+(-C[[:space:]]+[^[:space:]]+|-c[[:space:]]+[^[:space:]]+|--(git-dir|work-tree|namespace|exec-path|super-prefix|config-env)(=[^[:space:]]*|[[:space:]]+[^[:space:]]+)|--[A-Za-z][A-Za-z-]*(=[^[:space:]]*)?|-[A-Za-z]))*[[:space:]]+'
+# a line, or follows a space, `{`, `!` or `=` (a command in a value: GIT_EDITOR=…, --exec=…).
+GIT='(^|[[:space:]{!=])([^[:space:]]*/)?git([[:space:]]+(-C[[:space:]]+[^[:space:]]+|-c[[:space:]]+[^[:space:]]+|--(git-dir|work-tree|namespace|exec-path|super-prefix|config-env|attr-source|shallow-file)(=[^[:space:]]*|[[:space:]]+[^[:space:]]+)|--[A-Za-z][A-Za-z-]*(=[^[:space:]]*)?|-[A-Za-z]))*[[:space:]]+'
 # Config keys that are Nonna's own switches, and keys that can route git around her hooks: an
 # include, an alias, a hooks path, a mirror or forced push refspec. Matched without case.
 NKEY='nonna([.[:space:]=]|$)'
@@ -70,22 +70,26 @@ case "$tool" in
     [ -n "$cmd" ] || exit 0
     # How the shell will see it (lib/shell-words.awk). Readings, checked together: A keeps each word
     # whole, so a quoted value with a space cannot shift the words after it; B exposes what a quoted
-    # string holds, so code in sh -c "…" or "$(…)" is seen; and B read again, masking nothing, until
-    # it stops changing, so a quote nested inside one (sh -c '… "--force"') is removed as the inner
-    # shell removes it. A message is masked only where the reading is sure to be the shell's. A match
-    # in any refuses. Without awk: quotes deleted, nothing masked, which can only refuse more.
+    # string holds, so code in sh -c "…" or "$(…)" is seen; and B read again, masking nothing, while a
+    # quote or an escape is left in it (up to six times), so a quote nested inside one (sh -c '…
+    # "--force"') is removed as the inner shell removes it. Nesting deeper than that is refused. A
+    # message is masked only where the reading is sure to be the shell's. A match in any refuses.
+    # Without awk: quotes deleted, nothing masked, which can only refuse more.
     words() { printf '%s\n' "$cmd" | awk -v out="$1" -f "$here/lib/shell-words.awk" 2>/dev/null; }
+    quoted() { case "$1" in *[\'\"\\]*) return 0 ;; esac; return 1; }
     lvl="$(words B)"
     segs="$(words A)"$'\n'"$lvl"
-    case "$lvl" in *[\'\"\\]*) # a quote or an escape is left inside a quoted string
-      for _ in 1 2 3; do
-        next="$(printf '%s\n' "$lvl" | awk -v out=B -v nomask=1 -f "$here/lib/shell-words.awk" 2>/dev/null)"
-        [ "$next" = "$lvl" ] && break
-        segs="$segs"$'\n'"$next"
-        lvl="$next"
-      done
-      ;;
-    esac
+    n=0
+    while [ "$n" -lt 6 ] && quoted "$lvl"; do
+      next="$(printf '%s\n' "$lvl" | awk -v out=B -v nomask=1 -f "$here/lib/shell-words.awk" 2>/dev/null)"
+      [ "$next" = "$lvl" ] && break
+      segs="$segs"$'\n'"$next"
+      lvl="$next"
+      n=$((n + 1))
+    done
+    if [ "$n" -ge 6 ] && quoted "$lvl"; then
+      kitchen_door "refusing quotes nested deeper than the guard reads; run the inner command itself."
+    fi
     if [ -z "${segs//[[:space:]]/}" ]; then
       # shellcheck disable=SC2020  # tr maps each of those characters to a newline
       segs="$(printf '%s\n' "$cmd" | tr -d "\"'\\\\" | tr ';&|()`' '\n\n\n\n\n\n')"
