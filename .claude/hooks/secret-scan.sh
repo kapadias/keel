@@ -22,8 +22,9 @@ payload="$(cat 2>/dev/null || true)"
 # applies Read denies to Grep as well). A plugin cannot carry permissions, so without this a plugin
 # user's agent could read .env into its context. A name is not the file: each path is matched
 # lowercased too (a case-folding file system reads .ENV as .env) and with its symlinks followed.
-# Grep's path may be a directory, and its glob picks files by name. Templates (.env.example,
-# .sample, .template) are for reading. The lint proves every Read deny in settings.json is refused
+# Grep's path may be a directory, and its glob picks files: in the project it is refused when it picks
+# a secret file that is there (or a link to one), elsewhere when it could pick one by name.
+# Templates (.env.example, .sample, .template) are for reading. The lint proves every Read deny in settings.json is refused
 # here, for Read and for Grep.
 if printf '%s' "$payload" | grep -qE '"tool_name"[[:space:]]*:[[:space:]]*"(Read|Grep)"'; then
   # shellcheck source=/dev/null
@@ -48,8 +49,15 @@ if printf '%s' "$payload" | grep -qE '"tool_name"[[:space:]]*:[[:space:]]*"(Read
     done
     if d="$(cd "$(dirname "$p")" 2>/dev/null && pwd -P)"; then printf '%s/%s' "$d" "$(basename "$p")"; else printf '%s' "$p"; fi
   }
-  glob_picks_secret() { # <ripgrep glob>: 0 when it can pick a file the deny list covers
-    local g="$1" pat="" c i depth=0 s
+  picks() { # <path>: the glob ($pat, $lpat) matches it or its name, in any case
+    local l
+    l="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    # shellcheck disable=SC2053  # the right side is meant as a pattern
+    [[ $1 == $pat || ${1##*/} == $pat || $l == $lpat || ${l##*/} == $lpat ]]
+  }
+  glob_picks_secret() { # <ripgrep glob> <project dir it searches, or empty>: 0 when it picks a secret
+    local g="$1" dir="$2" c i depth=0 s f
+    pat=""
     case "$g" in '!'*) return 1 ;; esac # an exclusion reads nothing
     [ "${#g}" -le 200 ] || return 0     # too long to judge: refuse
     # ripgrep's **/ also matches no directory at all; bash's * already crosses slashes.
@@ -67,16 +75,31 @@ if printf '%s' "$payload" | grep -qE '"tool_name"[[:space:]]*:[[:space:]]*"(Read
     done
     [ "$depth" -eq 0 ] || return 0 # braces that do not balance: refuse
     shopt -s extglob
-    # One name for each thing the deny list covers; a glob is matched against the name and the path.
+    lpat="$(printf '%s' "$pat" | tr '[:upper:]' '[:lower:]')"
+    # Can it pick one at all? One name for each thing the deny list covers.
     for s in .env .env.local secrets/db.yml server.pem server.key cert.p12 key.p8 cert.pfx store.jks \
       id_rsa id_rsa.pub .ssh/config .aws/credentials .npmrc kubeconfig credentials; do
-      # shellcheck disable=SC2053  # the right side is meant as a pattern
-      [[ $s == $pat || ${s##*/} == $pat ]] && return 0
-      # shellcheck disable=SC2053
-      [[ $s == $(printf '%s' "$pat" | tr '[:upper:]' '[:lower:]') ]] && return 0
-      # shellcheck disable=SC2053
-      [[ ${s##*/} == $(printf '%s' "$pat" | tr '[:upper:]' '[:lower:]') ]] && return 0
+      picks "$s" && break
+      s=""
     done
+    [ -n "$s" ] || return 1
+    # It can. In the project, what decides is whether it picks a secret file that is there, or a link
+    # to one (a link to a secret directory, always); outside the project, the name alone does.
+    [ -n "$dir" ] || return 0
+    while IFS= read -r f; do
+      if [ -L "$f" ]; then
+        s="$(resolved "$f")"
+        if [ -d "$s" ]; then secret_file "$s" && return 0; continue; fi
+        secret_file "$s" || secret_file "$f" || continue
+      else
+        secret_file "$f" || continue
+      fi
+      picks "${f#"$dir"/}" && return 0
+    done < <(find "$dir" -name .git -prune -o -type l -path '*/node_modules/*' -o \( -type l \
+      -o -iname .env -o -iname '.env.*' -o -ipath '*/secrets/*' -o -iname '*.pem' -o -iname '*.key' \
+      -o -iname '*.p12' -o -iname '*.p8' -o -iname '*.pfx' -o -iname '*.jks' -o -iname 'id_rsa*' \
+      -o -ipath '*/.ssh/*' -o -ipath '*/.aws/*' -o -iname .npmrc -o -iname kubeconfig \
+      -o -iname credentials \) -print 2>/dev/null)
     return 1
   }
   f="$(printf '%s' "$payload" | nonna_json_field '.tool_input.file_path')"
@@ -91,7 +114,21 @@ if printf '%s' "$payload" | grep -qE '"tool_name"[[:space:]]*:[[:space:]]*"(Read
     hit=1
     break
   done
-  [ -n "$hit" ] || [ -z "$g" ] || ! glob_picks_secret "$g" || hit=1
+  # The directory the glob searches, when it is in the project; a single file was judged above, and a
+  # glob cannot widen it.
+  sd=""
+  if [ -z "$hit" ] && [ -n "$g" ]; then
+    proj="$(cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null && pwd -P)"
+    case "${d:-.}" in /*) sd="${d:-.}" ;; *) sd="$proj/${d:-.}" ;; esac
+    if [ -f "$sd" ]; then
+      g=""
+    elif [ -n "$proj" ] && sd="$(cd "$sd" 2>/dev/null && pwd -P)"; then
+      case "$sd/" in "${proj%/}"/*) ;; *) sd="" ;; esac
+    else
+      sd=""
+    fi
+  fi
+  [ -n "$hit" ] || [ -z "$g" ] || ! glob_picks_secret "$g" "$sd" || hit=1
   if [ -n "$hit" ]; then
     {
       echo "✗ Nonna: that drawer is private. (secret-scan: blocked reading ${f:-${d:-$g}}.)"
