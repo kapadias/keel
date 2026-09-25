@@ -74,7 +74,11 @@ lighter mode to select". A plugin user's first day is that use.
    could match, glob groups included (`gi[t]`, `@(git)`, zsh's `(a|b)`): git, or git's own binary
    for a command (`git-push`), a protected branch, `.git/hooks`. Names match without case, as
    macOS's disk finds `GIT`. What it cannot read before the hook times out is refused: a command
-   over 256 KB, or an expansion past 100,000 words. It refuses the agent's writes to `nonna.*`,
+   over 256 KB, or an expansion past 100,000 words or 2 MiB. Quoted text is expanded as code a
+   nested shell might run, so a minified JSON array in one word reaches that limit at 16 two-field
+   objects (fewer with more fields); pretty-printed JSON does not, and the refusal points to the
+   Write tool (the
+   tenth review round took this trade). It refuses the agent's writes to `nonna.*`,
    includes, aliases, `core.hooksPath`, push refspecs and `push.default`, whether through
    `git config`, `-c` or `--config-env`. It refuses a push of every branch (`--all`, `--mirror`, `:`,
    a wildcard), through `git push` or `subtree push`, and git's plumbing pushes (`send-pack`,

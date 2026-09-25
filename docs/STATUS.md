@@ -131,6 +131,9 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
   now refused too: git's own binaries (`/usr/lib/git-core/git-push`), capitals (macOS finds
   `GIT`), a path to `env`, `send-pack` (which runs no hook), `subtree push`, the `:` and wildcard refspecs, and push
   refspecs or `push.default` in the config. 856 tests.
+  Tenth review round: both approve. The one LOW is the declared trade: quoted text is expanded as
+  code, so a minified JSON array in one word is refused as too large to read from 16 two-field
+  objects (fewer with more fields; ADR-0011 §4).
 
 - **2026-09-25** — 2.0 packaging, the first unit of the launch plan (#17). Both manifests say 2.0.0;
   the plugin shows as "Nonna" and declares two install options, `run_tests` and `mode`. The hooks
