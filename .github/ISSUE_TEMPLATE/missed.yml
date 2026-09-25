@@ -2,6 +2,12 @@ name: Nonna let something through
 description: A red suite, a push to main, a secret or a force push got past her.
 labels: ["missed"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        **Never paste a secret's value here**, even one that already leaked: describe what kind it was and rotate it now.
+        If you found a way to get past a gate on purpose (a bypass, not a slip), report it privately instead:
+        https://github.com/kapadias/nonna/security/advisories/new
   - type: textarea
     id: what
     attributes:
