@@ -775,6 +775,43 @@ contains "plugin install: carries the constitution in additionalContext" "The th
 contains "plugin install: says the rules are not loaded" "NOT loaded" "$out"
 contains "plugin install: carries the never-list" "Mark work done" "$out"
 rm -rf "$TMP"
+# Plugin install: consent to run the repo's tests is the plugin's run_tests option (default on). The
+# first session records the detected command in the repo's own git config (never committed, never
+# cloned), where the Stop hook and the git pre-push hook both read it, and records the mode the same
+# way so git hooks, which cannot see plugin options, agree with the Claude Code hooks.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+printf '{"scripts":{"test":"node t.js"}}\n' > "$TMP/package.json"
+out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
+check "plugin: the first session records the detected test command" "npm test --silent" "$(git -C "$TMP" config --get nonna.testCmd)"
+check "plugin: the first session records the mode" lite "$(git -C "$TMP" config --get nonna.mode)"
+contains "plugin: tells the agent what the test gate runs" "Test gate: npm test --silent" "$out"
+git -C "$TMP" config nonna.testCmd "make check"; git -C "$TMP" config nonna.mode full
+CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh" >/dev/null
+check "plugin: never overwrites a test command already set" "make check" "$(git -C "$TMP" config --get nonna.testCmd)"
+check "plugin: never overwrites a mode already set" full "$(git -C "$TMP" config --get nonna.mode)"
+git -C "$TMP" config nonna.testCmd ""
+CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh" >/dev/null
+check "plugin: an empty test command (the gate turned off) stays empty" "" "$(git -C "$TMP" config --get nonna.testCmd)"
+rm -rf "$TMP"
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+printf '{"scripts":{"test":"node t.js"}}\n' > "$TMP/package.json"
+CLAUDE_PLUGIN_OPTION_RUN_TESTS=false CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh" >/dev/null
+git -C "$TMP" config --get nonna.testCmd >/dev/null; check "plugin: run_tests off records no test command" 1 "$?"
+rm -rf "$TMP"
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
+git -C "$TMP" config --get nonna.testCmd >/dev/null; check "plugin: no suite found, no test command recorded" 1 "$?"
+contains "plugin: says the test gate is off and how to turn it on" "git config nonna.testCmd" "$out"
+rm -rf "$TMP"
+# A copy-in install detects at run time; its session start records neither.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+mkdir -p "$TMP/.claude/hooks/lib"; cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"; cp "$HOOKS/lib/tests.sh" "$TMP/.claude/hooks/lib/"
+printf '{"scripts":{"test":"node t.js"}}\n' > "$TMP/package.json"
+out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"
+git -C "$TMP" config --get nonna.testCmd >/dev/null; check "copy-in: session start records no test command" 1 "$?"
+git -C "$TMP" config --get nonna.mode >/dev/null; check "copy-in: session start records no mode" 1 "$?"
+contains "copy-in: tells the agent what the test gate runs" "Test gate: npm test --silent" "$out"
+rm -rf "$TMP"
 # Standalone checkout: rules/ loads natively — carrying it again would double-pay.
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 mkdir -p "$TMP/.claude/hooks" "$TMP/.claude/rules"
@@ -974,6 +1011,11 @@ out="$(printf '{}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"
 printf '%s' "$out" | grep -q '"decision"'; check "stop: plugin install never auto-runs the repo's tests" 1 "$?"
 out="$(printf '{}' | NONNA_TEST_CMD='python3 -m pytest -q' CLAUDE_PROJECT_DIR="$TMP" "$SD")"
 contains "stop: plugin install runs the suite once NONNA_TEST_CMD opts in" "the tests say no" "$out"
+git -C "$TMP" config nonna.testCmd 'python3 -m pytest -q'
+out="$(printf '{}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+contains "stop: plugin install runs the command recorded in git config" "the tests say no" "$out"
+out="$(printf '{}' | NONNA_TEST_CMD='' CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+printf '%s' "$out" | grep -q '"decision"'; check "stop: an empty NONNA_TEST_CMD turns the recorded command off" 1 "$?"
 rm -rf "$TMP"
 # Without timeout(1) (macOS), the fallback must kill the whole process group, not wait out a child.
 NOTO="$(mktemp -d)"
@@ -992,6 +1034,14 @@ got="$(cd "$TMP" && unset NONNA_TEST_CMD && . "$HOOKS/lib/tests.sh" && nonna_tes
 # shellcheck disable=SC2031
 got="$(cd "$TMP" && unset NONNA_TEST_CMD && PATH="$STUB:$PATH" && . "$HOOKS/lib/tests.sh" && nonna_test_cmd)"; check "tests.sh: no pytest installed, no pytest command" 0 "${#got}"
 rm -rf "$TMP" "$STUB"
+# The test command: NONNA_TEST_CMD > git config nonna.testCmd > detection (copy-in only); empty is off.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; git -C "$TMP" config nonna.testCmd "make check"
+got="$(cd "$TMP" && unset NONNA_TEST_CMD && . "$HOOKS/lib/tests.sh" && nonna_test_cmd)"; check "tests.sh: reads the command recorded in git config" "make check" "$got"
+got="$(cd "$TMP" && export NONNA_TEST_CMD="pytest -x" && . "$HOOKS/lib/tests.sh" && nonna_test_cmd)"; check "tests.sh: NONNA_TEST_CMD beats git config" "pytest -x" "$got"
+mkdir -p "$TMP/.claude/hooks/lib"; : > "$TMP/.claude/hooks/lib/tests.sh"; printf '{"scripts":{"test":"node t.js"}}\n' > "$TMP/package.json"
+git -C "$TMP" config nonna.testCmd ""
+got="$(cd "$TMP" && unset NONNA_TEST_CMD && . "$HOOKS/lib/tests.sh" && nonna_test_cmd)"; check "tests.sh: an empty git config command turns off even copy-in detection" "" "$got"
+rm -rf "$TMP"
 
 rm -rf "$PYSTUB"; if [ -n "$OLD_PYTHONPATH" ]; then PYTHONPATH="$OLD_PYTHONPATH"; else unset PYTHONPATH; fi
 

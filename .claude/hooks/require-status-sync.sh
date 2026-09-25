@@ -146,8 +146,7 @@ if class="$(added_lines "$tmp/patch" | nonna_scan_secrets)"; then
 fi
 
 # "Done" means the suite passes: a code push runs the project's own tests (lib/tests.sh). No test
-# command (plugin installs need NONNA_TEST_CMD, or NONNA_TEST_CMD="") means this check does not
-# apply. The suite runs in the working tree, so it must BE what is pushed: HEAD, with no uncommitted
+# command (none recorded or detected, or NONNA_TEST_CMD="") means this check does not apply. The suite runs in the working tree, so it must BE what is pushed: HEAD, with no uncommitted
 # change to a tracked file that could hide a broken commit.
 if [ -n "$code_touched" ] && [ -f "$here/lib/tests.sh" ]; then
   # shellcheck source=/dev/null

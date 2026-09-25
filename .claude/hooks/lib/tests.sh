@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 # lib/tests.sh — "done" means the project's own test suite passes, not that the agent says so.
 #
-# nonna_test_cmd   prints the test command for the repo in the current directory, or nothing:
-#                  NONNA_TEST_CMD if set (empty string turns the gate off), else detected from
-#                  pytest config/tests, package.json's "test" script, go.mod or Cargo.toml.
-#                  Detection needs consent: it runs only when Nonna was copied into the repo
-#                  (.claude/hooks/lib/tests.sh exists). Under a plugin install nobody agreed to have
-#                  the repo's own code run by a hook, so only an explicit NONNA_TEST_CMD does that.
+# nonna_test_cmd   prints the test command for the repo in the current directory, or nothing.
+#                  Precedence: NONNA_TEST_CMD (empty turns the gate off) > git config nonna.testCmd
+#                  (empty turns it off) > detection, in a copy-in install only (the repo carries
+#                  .claude/hooks/lib/tests.sh). A plugin install detects once, at session start, when
+#                  the plugin's run_tests option allows it (the default): session-start.sh records the
+#                  command in the repo's own git config, which is never committed and never cloned,
+#                  and says so. So the Stop hook and the git pre-push hook run one command, and the
+#                  user can see and change it.
+# nonna_detect_test_cmd  prints the command detection finds here: pytest config/tests,
+#                  package.json's "test" script, go.mod or Cargo.toml.
 # nonna_run_tests  runs it with a timeout (NONNA_TEST_TIMEOUT seconds, default 600); exit status is
 #                  the suite's, 124 when it timed out; output tail in $NONNA_TEST_TAIL.
 # shellcheck shell=bash
@@ -16,7 +20,16 @@ nonna_test_cmd() {
     printf '%s' "$NONNA_TEST_CMD"
     return 0
   fi
+  local cfg
+  if cfg="$(git config --get nonna.testCmd 2>/dev/null)"; then
+    printf '%s' "$cfg"
+    return 0
+  fi
   [ -f .claude/hooks/lib/tests.sh ] || return 0
+  nonna_detect_test_cmd
+}
+
+nonna_detect_test_cmd() {
   local t has_py_tests=0
   for t in tests/test_*.py tests/*_test.py test/test_*.py test_*.py; do
     [ -f "$t" ] && has_py_tests=1 && break

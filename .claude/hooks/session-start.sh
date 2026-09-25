@@ -51,26 +51,55 @@ elif ! grep -qs 'require-status-sync' .git/hooks/pre-push; then
   dod_warn=" WARNING: .git/hooks/pre-push exists and is not Nonna's DoD hook — Definition of Done is NOT enforced; chain ${nonna_root}/hooks/require-status-sync.sh from your hook manually."
 fi
 
-# 2. Detect toolchain.
+# 2. Plugin install: record what the git hooks cannot read from the plugin's options, the first time
+#    Nonna meets this repo: the mode, and (when the run_tests option allows it, the default) the test
+#    command detection finds. Both go into the repo's own git config, which is never committed and
+#    never cloned, so a hostile repo cannot plant either. Nothing already set is overwritten: not a
+#    mode the user chose, not a command they set, not an empty one (the gate turned off).
+if [ ! -f .claude/hooks/lib/tests.sh ] && [ -n "$nonna_root" ] && git rev-parse --git-dir >/dev/null 2>&1; then
+  git config --get nonna.mode >/dev/null 2>&1 || git config nonna.mode "$(nonna_mode)" 2>/dev/null || true
+  case "${CLAUDE_PLUGIN_OPTION_RUN_TESTS:-true}" in
+    false | False | FALSE | 0 | no | off) : ;;
+    *)
+      if ! git config --get nonna.testCmd >/dev/null 2>&1 && [ -f "$nonna_root/hooks/lib/tests.sh" ]; then
+        # shellcheck source=/dev/null
+        . "$nonna_root/hooks/lib/tests.sh"
+        detected="$(nonna_detect_test_cmd)"
+        [ -z "$detected" ] || git config nonna.testCmd "$detected" 2>/dev/null || true
+      fi
+      ;;
+  esac
+fi
+gate=""
+if [ -n "$nonna_root" ] && [ -f "$nonna_root/hooks/lib/tests.sh" ]; then
+  # shellcheck source=/dev/null
+  . "$nonna_root/hooks/lib/tests.sh"
+  gate="$(nonna_test_cmd)"
+fi
+
+# 3. Detect toolchain.
 stack=""
-testcmd=""
-[ -f package.json ] && { stack="$stack node"; testcmd="npm test"; }
-{ [ -f pyproject.toml ] || [ -f setup.cfg ]; } && { stack="$stack python"; testcmd="pytest"; }
-[ -f go.mod ] && { stack="$stack go"; testcmd="go test ./..."; }
-[ -f Cargo.toml ] && { stack="$stack rust"; testcmd="cargo test"; }
+[ -f package.json ] && stack="$stack node"
+{ [ -f pyproject.toml ] || [ -f setup.cfg ]; } && stack="$stack python"
+[ -f go.mod ] && stack="$stack go"
+[ -f Cargo.toml ] && stack="$stack rust"
 stack="$(printf '%s' "$stack" | sed 's/^ //')"
 [ -n "$stack" ] || stack="undetected"
 
-# 3. Emit additionalContext (JSON on stdout; exit 0).
+# 4. Emit additionalContext (JSON on stdout; exit 0).
 msg="Nonna harness active. Gates live: branch-guard (no commits/pushes to main/master/develop, no force pushes), secret-scan on writes and Bash secret reads, Definition-of-Done pre-push (docs/STATUS.md). Detected stack: ${stack}.${dod_warn}"
 # Announce where the harness actually lives. Commands invoke gate scripts under
 # skills/*/scripts/; that path differs between a standalone checkout and a plugin
 # install, and the model cannot infer it. Resolving it here — in the one process
 # that has CLAUDE_PLUGIN_ROOT exported — keeps the model out of the guess.
 [ -n "$nonna_root" ] && msg="${msg} Harness root: ${nonna_root} — gate scripts live at \${NONNA}/skills/<skill>/scripts/, e.g. ${nonna_root}/skills/code-review/scripts/check-review.sh."
-[ -n "$testcmd" ] && msg="${msg} Likely test gate: '${testcmd}' — wire /test to your gate (see stacks/)."
+if [ -n "$gate" ]; then
+  msg="${msg} Test gate: ${gate} runs before a turn that changed code can end, and before a push; a red suite blocks."
+else
+  msg="${msg} Test gate: off, no test command found here. The user can set one: git config nonna.testCmd '<command>'."
+fi
 
-# 4. Plugin install: carry the constitution in (nonna_core_carrier, lib/core.sh —
+# 5. Plugin install: carry the constitution in (nonna_core_carrier, lib/core.sh —
 #    the same carrier subagent-start.sh uses, so parent and subagents agree).
 core="$(nonna_core_carrier)"
 [ -n "$core" ] && msg="${msg}

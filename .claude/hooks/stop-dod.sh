@@ -42,8 +42,8 @@ reason=""
 
 # "Done" means the suite passes. Run the project's own tests when code changed; block once on red.
 # On the second stop (stop_hook_active) let it through: an agent that cannot fix it must say so,
-# not loop. No test command (see lib/tests.sh: plugin installs need NONNA_TEST_CMD) means this check
-# does not apply. A green run is remembered per tree and command, so an idle turn end costs nothing;
+# not loop. No test command (lib/tests.sh: NONNA_TEST_CMD, git config nonna.testCmd, or copy-in
+# detection) means this check does not apply. A green run is remembered per tree and command, so an idle turn end costs nothing;
 # a suite slower than the Stop budget is not red, and the pre-push gate still runs it in full.
 # The cache key is the tree (tracked + untracked) and the command; git-ignored inputs, submodule
 # working trees and the environment are not in it. That is a convenience gate's trade: pre-push has
