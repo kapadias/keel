@@ -205,7 +205,8 @@ link_hook() { # <git hook name> <script under .claude/hooks>
     return 0
   fi
   if [ -e "$dest" ] || [ -L "$dest" ]; then
-    grep -qs "$2" "$dest" || warn_msgs+=("$1: you already have a $1 hook — chain .claude/hooks/$2 from it, or my gates do not run")
+    # It runs hers only when it names her script's path, not a file that merely shares its name.
+    grep -qsF ".claude/hooks/$2" "$dest" || warn_msgs+=("$1: you already have a $1 hook — chain .claude/hooks/$2 from it, or my gates do not run")
     return 0
   fi
   if [ "$hooks_dir" = ".git/hooks" ]; then

@@ -877,6 +877,13 @@ TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 n=0; for f in CLAUDE.md AGENTS.md GEMINI.md .cursor/rules/nonna.mdc .github/copilot-instructions.md .windsurf/rules/nonna.md .clinerules/nonna.md .kiro/steering/nonna.md; do [ -f "$TMP/$f" ] && n=$((n + 1)); done
 check "install: --host all writes all eight host files" 8 "$n"
 rm -rf "$TMP"
+# A hook of the user's that merely names a file called pre-commit.sh does not run hers: install says
+# to chain hers, as session start does.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+printf '#!/bin/sh\n# lint staged files: scripts/pre-commit.sh\nexit 0\n' > "$TMP/.git/hooks/pre-commit"; chmod +x "$TMP/.git/hooks/pre-commit"
+out="$(cd "$TMP" && NONNA_SRC="$ROOT" bash "$IN" 2>&1)"
+contains "install: a hook that merely names her script's file is told to chain hers" "chain .claude/hooks/pre-commit.sh from it" "$out"
+rm -rf "$TMP"
 # --mode lite: the gates and the house rules, nothing else; the mode is recorded for every hook.
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 out="$(cd "$TMP" && NONNA_SRC="$ROOT" bash "$IN" --mode lite 2>&1)"; check "install: --mode lite succeeds" 0 "$?"
