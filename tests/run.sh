@@ -908,6 +908,24 @@ out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/sess
 git -C "$TMP" config --get nonna.testCmd >/dev/null; check "plugin: no suite found, no test command recorded" 1 "$?"
 contains "plugin: says the test gate is off and how to turn it on" "git config nonna.testCmd" "$out"
 rm -rf "$TMP"
+# The first session in a repo tells the USER what Nonna did (systemMessage), not only the agent:
+# the mode, what the test gate runs, the git hooks she added. Once per repo per major version.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+printf '{"scripts":{"test":"node t.js"}}\n' > "$TMP/package.json"
+out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
+um="$(printf '%s' "$out" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("systemMessage",""))' 2>/dev/null)"
+contains "notice: names the mode" "Nonna is on here (lite)." "$um"
+contains "notice: says what the test gate runs" "Before the agent can say done, Nonna runs: npm test --silent." "$um"
+contains "notice: says which git hooks she added" "Added .git/hooks/pre-push and pre-commit." "$um"
+contains "notice: says where to see or change it" "/nonna" "$um"
+check "notice: is remembered per repo" 2 "$(git -C "$TMP" config --get nonna.announced)"
+out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
+printf '%s' "$out" | grep -q '"systemMessage"'; check "notice: is not repeated" 1 "$?"
+rm -rf "$TMP"
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
+um="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("systemMessage",""))' 2>/dev/null)"
+contains "notice: says when there is no test gate, and how to set one" "git config nonna.testCmd" "$um"
+rm -rf "$TMP"
 # A copy-in install detects at run time; its session start records neither.
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 mkdir -p "$TMP/.claude/hooks/lib"; cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"; cp "$HOOKS/lib/tests.sh" "$TMP/.claude/hooks/lib/"

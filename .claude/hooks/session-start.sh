@@ -114,7 +114,10 @@ stack="$(printf '%s' "$stack" | sed 's/^ //')"
 [ -n "$stack" ] || stack="undetected"
 
 # 4. Emit additionalContext (JSON on stdout; exit 0).
-msg="Nonna harness active. Gates live: branch-guard (no commits/pushes to main/master/develop, no force pushes), secret-scan on writes and Bash secret reads, Definition-of-Done pre-push (docs/STATUS.md). Detected stack: ${stack}.${hook_warn}"
+mode="$(nonna_mode)"
+status_gate=""
+[ "$mode" = full ] && [ -f docs/STATUS.md ] && status_gate=", the Definition-of-Done record (docs/STATUS.md, at turn end and pre-push)"
+msg="Nonna is on (${mode}). Gates live: branch guard (no commits or pushes to main/master/develop, no force push, no skipping the git hooks), secret guard (writes, reads of secret files, commits, pushes)${status_gate}. Detected stack: ${stack}.${hook_warn}"
 # Announce where the harness actually lives. Commands invoke gate scripts under
 # skills/*/scripts/; that path differs between a standalone checkout and a plugin
 # install, and the model cannot infer it. Resolving it here — in the one process
@@ -133,5 +136,26 @@ core="$(nonna_core_carrier)"
 
 ${core}"
 
-nonna_emit_context SessionStart "$msg"
+# 6. The first session in a repo (per major version) tells the user, not only the agent, what Nonna
+#    did here: a plugin that edits .git/hooks and .git/config without saying so would be right to be
+#    distrusted. Claude Code shows a systemMessage to the user.
+user_msg=""
+if [ "$(git config --get nonna.announced 2>/dev/null)" != 2 ] && git rev-parse --git-dir >/dev/null 2>&1; then
+  user_msg="Nonna is on here (${mode})."
+  if [ -n "$gate" ]; then
+    user_msg="$user_msg Before the agent can say done, Nonna runs: ${gate}."
+  else
+    user_msg="$user_msg She found no test command here, so the test gate is off; set one with: git config nonna.testCmd '<command>'."
+  fi
+  if [ "${#wired[@]}" -gt 0 ]; then
+    added="${wired[0]}"
+    [ "${#wired[@]}" -lt 2 ] || added="${wired[0]} and ${wired[1]}"
+    user_msg="$user_msg Added .git/hooks/${added}."
+  fi
+  [ "${#hook_warns[@]}" -eq 0 ] || user_msg="$user_msg Note: $(printf '%s; ' "${hook_warns[@]}")"
+  user_msg="$user_msg See or change it with /nonna."
+  git config nonna.announced 2 2>/dev/null || true
+fi
+
+nonna_emit_context SessionStart "$msg" "$user_msg"
 exit 0

@@ -72,33 +72,47 @@ nonna_core_carrier() {
     "$core"
 }
 
-# nonna_emit_context <event> <text>
-#   Prints the hookSpecificOutput envelope Claude Code reads for context
-#   injection. jq does the escaping when present; the fallback escapes the JSON
-#   string by hand so a multi-line carrier is still valid JSON without it.
+# nonna_emit_context <event> <text> [user message]
+#   Prints the hookSpecificOutput envelope Claude Code reads for context injection, plus a
+#   systemMessage, which Claude Code shows to the user, when a user message is given. jq does the
+#   escaping when present; the fallback escapes the JSON strings by hand so a multi-line carrier
+#   is still valid JSON without it.
 nonna_emit_context() {
-  local event="$1" text="$2" esc
+  local event="$1" text="$2" user="${3:-}" esc uesc
   if command -v jq >/dev/null 2>&1; then
-    jq -cn --arg e "$event" --arg c "$text" \
-      '{hookSpecificOutput: {hookEventName: $e, additionalContext: $c}}'
+    jq -cn --arg e "$event" --arg c "$text" --arg u "$user" \
+      '{hookSpecificOutput: {hookEventName: $e, additionalContext: $c}} + (if $u == "" then {} else {systemMessage: $u} end)'
     return 0
   fi
-  # Character by character with plain string literals: gsub replacement strings treat
-  # backslashes differently in mawk and gawk, and a JSON escaper cannot afford that.
-  # Tab/CR become escapes; every other C0 control byte is dropped (JSON forbids them raw,
-  # and none carries meaning here); newlines are joined last. If the pipeline cannot run (no awk) it yields nothing
-  # from non-empty input — emit nothing and say so, never an empty, silent carrier.
-  esc="$(printf '%s' "$text" \
+  esc="$(_nonna_json_escape "$text")"
+  # No awk: the escaper yields nothing from non-empty input. Emit nothing and say so, never an
+  # empty, silent carrier.
+  if [ -n "$text" ] && [ -z "$esc" ]; then
+    printf 'nonna: cannot emit %s context without jq or awk\n' "$event" >&2
+    return 0
+  fi
+  uesc=""
+  [ -z "$user" ] || uesc="$(_nonna_json_escape "$user")"
+  if [ -n "$uesc" ]; then
+    printf '{"systemMessage":"%s","hookSpecificOutput":{"hookEventName":"%s","additionalContext":"%s"}}\n' "$uesc" "$event" "$esc"
+  else
+    printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":"%s"}}\n' "$event" "$esc"
+  fi
+}
+
+# _nonna_json_escape <text>
+#   The text as the inside of a JSON string, without jq. Character by character with plain string
+#   literals: gsub replacement strings treat backslashes differently in mawk and gawk, and a JSON
+#   escaper cannot afford that. Tab/CR become escapes; every other C0 control byte is dropped (JSON
+#   forbids them raw, and none carries meaning here); newlines are joined last. Without awk it
+#   prints nothing, and the caller says so.
+_nonna_json_escape() {
+  printf '%s' "$1" \
     | tr -d '\000-\010\013\014\016-\037' \
     | awk '{ out = ""
              for (i = 1; i <= length($0); i++) { c = substr($0, i, 1)
                if (c == "\\") c = "\\\\"; else if (c == "\"") c = "\\\""
                else if (c == "\t") c = "\\t"; else if (c == "\r") c = "\\r"
                out = out c }
-             if (NR > 1) printf "\\n"; printf "%s", out }' 2>/dev/null)"
-  if [ -n "$text" ] && [ -z "$esc" ]; then
-    printf 'nonna: cannot emit %s context without jq or awk\n' "$event" >&2
-    return 0
-  fi
-  printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":"%s"}}\n' "$event" "$esc"
+             if (NR > 1) printf "\\n"; printf "%s", out }' 2>/dev/null
 }
