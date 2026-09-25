@@ -75,6 +75,17 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
   keeps her settings, and nothing else. Shared helpers: `nonna_mode_source`, `nonna_green_key`,
   `nonna_hook_chains_hers`. A lite copy-in brings `/nonna`. `install.sh` no longer takes a hook that
   merely names her script's file as one that runs it. 968 tests.
+  First review round: both approve, and every finding is fixed.
+  - A read of her files beside an unrelated shell, such as linting her scripts and then running
+    the suite, is no longer refused. A copy, a pipe, a variable or a `cd` that carries her script
+    into a shell still is, and so are `eval` and a copy run by its path.
+  - While she is off, a command too large to read is refused only when it could touch her
+    settings.
+  - Detection finds pytest without importing anything from the repository, where a `pytest.py`
+    would have run.
+  - The lint holds a fenced `!` block to the same pre-approval as an inline one.
+
+  986 tests.
 - **2026-09-25** — Plugin defaults, the second unit of the launch plan (#17, ADR-0011). One switch
   per repo, git config `nonna.mode` (`off | lite | full`), read by every Claude Code hook and git
   hook. The plugin defaults to lite: the test gate, "where's the test?", the branch and secret guards

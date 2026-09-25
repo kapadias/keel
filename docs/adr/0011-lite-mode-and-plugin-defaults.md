@@ -87,6 +87,8 @@ lighter mode to select". A plugin user's first day is that use.
    `.git/config` and the git hooks. It is a speed bump, not a sandbox.
    These get past it:
    - a script file, or git under another name;
+   - another language's interpreter (`python3 -c`, `perl -e`), and code the test suite runs (a test
+     or a `conftest.py` the agent wrote), which the gates themselves run;
    - a value the shell computes when it runs (a variable, `$(…)`'s output, `xargs`);
    - a glob that a file the agent made completes;
    - git configuration already in place (the user's own `push.default`);
@@ -141,12 +143,16 @@ lighter mode to select". A plugin user's first day is that use.
       and runs a shell, however the two are joined:
       - the naming: her skill's directory, `nonna.sh`, a glob that could be `skills/nonna/scripts`,
         or any script run while the Bash tool is inside her directory;
-      - the shell: as the command (`sh`, `bash`, `source`, `.`, `exec`, a `*.sh`), or through one
-        that runs another (`env`, `sudo`, `xargs`, `find -exec`…).
+      - the shell: as the command (`sh`, `bash`, `source`, `.`, `exec`, `eval`, a `*.sh`, or any
+        program given by its path, as a copy would be), or through one that runs another (`env`,
+        `sudo`, `xargs`, `find -exec`…).
 
-      Reading, searching, linting and staging them run no shell. Like any script file (4), a copy
-      run from elsewhere in a later command, another language's interpreter, or a path computed at
-      run time gets past it.
+      Reading, searching, linting and staging them run no shell. A part of the command that only
+      reads her files (`cat`, `grep`, `shellcheck`, `git add` or `diff`…, redirecting nothing) does
+      not name them, unless a pipe or a command or process substitution could carry what it read
+      into a shell; so reading or linting her scripts and then running the suite passes. Like any
+      script file (4), a copy run from elsewhere in a later command, another language's interpreter,
+      or a path computed at run time gets past it.
 
     - **While she is off, the guard keeps her settings and nothing else.** It still refuses the
       agent:
@@ -157,9 +163,11 @@ lighter mode to select". A plugin user's first day is that use.
 
       Otherwise an agent could ready the ground while she is off, a test command of `true` or a
       hooks path around her, and the user who switches her back on would get a gate that no longer
-      bites, without a word. It reads each command as it does when she is on, so what it cannot read
-      is refused then too. Force pushes, protected branches and `--no-verify` are not hers to stop
-      while she is off, and nothing else is said. The user chose this over a silent off.
+      bites, without a word. It reads each command as it does when she is on. What it cannot read
+      (too long, an expansion too large, quotes nested too deep) is refused only when it could touch
+      her settings: git or nonna in it, however quoted, a `$'…'` escape, or a run inside her
+      directory. Force pushes, protected branches and `--no-verify` are not hers to stop while she
+      is off, and nothing else is said. The user chose this over a silent off.
 
 ## Consequences
 
