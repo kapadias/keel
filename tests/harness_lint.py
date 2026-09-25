@@ -368,8 +368,9 @@ for path in sorted(glob.glob(f"{ROOT}/.claude/skills/*/SKILL.md")):
 # rules do not pre-approve is not run as written (auto mode hands it to the
 # model, where the branch guard refuses her own scripts), and a rule wider than
 # the line pre-approves more than the line. So each ! line needs a rule that is
-# exactly it: Bash(<line>), or Bash(<line without its $ARGUMENTS>:*).
-BANG = re.compile(r"(?:^|\s)!`([^`]+)`", re.M)
+# exactly it: Bash(<line>), or Bash(<line without its $ARGUMENTS>:*). Claude Code
+# runs two forms, an inline !`…` and a fenced ```! block; both are held to it.
+BANG = re.compile(r"(?:^|\s)!`([^`]+)`|```!\s*\n?([\s\S]*?)\n?```", re.M)
 for path in sorted(glob.glob(f"{ROOT}/.claude/skills/*/SKILL.md")):
     raw = open(path, encoding="utf-8").read()
     m = FRONT.match(raw)
@@ -381,8 +382,8 @@ for path in sorted(glob.glob(f"{ROOT}/.claude/skills/*/SKILL.md")):
         if at
         else set()
     )
-    for line in BANG.findall(raw[m.end() :]):
-        line = line.strip()
+    for inline, fenced in BANG.findall(raw[m.end() :]):
+        line = (inline or fenced).strip()
         prefix = re.sub(r"\s+\$ARGUMENTS$", "", line)
         if line not in rules and f"{prefix}:*" not in rules:
             bad(
