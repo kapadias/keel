@@ -5,20 +5,22 @@ pre-push hook (`require-status-sync.sh`) blocks code pushes that leave it stale.
 
 ## Current state
 
-Nonna's discipline is enforced by code at seven lifecycle events plus the git pre-push hook. The
-harness tests its own gates and its own linter. The six workflows with side effects (`/ship`,
-`/release`, `/rollback`, `/adr`, `/sync`, `/intake`) are human-triggered only. A plugin install
-carries the constitution (`00-core.md`) into the session and into every subagent. Language- and
-domain-agnostic.
+Nonna's discipline is enforced by code at seven lifecycle events plus the git pre-commit and
+pre-push hooks. The harness tests its own gates and its own linter. The six workflows with side
+effects (`/ship`, `/release`, `/rollback`, `/adr`, `/sync`, `/intake`) are human-triggered only.
+One switch per repo sets the mode (`off | lite | full`, ADR-0011). A plugin install defaults to
+lite: the test gate, the branch and secret guards, and six house rules carried into the session and
+every subagent; full carries the constitution (`00-core.md`) and adds the STATUS gate. Language-
+and domain-agnostic.
 
-Always-on surface: **3,690 words** of prose (3,700-word budget) plus 5,570 chars of skill/agent
+Always-on surface: **3,681 words** of prose (3,700-word budget) plus 5,570 chars of skill/agent
 descriptions (5,600-char budget), both enforced by the linter.
 
 ## What exists
 
 - **Rules ×9** — `00-core` (the constitution, the decision ladder; also the plugin carrier),
   `dev-process`, `testing`, `engineering`, `git-workflow`, `sync`, `boundaries`, `safety`,
-  `token-economy`. The dense, always-on policy surface — **3,690 words, budgeted at 3,700 by
+  `token-economy`. The dense, always-on policy surface — **3,681 words with `CLAUDE.md`, budgeted at 3,700 by
   `harness_lint.py`**.
 - **Agents ×8** — `orchestrator`, `planner`, `implementer`, `test-engineer`, `code-reviewer`,
   `security-reviewer`, `explorer`, `debugger`. Reviewers emit a structured JSON verdict.
@@ -30,28 +32,49 @@ descriptions (5,600-char budget), both enforced by the linter.
   `/ship`, `/release`, `/rollback`, `/sync`, `/adr`, `/intake`. Model-tiered; several use `!`/`@` injection.
   The six with side effects set `disable-model-invocation: true` — human-triggered only, and out of
   context entirely.
-- **Hooks ×9** — `guard-branch` (blocks protected-branch commits/pushes + `--all`/`--mirror`/`+refspec`
-  force pushes), `secret-scan` (blocks secret writes + Bash reads of secret files), `format`,
-  `require-status-sync` (pre-push DoD + strict secret scan, auto-installed at SessionStart — warns on
-  a foreign hook), `session-start` (also carries `00-core.md` into plugin installs), `stop-dod`
-  (Stop — no turn ends with STATUS stale), `subagent-verdict` (SubagentStop — ADR-0005 enforced where
-  the verdict is produced), `post-compact` (PostCompact — restates loop state), `subagent-start`
-  (SubagentStart — carries `00-core.md` into every subagent under a plugin install). Seven events
-  wired; shared `lib/` + plugin `hooks.json`, asserted equivalent to `settings.json` by the linter.
-- **Settings** — denies reading secrets and force-push; wires all hooks.
+- **Hooks ×10** — each reads the mode first; `off` is silent. `guard-branch` (blocks protected-branch
+  commits/pushes, `--all`/`--mirror`, force pushes, `--no-verify`, hook-path overrides, and the
+  agent's writes to Nonna's own git config), `secret-scan` (blocks secret writes + reads of secret
+  files, Read or Bash), `format`, `require-status-sync` (pre-push: the test suite, a strict secret
+  scan, and in full mode the DoD), `pre-commit` (no commit on a protected branch, no staged secret),
+  `session-start` (wires both git hooks, through the plugin's data directory under a plugin install;
+  records the plugin's test command and mode; carries the mode's rules; tells the user once),
+  `stop-dod` (Stop — since the session began: the suite, "where's the test?", and in full mode a
+  stale STATUS), `subagent-verdict` (SubagentStop — ADR-0005 enforced where the verdict is
+  produced), `post-compact` (PostCompact — restates loop state), `subagent-start` (SubagentStart —
+  carries the mode's rules into every subagent under a plugin install). Seven events wired; shared
+  `lib/` (including `lite.md`, the lite house rules) + plugin `hooks.json`, asserted equivalent to
+  `settings.json` by the linter.
+- **Settings** — denies reading secrets and force-push (the hooks refuse both too, since a plugin
+  cannot carry this file); wires all hooks.
 - **Tests** — `tests/run.sh` (gate golden tests; the count is derived and drift-linted, never
   hardcoded) + `tests/harness_lint.py` (self-validation).
 - **Stacks** — `stacks/{python,typescript,go,rust}` wiring the test gate.
 - **Plugin** — `.claude/.claude-plugin/plugin.json` (2.0.0, `displayName`, `userConfig`:
   `run_tests`, `mode`) + `.claude-plugin/marketplace.json`. Both validate with `--strict`.
 - **Docs** — this `STATUS.md`, `INSTALL.md`, `OVERVIEW.md`, `docs/benchmarks/`, `CHANGELOG.md`, the
-  `docs/adr/` index, and ADRs 0001–0008.
+  `docs/adr/` index, and ADRs 0001–0011.
 - **CI** — `.github/workflows/ci.yml`: shellcheck (all scripts) + harness-lint + gate self-tests +
   plugin manifest (`claude plugin validate --strict`, pinned CLI).
 
 ## Recently changed
 
 History lives in `CHANGELOG.md` and `git log`. Entries here describe the current unit of work.
+
+- **2026-09-25** — Plugin defaults, the second unit of the launch plan (#17, ADR-0011). One switch
+  per repo, git config `nonna.mode` (`off | lite | full`), read by every Claude Code hook and git
+  hook. The plugin defaults to lite: the test gate, "where's the test?", the branch and secret guards
+  and six house rules (`hooks/lib/lite.md`). Full adds the STATUS gate, now only where
+  `docs/STATUS.md` exists. The plugin's test gate is on out of the box: the `run_tests` option is the
+  consent, and the first session records the detected command in `nonna.testCmd`. What Nonna records
+  about the mode goes in `nonna.defaultMode`, below the user's `nonna.mode`, so a global off reaches
+  every repo. Git hooks link through the plugin's data directory, so an update no longer leaves them
+  dangling, and `pre-commit` is wired too. Force pushes, `--no-verify`, hook-path overrides and reads
+  of secret files are refused by hooks, which a plugin carries. Stop checks everything since the
+  session began, shows the failing lines with secrets hidden, and asks for a test once when code
+  changed and none did. The first session tells the user what Nonna did in their repo. Full mode
+  drops the ladder when another plugin already states it. `install.sh --mode lite|full`.
+  `INSTALL.md` leads with the plugin. 538 tests.
 
 - **2026-09-25** — 2.0 packaging, the first unit of the launch plan (#17). Both manifests say 2.0.0;
   the plugin shows as "Nonna" and declares two install options, `run_tests` and `mode`. The hooks
@@ -129,6 +152,9 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
   failing input as `optional:`. The verdict-gate fix from `develop` is merged in.
 
 ## Next / open
+
+- The rest of the launch plan (#17): `/nonna` (status, setup, `lite|full|off`, uninstall), then
+  benchmark round 3 with lite, full and the real FastAPI suite, then the launch README and assets.
 
 - A behavioural eval on the failures the gates exist for (a secret in a fixture, a push to a
   protected branch, an error hidden by a "fix"), scored on "did it get caught".
