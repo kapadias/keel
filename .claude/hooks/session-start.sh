@@ -28,7 +28,7 @@ nonna_root="$(nonna_harness_root)"
 . "$here/lib/json.sh"
 sid="$(nonna_json_field '.session_id' <<<"$(cat 2>/dev/null || true)" | tr -cd 'A-Za-z0-9._-')"
 if [ -n "$sid" ] && base_dir="$(git rev-parse --git-path nonna 2>/dev/null)" && mkdir -p "$base_dir" 2>/dev/null; then
-  find "$base_dir" -name 'base-*' -mtime +7 -delete 2>/dev/null || true
+  find "$base_dir" \( -name 'base-*' -o -name 'notest-*' \) -mtime +7 -delete 2>/dev/null || true
   if [ ! -e "$base_dir/base-$sid" ] && head_sha="$(git rev-parse --verify --quiet HEAD)"; then
     printf '%s\n' "$head_sha" > "$base_dir/base-$sid" 2>/dev/null || true
   fi
