@@ -484,6 +484,40 @@ check "blocks an Edit of a git hook" 2 "$(printf '{"tool_name":"Edit","tool_inpu
 check "allows a Write elsewhere" 0 "$(printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"src/git/config.py"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB" 2>/dev/null; echo $?)"
 out="$(printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git commit --no-verify -m x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB" 2>&1)"
 contains "bypass refusal is in her voice" "no sneaking past the kitchen door" "$out"
+# /nonna's scripts are the user's switch: the skill runs them when a person types /nonna. The agent
+# may not run them, by any path, glob or shell, just as it may not run git config nonna.*: they
+# change her settings. Reading, linting and staging them is fine, and so is any script of the user's.
+NSD=".claude/skills/nonna/scripts"; NPD="$CLAUDE_CONFIG_DIR/plugins/cache/nonna/nonna/2.0.0/skills/nonna/scripts"
+check "blocks the agent running her /nonna script" 2 "$(gb "bash $NSD/nonna.sh off")"
+check "blocks it through the plugin's own path" 2 "$(gb "bash $NPD/nonna.sh test true")"
+check "blocks sourcing it with ." 2 "$(gb ". $NSD/uninstall.sh")"
+check "blocks sourcing it with source" 2 "$(gb "source $NSD/setup.sh")"
+check "blocks running it as a program" 2 "$(gb "$NPD/nonna.sh off")"
+check "blocks it under another shell" 2 "$(gb "zsh $NSD/uninstall.sh")"
+check "blocks it by name after a cd into her directory" 2 "$(gb "cd $NPD && bash nonna.sh off")"
+check "blocks piping it into a shell" 2 "$(gb "cat $NSD/uninstall.sh | sh")"
+check "blocks handing it to a shell through xargs" 2 "$(gb "ls $NSD/*.sh | xargs -n1 bash")"
+check "blocks it inside bash -c" 2 "$(gb "bash -c 'bash $NSD/nonna.sh off'")"
+check "blocks her directory spelled as a glob" 2 "$(gb "bash .claude/skills/n*/scripts/n*.sh off")"
+check "blocks her directory with every part a glob" 2 "$(gb "bash .claude/*/*/*/unin*.sh")"
+check "blocks her directory spelled as a brace list" 2 "$(gb "bash .claude/skills/{nonna,x}/scripts/setup.sh")"
+check "allows reading her scripts" 0 "$(gb "cat $NSD/nonna.sh")"
+check "allows linting them" 0 "$(gb "shellcheck -x $NSD/*.sh")"
+check "allows staging them" 0 "$(gb "git add $NSD/nonna.sh")"
+check "allows a user's own setup script" 0 "$(gb "bash scripts/setup.sh")"
+check "allows a user's own uninstall script, run as a program" 0 "$(gb "./uninstall.sh --dry-run")"
+check "allows a glob over the user's own scripts" 0 "$(gb 'for f in scripts/*.sh; do bash "$f"; done')"
+check "blocks it through env" 2 "$(gb "env A=1 bash $NSD/nonna.sh off")"
+check "blocks it through find -exec" 2 "$(gb "find .claude/skills/nonna -name '*.sh' -exec bash {} \\;")"
+check "blocks it through timeout" 2 "$(gb "timeout 5 sh $NSD/setup.sh")"
+check "blocks her path given as a pattern to find -exec" 2 "$(gb "find ~/.claude -path '*skills/nonna*' -name uninstall.sh -exec sh {} +")"
+check "allows searching her scripts for a word like bash" 0 "$(gb "grep -rn bash $NSD")"
+check "allows linting them for bash" 0 "$(gb "shellcheck -s bash $NSD/nonna.sh")"
+check "allows a commit message that names them" 0 "$(gb 'git commit -m "fix: the agent may not run bash .claude/skills/nonna/scripts/nonna.sh"')"
+printf '{"tool_name":"Bash","cwd":"%s","tool_input":{"command":"bash ./setup.sh"}}' "$ROOT/$NSD" | CLAUDE_PROJECT_DIR="$TMP" "$GB" 2>/dev/null
+check "blocks a script run from inside her directory" 2 "$?"
+out="$(printf '%s' '{"tool_name":"Bash","tool_input":{"command":"bash .claude/skills/nonna/scripts/nonna.sh off"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB" 2>&1)"
+contains "says her settings are the user's, changed with /nonna" "they change them with /nonna" "$out"
 rm -rf "$TMP"
 
 echo "== require-status-sync.sh (pre-push Definition of Done) =="
@@ -1234,6 +1268,23 @@ if [ -e "$OFF/.git/hooks/pre-push" ]; then rc=1; else rc=0; fi; check "off: sess
 check "off: subagent-start carries nothing" 0 "$(off_rc subagent-start.sh '{}')"
 check "off: subagent-verdict judges nothing" 0 "$(off_rc subagent-verdict.sh '{"agent_type":"code-reviewer","last_assistant_message":"prose, no verdict"}')"
 check "off: post-compact says nothing" 0 "$(off_rc post-compact.sh '{}')"
+# One thing she guards while off: her settings. The user switched her off, so only the user switches
+# her on again or changes what she will run then (ADR-0011): nonna.* and the config that routes git
+# around her, her git hooks, what her gates read from the environment, and her /nonna scripts.
+off_gb() { # <command>: the guard's exit code for it in $OFF, with NONNA_MODE=off
+  printf '{"tool_name":"Bash","tool_input":{"command":%s}}' "$(printf '%s' "$1" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')" \
+    | (cd "$OFF" && NONNA_MODE=off CLAUDE_PROJECT_DIR="$OFF" "$HOOKS/guard-branch.sh" 2>/dev/null); echo $?
+}
+check "off: the guard still refuses the agent setting her test command" 2 "$(off_gb 'git config nonna.testCmd true')"
+check "off: ...or switching her mode" 2 "$(off_gb 'git config nonna.mode full')"
+check "off: ...or routing git around her hooks" 2 "$(off_gb 'git config core.hooksPath /dev/null')"
+check "off: ...or rewriting her git hooks by hand" 2 "$(off_gb 'rm .git/hooks/pre-push')"
+check "off: ...or setting what her gates read" 2 "$(off_gb 'export NONNA_TEST_CMD=true')"
+check "off: ...or running her /nonna scripts" 2 "$(off_gb 'bash .claude/skills/nonna/scripts/nonna.sh uninstall')"
+check "off: ...or editing her git hooks with the file tools" 2 "$(printf '{"tool_name":"Edit","tool_input":{"file_path":"%s/.git/hooks/pre-commit"}}' "$OFF" | (cd "$OFF" && NONNA_MODE=off CLAUDE_PROJECT_DIR="$OFF" "$HOOKS/guard-branch.sh" 2>/dev/null); echo $?)"
+check "off: a force push is not hers to stop" 0 "$(off_gb 'git push --force origin main')"
+check "off: nor is --no-verify" 0 "$(off_gb 'git commit --no-verify -m x')"
+check "off: an edit on main is not warned about" 0 "$(off_rc guard-branch.sh '{"tool_name":"Edit","tool_input":{"file_path":"app.py"}}')"
 rm -rf "$OFF"
 
 echo "== session-start.sh (SessionStart) =="

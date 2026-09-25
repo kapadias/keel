@@ -4,7 +4,8 @@
 #       Editing is fine; committing is what's forbidden. Editing .git/config or .git/hooks -> BLOCK.
 #   • Bash `git commit`/`git merge` on a protected branch, or any `git push`
 #     that is on/targets a protected branch (or pushes --all/--mirror) -> BLOCK. So is a force
-#     push, skipping the git hooks, and changing what Nonna's gates read.
+#     push, skipping the git hooks, changing what Nonna's gates read, and running her /nonna
+#     scripts. While she is off, only her settings (the last two, and her git hooks) are kept.
 # The command is read the way the shell will run it: continued lines joined, a quoted commit message
 # masked, quotes and backslashes removed, and ( ), $( ) and backticks opened into commands of their
 # own. The git matcher tolerates a path prefix (/usr/bin/git) and global options (`-C <dir>`,
@@ -21,7 +22,11 @@ root="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 cd "$root" 2>/dev/null || exit 0
 # shellcheck source=/dev/null
 . "$here/lib/core.sh"
-[ "$(nonna_mode)" = off ] && exit 0 # off means off: nothing enforced, nothing said
+# Off means off, but for her settings: the user switched her off, so the agent may still not change
+# what she reads, run her /nonna scripts or touch her git hooks. The user switches her on again, and
+# decides what she runs then (ADR-0011). Nothing else is checked while she is off, and nothing said.
+off=0
+[ "$(nonna_mode)" = off ] && off=1
 # The full ref, prefix stripped: --short gives heads/main once a tag named main exists, and the
 # branch is named before its first commit too.
 ref="$(git symbolic-ref --quiet HEAD 2>/dev/null || true)"
@@ -78,6 +83,7 @@ case "$tool" in
       */.git/config | */.git/hooks/* | */.git/nonna/* | */.git/nonna-green)
         recipe "refusing to edit ${file}: her settings and git hooks live there." ;;
     esac
+    [ "$off" = 0 ] || exit 0
     if is_protected "$branch"; then
       marker="$root/.git/.nonna-branch-warned-$branch"
       if [ ! -f "$marker" ]; then
@@ -228,6 +234,24 @@ case "$tool" in
       | grep -qiE '(^|[^A-Za-z0-9_.-])\.git/(hooks(/[^[:space:]]*)?|config)[[:space:]]*$|(^|[[:space:]])(-[A-Za-z]*t[[:space:]]*|--ta[a-z-]*[=[:space:]]+)[^[:space:]]*\.git/(hooks|config)'; then
       recipe "refusing to change .git/config or .git/hooks by hand."
     fi
+
+    # Her /nonna scripts are the user's switch, run by the skill when a person types /nonna: they
+    # change her settings, as git config nonna.* does. A command that names them (her skill's
+    # directory, nonna.sh, or any script when it runs inside her directory) and runs a shell is
+    # refused, however the two are joined. A shell runs as a command (sh, bash, source, ., exec, or
+    # a *.sh as the command) or through one that runs another (env, sudo, xargs, find -exec, …);
+    # a shell's name as a word to grep for runs nothing, and reading, linting or staging is fine.
+    cwd="$(printf '%s' "$payload" | nonna_json_field '.cwd')"
+    HERS='(^|[^A-Za-z0-9_.-])(skills/nonna|nonna/scripts|nonna\.sh)([^A-Za-z0-9_-]|$)'
+    SH='([^[:space:]]*/)?(sh|bash|zsh|dash|ksh|mksh|yash|fish|busybox)'
+    WRAP='([^[:space:]]*/)?(env|sudo|doas|xargs|nohup|exec|command|builtin|nice|timeout|time|stdbuf|setsid|ionice|chrt|taskset|flock|unbuffer|parallel|watch)|-(exec|execdir|ok|okdir)'
+    SHELLS="${AT}(${SH}|source|\\.|exec|[^[:space:]]*\\.sh)([[:space:]]|$)|(^|[[:space:]])(${WRAP})[[:space:]](.*[[:space:]])?${SH}([[:space:]]|$)"
+    case "/$cwd/" in */skills/nonna/*) in_hers=1 ;; *) in_hers=0 ;; esac
+    if { [ "$in_hers" = 1 ] || printf '%s\n' "$segs" | grep -qiE "$HERS"; } \
+      && printf '%s\n' "$segs" | grep -qiE "$SHELLS"; then
+      recipe "refusing to run her /nonna scripts: they change her settings."
+    fi
+    [ "$off" = 0 ] || exit 0 # while she is off, her settings are all the guard keeps
 
     # The git hooks are the gate for a commit and a push, so skipping them is refused: --no-verify
     # (and its abbreviations), commit's -n, alone or in a cluster of flags that take no value, and
