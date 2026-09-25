@@ -107,9 +107,13 @@ Fix it and run the full suite, or tell the user plainly that it is not done and 
     if [ -n "$src_changed" ] && [ -z "$test_changed" ]; then
       # Asked once per set of changed code in a session: an answer that it needs no test holds
       # until more code changes, so a later turn (a question, a plan) is not asked again.
+      # Keyed on the changed code itself, not on file names: more code in a file already asked about
+      # asks again.
       memo="$(git rev-parse --git-path nonna 2>/dev/null)/notest-${sid:-none}"
-      sig="$(printf '%s\n' "$dirty" | while IFS= read -r f; do nonna_is_source_file "$f" && printf '%s\n' "$f"; done \
-        | git hash-object --stdin 2>/dev/null)"
+      srcs=()
+      while IFS= read -r f; do nonna_is_source_file "$f" && srcs+=("$f"); done <<<"$dirty"
+      sig="$( { git diff --no-color --no-ext-diff --no-textconv "${base:-HEAD}" -- ${srcs[@]+"${srcs[@]}"} 2>/dev/null \
+        || printf '%s\n' ${srcs[@]+"${srcs[@]}"}; } | git hash-object --stdin 2>/dev/null)"
       if [ -z "$sig" ] || [ "$(cat "$memo" 2>/dev/null)" != "$sig" ]; then
         { mkdir -p "$(dirname "$memo")" && printf '%s\n' "$sig" > "$memo"; } 2>/dev/null || true
         reason="${reason}✗ Nonna: where's the test? (stop: code changed, no test changed)
