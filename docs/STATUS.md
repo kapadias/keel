@@ -119,6 +119,10 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
   Seventh review round (code found the mark had broken the start-of-command anchor): a command that
   begins with a redirection is a command's start again, so `>/dev/null GIT_CONFIG_GLOBAL=…` is
   refused. 803 tests.
+  Eighth review round (both approved; security's MEDIUM): the guard refuses what it cannot read.
+  Without jq, a JSON string is decoded in full; an escaped quote had cut
+  `git commit -m "x" && git push --force` short. A failing jq or awk no longer waves a git command
+  through. 811 tests.
 
 - **2026-09-25** — 2.0 packaging, the first unit of the launch plan (#17). Both manifests say 2.0.0;
   the plugin shows as "Nonna" and declares two install options, `run_tests` and `mode`. The hooks
