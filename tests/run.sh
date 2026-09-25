@@ -1376,12 +1376,43 @@ rm -rf "$FX"
 FX="$(lint_fixture)"
 set_hook_cmd "$FX/.claude/settings.json" PreToolUse '"$CLAUDE_PROJECT_DIR"/.claude/hooks/guard-branch.sh; exit 0'
 out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a tail on a settings.json gate" 1 "$?"
-contains "lint: names the tailed settings.json command" "guard-branch.sh; exit 0" "$out"
+contains "lint: names the tailed settings.json command" "PreToolUse hook '\"\$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-branch.sh; exit 0'" "$out"
 rm -rf "$FX"
 FX="$(lint_fixture)"
 set_hook_cmd "$FX/.claude/hooks/hooks.json" Stop '"${CLAUDE_PLUGIN_ROOT}"/hooks/stop-dod.sh "${CLAUDE_PLUGIN_DATA}"'
 out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: only SessionStart may take the plugin data dir" 1 "$?"
 contains "lint: names the event given the data dir" "Stop hook" "$out"
+rm -rf "$FX"
+# Keys other than the command decide whether a hook can block at all: async cannot, a timeout lets
+# the action through, and a non-command type hands the decision to a model. Each is refused.
+set_hook_key() { # <json file> <event> <key> <json value>: set a key on that event's first hook
+  python3 - "$@" <<'PY'
+import json, sys
+path, event, key, value = sys.argv[1:5]
+cfg = json.load(open(path, encoding="utf-8"))
+cfg["hooks"][event][0]["hooks"][0][key] = json.loads(value)
+json.dump(cfg, open(path, "w", encoding="utf-8"), indent=2)
+PY
+}
+FX="$(lint_fixture)"
+set_hook_key "$FX/.claude/hooks/hooks.json" PreToolUse async true
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks an async gate (it cannot block)" 1 "$?"
+contains "lint: names the async key" "has keys ['async']" "$out"
+rm -rf "$FX"
+FX="$(lint_fixture)"
+set_hook_key "$FX/.claude/hooks/hooks.json" PreToolUse timeout 0.001
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a gate timeout short enough to let everything through" 1 "$?"
+contains "lint: names the short timeout" "timeout 0.001 is under 10s" "$out"
+rm -rf "$FX"
+FX="$(lint_fixture)"
+set_hook_key "$FX/.claude/hooks/hooks.json" PreToolUse type '"prompt"'
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a gate handed to a model" 1 "$?"
+contains "lint: says a gate is a command" 'must be type "command"' "$out"
+rm -rf "$FX"
+FX="$(lint_fixture)"
+set_hook_key "$FX/.claude/hooks/hooks.json" Stop timeout 30
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a gate timed differently in the two install modes" 1 "$?"
+contains "lint: names the event whose timeout differs" "hook wiring: 'Stop' differs" "$out"
 rm -rf "$FX"
 # Arguments after the script (SessionStart gets the plugin data dir) are not part of the gate's identity.
 FX="$(lint_fixture)"

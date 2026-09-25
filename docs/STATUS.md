@@ -64,7 +64,9 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
   block. Issue templates and a code of conduct are added.
   Review round: the linter now holds every hook command to one exact form (quoted root, script,
   nothing after it), because a `|| true` tail in one install mode would turn a gate's block into a
-  pass and still lint clean. The only argument allowed is SessionStart's plugin data dir. 389 tests.
+  pass and still lint clean. The only argument allowed is SessionStart's plugin data dir. The
+  other keys are pinned the same way: a gate is type "command", never async, with no timeout under
+  10 s, and timed the same in both install modes. 397 tests.
 
 - **2026-09-24** — README answers an outside review. A bridge sentence says the 8 of 8 task is
   the worst case (a third of runs on average); the break-even is a four-row table so readers can pick

@@ -220,10 +220,17 @@ HOOK_FORMS = {
 
 def hook_script(rel: str, event: str, cmd: str):
     """The script a hook command runs (relative to .claude/), or None if the command is not in its one form."""
-    m = HOOK_FORMS[rel][0].match(cmd)
+    m = HOOK_FORMS[rel][0].fullmatch(cmd)
     if not m or (m.groupdict().get("data") and event != "SessionStart"):
         return None
     return m.group(1)
+
+
+# The other keys decide whether a hook can block at all, so they are pinned too: an async hook
+# cannot block, a timeout counts as a non-blocking error (a tiny one fails the gate open), and any
+# type but "command" hands the decision to a model. statusMessage only sets the spinner text.
+HOOK_KEYS = {"type", "command", "timeout", "statusMessage"}
+MIN_HOOK_TIMEOUT = 10  # seconds
 
 
 def check_hook_forms(rel: str, cfg: dict) -> None:
@@ -240,6 +247,14 @@ def check_hook_forms(rel: str, cfg: dict) -> None:
                 elif not os.path.isfile(os.path.join(ROOT, ".claude", script)):
                     shown = script if rel.endswith("hooks.json") else f".claude/{script}"
                     bad(f"{os.path.basename(rel)}: wired hook missing on disk: {shown}")
+                if hook.get("type") != "command":
+                    bad(f"{rel}: {event} hook '{cmd}' must be type \"command\" (a gate is a script, not a model's judgment)")
+                extra = sorted(set(hook) - HOOK_KEYS)
+                if extra:
+                    bad(f"{rel}: {event} hook '{cmd}' has keys {extra} (allowed: {sorted(HOOK_KEYS)}; an async hook cannot block)")
+                t = hook.get("timeout")
+                if "timeout" in hook and (isinstance(t, bool) or not isinstance(t, (int, float)) or t < MIN_HOOK_TIMEOUT):
+                    bad(f"{rel}: {event} hook '{cmd}' timeout {t!r} is under {MIN_HOOK_TIMEOUT}s (a timeout lets the action through)")
 
 
 with open(f"{ROOT}/.claude/settings.json", encoding="utf-8") as fh:
@@ -551,7 +566,10 @@ def hook_shape(rel: str, cfg: dict) -> dict:
             scripts = []
             for hook in entry.get("hooks", []):
                 cmd = hook.get("command", "")
-                scripts.append(hook_script(rel, event, cmd) or cmd)
+                # The whole hook, with the command reduced to its script: a timeout or type set in
+                # one mode only changes what the gate does in that mode, so it must differ here too.
+                rest = {k: v for k, v in hook.items() if k not in ("command", "statusMessage")}
+                scripts.append(json.dumps({**rest, "script": hook_script(rel, event, cmd) or cmd}, sort_keys=True))
             by_matcher.setdefault(entry.get("matcher", "*"), []).extend(scripts)
         shape[event] = by_matcher
     return shape
