@@ -29,6 +29,7 @@ import glob
 import json
 import os
 import re
+import subprocess
 import sys
 
 ROOT = os.environ.get("NONNA_LINT_ROOT") or os.path.dirname(
@@ -624,6 +625,42 @@ if os.path.isfile(plugin_hooks):
             )
     # The nonna plugin's root is .claude/ (marketplace source "./.claude").
     check_hook_forms(".claude/hooks/hooks.json", ph)
+
+# --- the core gates are wired, in both install modes ---
+# Equivalence alone passes a gate deleted from both files. These are the gates the README promises.
+REQUIRED_GATES = {
+    ("PreToolUse", "Bash"): ("hooks/guard-branch.sh", "hooks/secret-scan.sh"),
+    ("PreToolUse", "Edit|Write|MultiEdit"): ("hooks/guard-branch.sh", "hooks/secret-scan.sh"),
+    ("PreToolUse", "Read"): ("hooks/secret-scan.sh",),
+    ("Stop", "*"): ("hooks/stop-dod.sh",),
+    ("SessionStart", "*"): ("hooks/session-start.sh",),
+}
+for rel, wiring in ((".claude/settings.json", settings), (".claude/hooks/hooks.json", ph if os.path.isfile(plugin_hooks) else {})):
+    for (event, matcher), scripts in REQUIRED_GATES.items():
+        wired = set()
+        for entry in (wiring.get("hooks") or {}).get(event, []):
+            if entry.get("matcher", "*") == matcher:
+                wired |= {hook_script(rel, event, h.get("command", "")) for h in entry.get("hooks", [])}
+        for script in scripts:
+            if script not in wired:
+                bad(f"{rel}: {event} '{matcher}' must run {script} (a core gate)")
+
+# --- every Read settings.json denies, the Read hook refuses too ---
+# A plugin install cannot carry permissions.deny: the hook is all it has. Each deny glob becomes a
+# sample path, and secret-scan.sh must refuse to Read it.
+for rule in (settings.get("permissions") or {}).get("deny", []):
+    m = re.fullmatch(r"Read\((.+)\)", rule)
+    if not m:
+        continue
+    sample = m.group(1).replace("**", "x").replace("*", "a")
+    payload = json.dumps({"tool_name": "Read", "tool_input": {"file_path": sample}})
+    rc = subprocess.run(
+        ["bash", os.path.join(ROOT, ".claude/hooks/secret-scan.sh")],
+        input=payload, capture_output=True, text=True,
+        env={**os.environ, "NONNA_MODE": "full", "CLAUDE_PROJECT_DIR": ROOT},
+    ).returncode
+    if rc != 2:
+        bad(f".claude/hooks/secret-scan.sh lets the agent Read {sample}, which settings.json denies ({rule}); a plugin install has only the hook")
 
 if offenders:
     print("Harness lint FAILED:")

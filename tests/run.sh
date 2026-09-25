@@ -62,6 +62,15 @@ printf '%s' '{"tool_name":"Bash","tool_input":{"command":"grep -r foo ."}}' | "$
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"cat secrets/db.txt"}}' | "$SS"; check "blocks Bash read of a bare secrets/ path" 2 "$?"
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"cat david_rsanchez.txt"}}' | "$SS"; check "does not false-block 'id_rsa' as a substring" 0 "$?"
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"tail -f logs/app.env.log"}}' | "$SS"; check "does not false-block '.env' as an interior substring" 0 "$?"
+# Read: a plugin cannot carry settings.json's permissions.deny, so the hook must refuse secret reads.
+printf '%s' '{"tool_name":"Read","tool_input":{"file_path":"/repo/.env"}}' | "$SS"; check "blocks Read of .env" 2 "$?"
+printf '%s' '{"tool_name":"Read","tool_input":{"file_path":".env.local"}}' | "$SS"; check "blocks Read of .env.local" 2 "$?"
+printf '%s' '{"tool_name":"Read","tool_input":{"file_path":"/home/a/.ssh/id_ed25519"}}' | "$SS"; check "blocks Read under .ssh/" 2 "$?"
+printf '%s' '{"tool_name":"Read","tool_input":{"file_path":"certs/server.key"}}' | "$SS"; check "blocks Read of a .key" 2 "$?"
+out="$(printf '%s' '{"tool_name":"Read","tool_input":{"file_path":"config/secrets/db.yml"}}' | "$SS" 2>&1)"; check "blocks Read under secrets/" 2 "$?"
+contains "Read block is in her voice" "that drawer is private" "$out"
+printf '%s' '{"tool_name":"Read","tool_input":{"file_path":".env.example"}}' | "$SS"; check "allows Read of .env.example" 0 "$?"
+printf '%s' '{"tool_name":"Read","tool_input":{"file_path":"src/environment.py"}}' | "$SS"; check "allows Read of an ordinary file" 0 "$?"
 
 echo "== guard-branch.sh (PreToolUse branch gate) =="
 GB="$HOOKS/guard-branch.sh"
@@ -79,6 +88,33 @@ printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin +main"
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin +feature/x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "blocks +refspec force push to any ref" 2 "$?"
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin \"+main\""}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "blocks quoted +refspec force push" 2 "$?"
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git commit -m \"support +x mode\" && git push -u origin feature/x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "a + in an earlier compound command does not false-block the push" 0 "$?"
+# Flag-form force pushes: settings.json denies them for copy-in installs, a plugin cannot, so the hook does.
+gb() { printf '{"tool_name":"Bash","tool_input":{"command":%s}}' "$(printf '%s' "$1" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')" | CLAUDE_PROJECT_DIR="$TMP" "$GB" 2>/dev/null; echo $?; }
+check "blocks git push --force" 2 "$(gb 'git push --force origin feature/x')"
+check "blocks git push -f" 2 "$(gb 'git push -f origin feature/x')"
+check "blocks a -uf short-flag cluster" 2 "$(gb 'git push -uf origin feature/x')"
+check "blocks --force-with-lease" 2 "$(gb 'git push --force-with-lease origin feature/x')"
+check "blocks --force-with-lease=ref:sha" 2 "$(gb 'git push --force-with-lease=feature/x:abc123 origin feature/x')"
+check "allows --follow-tags" 0 "$(gb 'git push --follow-tags origin feature/x')"
+check "allows push -n (a dry run)" 0 "$(gb 'git push -n origin feature/x')"
+# Hook bypasses: the git hooks are the gate for a push and a commit, so skipping them is refused.
+check "blocks commit --no-verify" 2 "$(gb 'git commit --no-verify -m x')"
+check "blocks commit -n" 2 "$(gb 'git commit -n -m x')"
+check "blocks a commit -nm cluster" 2 "$(gb 'git commit -nm x')"
+check "blocks push --no-verify" 2 "$(gb 'git push --no-verify origin feature/x')"
+check "blocks a core.hooksPath override" 2 "$(gb 'git -c core.hooksPath=/dev/null commit -m x')"
+check "blocks setting core.hooksPath" 2 "$(gb 'git config core.hooksPath /tmp/none')"
+check "a commit message that mentions --no-verify is not a bypass" 0 "$(gb 'git commit -m "do not use --no-verify or -n"')"
+# Nonna's own switches are the user's: the agent may read them, not change them.
+check "blocks the agent turning Nonna off" 2 "$(gb 'git config nonna.mode off')"
+check "blocks the agent rewriting the test command" 2 "$(gb 'git config --global nonna.testCmd true')"
+check "blocks the agent removing her config" 2 "$(gb 'git config --remove-section nonna')"
+check "allows reading her config" 0 "$(gb 'git config --get nonna.mode')"
+check "a read then a write in one command is still a write" 2 "$(gb 'git config --get nonna.mode && git config nonna.mode off')"
+out="$(printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push --force origin feature/x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB" 2>&1)"
+contains "force-push refusal is in her voice" "we don't force things in this house" "$out"
+out="$(printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git commit --no-verify -m x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB" 2>&1)"
+contains "bypass refusal is in her voice" "no sneaking past the kitchen door" "$out"
 rm -rf "$TMP"
 
 echo "== require-status-sync.sh (pre-push Definition of Done) =="
@@ -1550,6 +1586,20 @@ rm "$FX/.claude/hooks/format.sh"
 out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a wired hook script that is missing" 1 "$?"
 contains "lint: settings.json names the missing script" "settings.json: wired hook missing on disk: .claude/hooks/format.sh" "$out"
 contains "lint: hooks.json names the missing script" "hooks.json: wired hook missing on disk: hooks/format.sh" "$out"
+rm -rf "$FX"
+# The core gates are pinned: removing one from BOTH wiring files lints clean by equivalence alone.
+FX="$(lint_fixture)"
+for f in "$FX/.claude/settings.json" "$FX/.claude/hooks/hooks.json"; do
+  python3 -c 'import json,sys; p=sys.argv[1]; c=json.load(open(p)); e=[x for x in c["hooks"]["PreToolUse"] if x["matcher"]=="Bash"][0]; e["hooks"]=[h for h in e["hooks"] if "secret-scan" not in h["command"]]; json.dump(c,open(p,"w"),indent=2)' "$f"
+done
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a core gate removed from both wiring files" 1 "$?"
+contains "lint: names the missing core gate" "PreToolUse 'Bash' must run hooks/secret-scan.sh" "$out"
+rm -rf "$FX"
+# Every Read that settings.json denies, the Read hook refuses too: a plugin install has only the hook.
+FX="$(lint_fixture)"
+sed -i 's# | \*/kubeconfig##' "$FX/.claude/hooks/secret-scan.sh"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a Read deny the hook does not refuse" 1 "$?"
+contains "lint: names the deny the hook lets through" "kubeconfig" "$out"
 rm -rf "$FX"
 # lite.md rides every lite session and subagent: it has a word budget, and it must keep a line for
 # each never-list item it inherits (tests, branches, secrets, gates).

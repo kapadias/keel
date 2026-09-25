@@ -43,6 +43,32 @@ case "$tool" in
   Bash)
     cmd="$(printf '%s' "$payload" | nonna_json_field '.tool_input.command')"
     [ -n "$cmd" ] || exit 0
+    # The command with its quoted strings removed, so a commit message that mentions a flag is not
+    # read as the flag. The +refspec check below keeps the quoted form on purpose.
+    bare="$(printf '%s' "$cmd" | sed -E "s/'[^']*'//g; s/\"[^\"]*\"//g")"
+
+    # Nonna's own switches (git config nonna.*) belong to the user, who changes them with /nonna. The
+    # agent may read them; a write, in any segment of a compound command, is refused.
+    # shellcheck disable=SC2020  # tr maps each of ; & | to a newline: one segment per line
+    while IFS= read -r seg; do
+      printf '%s' "$seg" | grep -qE "$GIT"'config([[:space:]]|$)' || continue
+      printf '%s' "$seg" | grep -qiE '(^|[[:space:]])nonna(\.|[[:space:]]|$)' || continue
+      printf '%s' "$seg" | grep -qE -- '(^|[[:space:]])(--get|--get-all|--get-regexp|--list|-l)([[:space:]]|$)' && continue
+      echo "✗ Nonna: only the cook changes the recipe. (branch guard: refusing to change Nonna's own git config.)" >&2
+      echo "  Her settings are the user's: they change them with /nonna." >&2
+      exit 2
+    done < <(printf '%s\n' "$bare" | tr ';&|' '\n\n\n')
+
+    # The git hooks are the gate for a commit and a push, so skipping them is refused: --no-verify,
+    # commit's -n, and pointing core.hooksPath elsewhere. A speed bump, not a wall: git commit-tree
+    # and update-ref still get around it, and the pre-push hook is the backstop (ADR-0004).
+    if printf '%s' "$bare" | grep -qE "$GIT"'(commit|push|merge|am|rebase|cherry-pick|revert)[^;&|]*[[:space:]]--no-verify([[:space:]]|$)' \
+      || printf '%s' "$bare" | grep -qE "$GIT"'commit[^;&|]*[[:space:]]-[A-Za-z]*n[A-Za-z]*([[:space:]]|$)' \
+      || printf '%s' "$bare" | grep -qiE '(^|[;&|[:space:]])([^[:space:]]*/)?git([[:space:]][^;&|]*)?[[:space:]]core\.hookspath'; then
+      echo "✗ Nonna: no sneaking past the kitchen door. (branch guard: refusing --no-verify and hook overrides; the git hooks are the gate.)" >&2
+      echo "  Fix what the hook refuses, or tell the user plainly why you cannot." >&2
+      exit 2
+    fi
 
     # Commit/merge while sitting on a protected branch.
     if is_protected "$branch" && printf '%s' "$cmd" | grep -qE "$GIT"'(commit|merge)([[:space:]]|$)'; then
@@ -58,6 +84,14 @@ case "$tool" in
       if printf '%s' "$cmd" | grep -qE -e '[[:space:]]--(all|mirror)([[:space:]]|=|$)'; then
         echo "✗ Nonna: one pot at a time. (branch guard: refusing 'git push --all/--mirror' — it pushes (or deletes) protected refs.)" >&2
         echo "  Push one branch explicitly: git push origin <feature-branch> (rules/git-workflow.md)." >&2
+        exit 2
+      fi
+      # Flag-form force pushes. settings.json denies them for a copy-in install, but a plugin cannot
+      # carry permissions, so the hook must. Scoped to the push segment; a short-flag cluster (-uf)
+      # counts, --follow-tags does not.
+      if printf '%s' "$bare" | grep -qE "$GIT"'push[^;&|]*[[:space:]](--force(-with-lease)?(=[^[:space:]]*)?|-[A-Za-z]*f[A-Za-z]*)([[:space:]]|$)'; then
+        echo "✗ Nonna: we don't force things in this house. (branch guard: refusing a force push.)" >&2
+        echo "  Push a new commit instead (rules/git-workflow.md)." >&2
         exit 2
       fi
       # A refspec with a leading '+' is a force push in refspec syntax — parity with the

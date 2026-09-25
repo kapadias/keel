@@ -18,6 +18,29 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 payload="$(cat 2>/dev/null || true)"
 [ -n "$payload" ] || exit 0
 
+# Read branch: the same secret files settings.json's permissions.deny refuses to Read. A plugin
+# cannot carry permissions, so without this a plugin user's agent could read .env into its context.
+# Templates (.env.example, .sample, .template) are for reading. The lint proves every Read deny in
+# settings.json is refused here too.
+if printf '%s' "$payload" | grep -qE '"tool_name"[[:space:]]*:[[:space:]]*"Read"'; then
+  # shellcheck source=/dev/null
+  . "$here/lib/json.sh"
+  p="$(printf '%s' "$payload" | nonna_json_field '.tool_input.file_path')"
+  [ -n "$p" ] || exit 0
+  case "$p" in *.env.example | *.env.sample | *.env.template) exit 0 ;; esac
+  case "/${p#./}" in
+    */.env | */.env.* | */secrets/* | *.pem | *.key | *.p12 | *.p8 | *.pfx | *.jks \
+      | */id_rsa* | */.ssh/* | */.aws/* | */.npmrc | */kubeconfig | */credentials)
+      {
+        echo "✗ Nonna: that drawer is private. (secret-scan: blocked reading $p.)"
+        echo "  Secret files stay out of the context; reference an env var instead (rules/safety.md)."
+      } >&2
+      exit 2
+      ;;
+  esac
+  exit 0
+fi
+
 # Bash branch: parity with settings.json's Read-tool deny list — `cat .env` must not be the
 # workaround. Block obvious read/copy verbs aimed at a secret-file path; anything ambiguous is
 # allowed (defense-in-depth). Runs with OR without jq — the command text survives JSON escaping,
