@@ -1283,7 +1283,7 @@ rm -rf "$TMP" "$PD" "$V2"
 # A dangling link of ours (the old absolute link into a removed cache version) is repaired; a
 # dangling link that is not ours is left alone and reported.
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; PD="$(mktemp -d)"
-ln -s /gone/.claude/plugins/cache/nonna/nonna/1.0.0/hooks/require-status-sync.sh "$TMP/.git/hooks/pre-push"
+ln -s "$CLAUDE_CONFIG_DIR/plugins/cache/nonna/nonna/1.0.0/hooks/require-status-sync.sh" "$TMP/.git/hooks/pre-push"
 ln -s /gone/husky/pre-commit "$TMP/.git/hooks/pre-commit"
 out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh" "$PD/data")"
 if [ -e "$TMP/.git/hooks/pre-push" ]; then rc=0; else rc=1; fi; check "plugin: a dangling pre-push of ours is repaired" 0 "$rc"
@@ -1292,7 +1292,7 @@ contains "plugin: ...and reported" ".git/hooks/pre-commit is not Nonna's" "$out"
 rm -rf "$TMP" "$PD"
 # The plugin used to be Keel: its links point into a cache that is gone. They are ours, repaired.
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; PD="$(mktemp -d)"
-ln -s /gone/.claude/plugins/cache/keel/keel/1.0.0/hooks/require-status-sync.sh "$TMP/.git/hooks/pre-push"
+ln -s "$CLAUDE_CONFIG_DIR/plugins/cache/keel/keel/1.0.0/hooks/require-status-sync.sh" "$TMP/.git/hooks/pre-push"
 CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh" "$PD/data" >/dev/null
 check "plugin: a dangling Keel-era link is repaired" "$PD/data/current/hooks/require-status-sync.sh" "$(readlink "$TMP/.git/hooks/pre-push")"
 rm -rf "$TMP" "$PD"
@@ -1309,6 +1309,15 @@ ln -s ../../scripts/pre-commit.sh "$TMP/.git/hooks/pre-commit"
 out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
 contains "plugin: the user's own scripts/pre-commit.sh hook is reported as not hers" ".git/hooks/pre-commit is not Nonna's" "$out"
 check "plugin: ...and left as it was" ../../scripts/pre-commit.sh "$(readlink "$TMP/.git/hooks/pre-commit")"
+printf '#!/bin/sh\n# scripts/pre-commit.sh: lint staged files\nexit 0\n' > "$TMP/scripts/pre-commit.sh"
+out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
+contains "plugin: a user's hook that names itself is still not hers" ".git/hooks/pre-commit is not Nonna's" "$out"
+rm -rf "$TMP"
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; mkdir -p "$TMP/x/plugins/cache/nonna/evil"
+printf '#!/bin/sh\nexit 0\n' > "$TMP/x/plugins/cache/nonna/evil/pre-commit.sh"; chmod +x "$TMP/x/plugins/cache/nonna/evil/pre-commit.sh"
+ln -s "$TMP/x/plugins/cache/nonna/evil/pre-commit.sh" "$TMP/.git/hooks/pre-commit"
+out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
+contains "plugin: a link shaped like her cache but elsewhere is not hers" ".git/hooks/pre-commit is not Nonna's" "$out"
 rm -rf "$TMP"
 # A foreign hook is hers only if it runs her script; mentioning her name is not enough.
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q

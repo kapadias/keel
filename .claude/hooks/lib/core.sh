@@ -41,13 +41,15 @@ nonna_config() {
 
 # nonna_hook_is_hers <link target> <script> [<her link now>]
 #   True when a git hook's link leads to her own <script>: the link she would make now, one into her
-#   plugin's cache or data (a version since removed; Keel was her name), or a copy-in's
-#   .claude/hooks/<script>. A user's own script that shares the name is not hers.
+#   plugin's cache or data under the plugins directory Claude Code uses (a version since removed;
+#   Keel was her name), or a copy-in's ../../.claude/hooks/<script>. A user's own script that
+#   shares the name, or a path merely shaped like hers, is not hers.
 nonna_hook_is_hers() {
+  local plugins="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins"
   [ -n "${3:-}" ] && [ "$1" = "$3" ] && return 0
   case "$1" in
-    */plugins/cache/nonna/*/"$2" | */plugins/cache/keel/*/"$2" | */plugins/data/nonna*/"$2" \
-      | */plugins/data/keel*/"$2" | */.claude/hooks/"$2") return 0 ;;
+    "$plugins"/cache/nonna/*/"$2" | "$plugins"/cache/keel/*/"$2" | "$plugins"/data/nonna*/"$2" \
+      | "$plugins"/data/keel*/"$2" | ../../.claude/hooks/"$2") return 0 ;;
   esac
   return 1
 }

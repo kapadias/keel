@@ -55,7 +55,7 @@ wired=()
 hook_warns=()
 wire_hook() { # <git hook name> <script name>
   local dest="$hooks_dir/$1" target="$hooks_src/$2"
-  if [ -L "$dest" ] && [ ! -e "$dest" ] && nonna_hook_is_hers "$(readlink "$dest")" "$2"; then
+  if [ -L "$dest" ] && [ ! -e "$dest" ] && nonna_hook_is_hers "$(readlink "$dest")" "$2" "$target"; then
     rm -f "$dest" # dangling and hers: repaired below
   fi
   if [ ! -e "$dest" ] && [ ! -L "$dest" ]; then
@@ -68,8 +68,8 @@ wire_hook() { # <git hook name> <script name>
     if nonna_hook_is_hers "$(readlink "$dest" 2>/dev/null)" "$2" "$target"; then
       # Hers, but git skips a link that points at nothing without a word.
       [ -e "$dest" ] || hook_warns+=("$dest points at nothing, so her $1 gate is NOT enforced")
-    else # the user's own, even when it shares her script's name, unless it runs hers
-      grep -qsF "$2" "$dest" \
+    else # the user's own, even when it shares her script's name, unless it chains hers
+      grep -qsF -e "$target" -e ".claude/hooks/$2" -e "current/hooks/$2" "$dest" \
         || hook_warns+=("$dest is not Nonna's, so her $1 gate is NOT enforced; chain $target from it")
     fi
   fi
