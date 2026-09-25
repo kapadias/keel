@@ -23,6 +23,12 @@ FAKE_AWS="AKIA""1234567890ABCDEF"
 GIT=(git -c user.email=nonna@test -c user.name=nonna-test -c init.defaultBranch=main -c commit.gpgsign=false)
 # The hooks read the user's Claude Code settings (which plugins are enabled); never the developer's own.
 CLAUDE_CONFIG_DIR="$(mktemp -d)"; export CLAUDE_CONFIG_DIR
+# Nor the developer's git config or environment: a global nonna.mode off, or NONNA_MODE in the shell
+# that runs the suite, must not change what a gate does here.
+GIT_CONFIG_GLOBAL="$CLAUDE_CONFIG_DIR/gitconfig"; : > "$GIT_CONFIG_GLOBAL"; export GIT_CONFIG_GLOBAL
+GIT_CONFIG_NOSYSTEM=1; export GIT_CONFIG_NOSYSTEM
+unset NONNA_MODE NONNA_TEST_CMD NONNA_TEST_TIMEOUT NONNA_LADDER CLAUDE_PLUGIN_OPTION_MODE \
+  CLAUDE_PLUGIN_OPTION_RUN_TESTS CLAUDE_PLUGIN_ROOT CLAUDE_PLUGIN_DATA CLAUDE_PROJECT_DIR
 
 check() { # <desc> <expected_exit> <actual_exit>
   if [ "$2" = "$3" ]; then
@@ -37,6 +43,9 @@ contains() { # <desc> <needle> <haystack>
     *) FAIL=$((FAIL + 1)); printf '  FAIL %s (missing: %s)\n' "$1" "$2" ;;
   esac
 }
+
+echo "== the suite runs on its own config =="
+git config --global --get-regexp '^nonna\.' >/dev/null 2>&1; check "suite: no global nonna.* setting reaches the gates" 1 "$?"
 
 echo "== secret-patterns lib =="
 out="$( . "$HOOKS/lib/secret-patterns.sh"; printf 'aws = "%s"' "$FAKE_AWS" | nonna_scan_secrets )"; rc=$?
@@ -1198,7 +1207,7 @@ contains "stop: a red suite committed this session still blocks" "the tests say 
 out="$(printf '{"session_id":"s-other"}' | NONNA_TEST_CMD=false CLAUDE_PROJECT_DIR="$WT" "$SD")"
 printf '%s' "$out" | grep -q '"decision"'; check "stop: another session's base does not apply" 1 "$?"
 if [ -s "$WT/.git/nonna/base-s-1" ]; then rc=0; else rc=1; fi; check "session base: SessionStart records where the session began" 0 "$rc"
-touch -d '10 days ago' "$WT/.git/nonna/base-s-1"
+python3 -c 'import os, sys, time; t = time.time() - 10 * 86400; os.utime(sys.argv[1], (t, t))' "$WT/.git/nonna/base-s-1"
 printf '{"session_id":"s-2"}' | CLAUDE_PROJECT_DIR="$WT" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh" >/dev/null
 if [ -e "$WT/.git/nonna/base-s-1" ]; then rc=1; else rc=0; fi; check "session base: a week-old base is pruned" 0 "$rc"
 rm -rf "$WT"
@@ -1703,6 +1712,17 @@ FX="$(lint_fixture)"
 sed -i 's/, and never force-push//' "$FX/.claude/hooks/lib/lite.md"
 out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a lite.md that drops a never-list item" 1 "$?"
 contains "lint: names the dropped never-list item" "force-push" "$out"
+rm -rf "$FX"
+FX="$(lint_fixture)"
+sed -i 's/Never commit or push to main, master or develop, and never force-push/Never force-push/' "$FX/.claude/hooks/lib/lite.md"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: blocks a lite.md that drops the protected-branch line" 1 "$?"
+contains "lint: names the protected-branch item" "'Commit or push to'" "$out"
+rm -rf "$FX"
+# A reworded never-list must not quietly switch lite's check off: the lint says what it lost.
+FX="$(lint_fixture)"
+sed -i 's/^- Put a secret in code/- Place a secret in code/' "$FX/.claude/rules/00-core.md"
+out="$(NONNA_LINT_ROOT="$FX" python3 "$LINT" 2>&1)"; check "lint: a reworded never-list item fails the lite check" 1 "$?"
+contains "lint: names the never-list item it no longer finds" "no longer says 'Put a secret'" "$out"
 rm -rf "$FX"
 # The companion plugin's name is allowed in exactly one harness file: the helper that detects it.
 FX="$(lint_fixture)"

@@ -462,6 +462,7 @@ for rel in (".claude/rules/00-core.md", ".claude/skills/lean/SKILL.md"):
 # saying what its own gates enforce.
 MAX_LITE_WORDS = 150
 LITE_COVERS = (  # (never-list wording in 00-core.md, phrase lite.md must keep)
+    ("Commit or push to", "Never commit or push to main"),
     ("force-push", "never force-push"),
     ("Put a secret", "Never put a secret"),
     ("with failing tests", "whole test suite passes"),
@@ -482,7 +483,12 @@ else:
         core_text = fh.read()
     never = " ".join(core_text.split("## Never", 1)[-1].split("\n## ", 1)[0].split())
     for item, phrase in LITE_COVERS:
-        if item in never and phrase not in lite:
+        if item not in never:
+            # A reworded never-list would otherwise switch this check off without a word.
+            bad(
+                f".claude/rules/00-core.md: the never-list no longer says '{item}' — update LITE_COVERS in tests/harness_lint.py"
+            )
+        elif phrase not in lite:
             bad(
                 f".claude/hooks/lib/lite.md: no line for the never-list item '{item}' (keep '{phrase}')"
             )
