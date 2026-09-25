@@ -101,6 +101,20 @@ nonna_is_source_file() {
   return 1
 }
 
+# nonna_green_key <command>  the key a passing run is remembered by (git rev-parse --git-path
+#                  nonna-green): the tree, tracked and untracked files read through a scratch index,
+#                  and the command. Nothing when the tree cannot be read. It writes git objects, so a
+#                  reader computes it only when there is a key to compare with.
+nonna_green_key() {
+  local idx tree
+  idx="$(mktemp 2>/dev/null)" || return 0
+  if cp "$(git rev-parse --git-path index)" "$idx" 2>/dev/null \
+    && tree="$(GIT_INDEX_FILE="$idx" git add -A . >/dev/null 2>&1 && GIT_INDEX_FILE="$idx" git write-tree 2>/dev/null)"; then
+    printf '%s\n%s' "$tree" "$1" | git hash-object --stdin 2>/dev/null
+  fi
+  rm -f "$idx"
+}
+
 # nonna_shown_cmd <command>  the command as a message may show it: never one that carries a secret.
 nonna_shown_cmd() {
   # shellcheck source=/dev/null
