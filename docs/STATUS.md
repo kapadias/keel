@@ -143,6 +143,10 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
   read the full ref. Her plugin paths are anchored to the plugins directory Claude Code uses, so a
   link merely shaped like hers is not hers. And a user's hook chains hers only when it names her
   script's path, not a file that merely shares its name. 864 tests.
+  Twelfth review round: both approve, and their two LOWs are fixed. A path that climbs back out of
+  her cache with `..` is not hers, and her plugins directory is read as written and as resolved, so
+  a `HOME` ending in `/` or a symlinked config directory still gets her dangling link repaired.
+  867 tests.
 
 - **2026-09-25** — 2.0 packaging, the first unit of the launch plan (#17). Both manifests say 2.0.0;
   the plugin shows as "Nonna" and declares two install options, `run_tests` and `mode`. The hooks
