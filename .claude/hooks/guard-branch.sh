@@ -22,7 +22,7 @@ cd "$root" 2>/dev/null || exit 0
 # shellcheck source=/dev/null
 . "$here/lib/core.sh"
 [ "$(nonna_mode)" = off ] && exit 0 # off means off: nothing enforced, nothing said
-branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '')"
+branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)" # a branch before its first commit too
 
 is_protected() { case "$1" in main | master | develop) return 0 ;; *) return 1 ;; esac; }
 

@@ -147,6 +147,9 @@ TMP="$(mktemp -d)"
 "${GIT[@]}" -C "$TMP" commit -q --allow-empty -m init
 "${GIT[@]}" -C "$TMP" branch -M main
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "blocks commit on main" 2 "$?"
+UNBORN="$(mktemp -d)"; "${GIT[@]}" -C "$UNBORN" init -q; "${GIT[@]}" -C "$UNBORN" symbolic-ref HEAD refs/heads/main
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}' | CLAUDE_PROJECT_DIR="$UNBORN" "$GB" 2>/dev/null; check "blocks the first commit on a main that has no commits yet" 2 "$?"
+rm -rf "$UNBORN"
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin main"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "blocks push to main" 2 "$?"
 printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"a.txt"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "allows (warns) edit on main" 0 "$?"
 "${GIT[@]}" -C "$TMP" checkout -q -b feature/x
