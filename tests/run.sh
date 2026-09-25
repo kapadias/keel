@@ -150,6 +150,10 @@ printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}' | 
 UNBORN="$(mktemp -d)"; "${GIT[@]}" -C "$UNBORN" init -q; "${GIT[@]}" -C "$UNBORN" symbolic-ref HEAD refs/heads/main
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}' | CLAUDE_PROJECT_DIR="$UNBORN" "$GB" 2>/dev/null; check "blocks the first commit on a main that has no commits yet" 2 "$?"
 rm -rf "$UNBORN"
+"${GIT[@]}" -C "$TMP" tag main
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git commit -m x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB" 2>/dev/null; check "blocks commit on main when a tag named main exists" 2 "$?"
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin HEAD"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB" 2>/dev/null; check "blocks pushing HEAD from main when a tag named main exists" 2 "$?"
+"${GIT[@]}" -C "$TMP" tag -d main >/dev/null
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push origin main"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "blocks push to main" 2 "$?"
 printf '%s' '{"tool_name":"Write","tool_input":{"file_path":"a.txt"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB"; check "allows (warns) edit on main" 0 "$?"
 "${GIT[@]}" -C "$TMP" checkout -q -b feature/x
@@ -747,6 +751,9 @@ echo a > "$TMP/src/a.py"; "${GIT[@]}" -C "$TMP" add -A
 echo b >> "$TMP/src/a.py"; "${GIT[@]}" -C "$TMP" add -A
 out="$("${GIT[@]}" -C "$TMP" commit -q -m on-main 2>&1)"; check "pre-commit: blocks a commit on main" 1 "$?"
 contains "pre-commit: says why, in Nonna's voice" "not in my kitchen" "$out"
+"${GIT[@]}" -C "$TMP" tag main
+"${GIT[@]}" -C "$TMP" commit -q -m on-main 2>/dev/null; check "pre-commit: blocks a commit on main when a tag named main exists" 1 "$?"
+"${GIT[@]}" -C "$TMP" tag -d main >/dev/null
 "${GIT[@]}" -C "$TMP" checkout -q -b develop
 "${GIT[@]}" -C "$TMP" commit -q -m on-develop 2>/dev/null; check "pre-commit: blocks a commit on develop" 1 "$?"
 "${GIT[@]}" -C "$TMP" checkout -q -b fix/1-thing

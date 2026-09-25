@@ -22,7 +22,10 @@ cd "$root" 2>/dev/null || exit 0
 # shellcheck source=/dev/null
 . "$here/lib/core.sh"
 [ "$(nonna_mode)" = off ] && exit 0 # off means off: nothing enforced, nothing said
-branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)" # a branch before its first commit too
+# The full ref, prefix stripped: --short gives heads/main once a tag named main exists, and the
+# branch is named before its first commit too.
+ref="$(git symbolic-ref --quiet HEAD 2>/dev/null || true)"
+branch="${ref#refs/heads/}"
 
 is_protected() { case "$1" in main | master | develop) return 0 ;; *) return 1 ;; esac; }
 
