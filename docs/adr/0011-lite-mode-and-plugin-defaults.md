@@ -152,7 +152,9 @@ lighter mode to select". A plugin user's first day is that use.
       not name them, unless a pipe or a command or process substitution could carry what it read
       into a shell; so reading or linting her scripts and then running the suite passes. Like any
       script file (4), a copy run from elsewhere in a later command, another language's interpreter,
-      or a path computed at run time gets past it.
+      or a path computed at run time gets past it, and so does a reader made to start a program
+      through an option of its own: the reader list trusts readers to read (a `debt:` marker in
+      the guard names when to revisit it).
 
     - **While she is off, the guard keeps her settings and nothing else.** It still refuses the
       agent:
@@ -166,8 +168,10 @@ lighter mode to select". A plugin user's first day is that use.
       bites, without a word. It reads each command as it does when she is on. What it cannot read
       (too long, an expansion too large, quotes nested too deep) is refused only when it could touch
       her settings: git or nonna in it, however quoted, a `$'…'` escape, or a run inside her
-      directory. Force pushes, protected branches and `--no-verify` are not hers to stop while she
-      is off, and nothing else is said. The user chose this over a silent off.
+      directory. So while she is off, an unreadable command that spells those names some other way
+      gets past; a readable one is still read in full. Force pushes, protected branches and
+      `--no-verify` are not hers to stop while she is off, and nothing else is said. The user chose
+      this over a silent off.
 
 ## Consequences
 

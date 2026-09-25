@@ -85,7 +85,11 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
     would have run.
   - The lint holds a fenced `!` block to the same pre-approval as an inline one.
 
-  986 tests.
+  986 tests. Second round: both approve. The one open finding is a MEDIUM: a reader made to start
+  a program through an option of its own gets past the scripts rule. It is no stronger than the
+  script-file limit, so it is a named limit in ADR-0011 §12, with a `debt:` marker in the guard
+  that is revisited if that limit is ever closed.
+
 - **2026-09-25** — Plugin defaults, the second unit of the launch plan (#17, ADR-0011). One switch
   per repo, git config `nonna.mode` (`off | lite | full`), read by every Claude Code hook and git
   hook. The plugin defaults to lite: the test gate, "where's the test?", the branch and secret guards

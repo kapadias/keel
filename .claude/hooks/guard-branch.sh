@@ -258,6 +258,7 @@ case "$tool" in
     SH='([^[:space:]]*/)?(sh|bash|zsh|dash|ksh|mksh|yash|fish|busybox)'
     WRAP='([^[:space:]]*/)?(env|sudo|doas|xargs|nohup|exec|command|builtin|nice|timeout|time|stdbuf|setsid|ionice|chrt|taskset|flock|unbuffer|parallel|watch)|-(exec|execdir|ok|okdir)'
     SHELLS="${AT}(${SH}|source|\\.|exec|eval|[^[:space:]]*\\.sh|\\.{0,2}/[^[:space:]]*|~/[^[:space:]]*)([[:space:]]|$)|(^|[[:space:]])(${WRAP})[[:space:]](.*[[:space:]])?${SH}([[:space:]]|$)"
+    # debt: the reader list trusts each reader's own options to run nothing, revisit if the script-file limit (ADR-0011 §4) is ever closed, since this is no stronger than it
     READS='(cat|less|more|head|tail|grep|egrep|fgrep|rg|ag|ack|wc|ls|stat|file|shellcheck|diff|cmp|nl|bat|git[[:space:]]+(add|diff|log|show|status|blame|ls-files|grep))'
     named="$segs"
     if ! printf '%s' "$cmd" | grep -qE '\||<\(|>\(|\$\(|`'; then
