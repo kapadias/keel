@@ -22,34 +22,61 @@ cd "$root" 2>/dev/null || exit 0
 #    unwired-gate defect ADR-0004 exists to prevent.
 #    Resolution lives in lib/core.sh, shared with subagent-start.sh.
 nonna_root="$(nonna_harness_root)"
-nonna_link=""   # symlink target for the pre-push hook: relative in-repo, absolute otherwise
-if [ -f ".claude/hooks/require-status-sync.sh" ]; then
-  nonna_link="../../.claude/hooks/require-status-sync.sh"
+# 1. Wire the git hooks (pre-push, pre-commit). A copy-in install links relative to the repo's own
+#    .claude/hooks, which survives a repo move. A plugin install links through
+#    ${CLAUDE_PLUGIN_DATA}/current, a link to the running plugin version refreshed every session: the
+#    versioned cache directory is removed after an update, and git silently skips a dangling hook.
+#    A foreign hook is never overwritten, a hook manager's directory never written: both are
+#    reported, because a gate that is off without saying so is what ADR-0004 exists to prevent.
+data="${1:-${CLAUDE_PLUGIN_DATA:-}}"
+hooks_dir="$(git rev-parse --git-path hooks 2>/dev/null || true)"
+hooks_src=""
+if [ -f .claude/hooks/require-status-sync.sh ]; then
+  hooks_src="../../.claude/hooks"
 elif [ -n "$nonna_root" ]; then
-  nonna_link="${nonna_root}/hooks/require-status-sync.sh"
+  hooks_src="$nonna_root/hooks"
+  if [ -n "$data" ] && mkdir -p "$data" 2>/dev/null && ln -sfn "$nonna_root" "$data/current" 2>/dev/null; then
+    hooks_src="$data/current/hooks"
+  fi
 fi
-
-# 1. Install the pre-push hook if absent and this is a git checkout. Guard on the
-#    source EXISTING — never create a dangling symlink, which git would try to
-#    exec and fail, wedging every push.
-dod_warn=""
-if [ ! -d .git ]; then
-  : # not a git checkout — nothing to wire, nothing to warn about
-elif [ -z "$nonna_root" ]; then
-  dod_warn=" WARNING: Nonna's pre-push hook could not be located (no .claude/hooks/ in this project and CLAUDE_PLUGIN_ROOT unset or incomplete) — Definition of Done is NOT enforced."
-elif [ ! -e .git/hooks/pre-push ] && [ ! -L .git/hooks/pre-push ]; then
-  ln -sf "$nonna_link" .git/hooks/pre-push 2>/dev/null \
-    || cp "$nonna_root/hooks/require-status-sync.sh" .git/hooks/pre-push 2>/dev/null \
-    || true
-  chmod +x "$nonna_root/hooks/require-status-sync.sh" 2>/dev/null || true
-  # Never assume the write landed — an unwritable .git/hooks must not pass silently.
-  [ -e .git/hooks/pre-push ] \
-    || dod_warn=" WARNING: could not install Nonna's pre-push hook into .git/hooks — Definition of Done is NOT enforced."
-elif ! grep -qs 'require-status-sync' .git/hooks/pre-push; then
-  # A foreign pre-push hook is installed. Never overwrite it (destructive) —
-  # but going silent would disable the DoD gate without anyone knowing.
-  dod_warn=" WARNING: .git/hooks/pre-push exists and is not Nonna's DoD hook — Definition of Done is NOT enforced; chain ${nonna_root}/hooks/require-status-sync.sh from your hook manually."
+wired=()
+hook_warns=()
+wire_hook() { # <git hook name> <script name>
+  local dest="$hooks_dir/$1" target="$hooks_src/$2"
+  if [ -L "$dest" ] && [ ! -e "$dest" ]; then # dangling: repair it only if it was ours
+    case "$(readlink "$dest")" in
+      */plugins/cache/nonna/* | */plugins/data/nonna* | */.claude/hooks/"$2") rm -f "$dest" ;;
+    esac
+  fi
+  if [ ! -e "$dest" ] && [ ! -L "$dest" ]; then
+    # Never create a dangling link: git would skip it without a word.
+    case "$target" in /*) ;; *) [ -e "$hooks_dir/$target" ] || { hook_warns+=("$2 is missing from the harness, so the $1 gate is NOT enforced"); return 0; } ;; esac
+    [ -e "$target" ] || [ "${target#/}" = "$target" ] || { hook_warns+=("$2 is missing from the harness, so the $1 gate is NOT enforced"); return 0; }
+    mkdir -p "$hooks_dir" 2>/dev/null && ln -s "$target" "$dest" 2>/dev/null && wired+=("$1")
+    [ -e "$dest" ] || hook_warns+=("could not install $dest, so that gate is NOT enforced")
+  else
+    case "$(readlink "$dest" 2>/dev/null)" in
+      */"$2") ;; # ours: a link to her script
+      *) grep -Eqs "$2|Nonna" "$dest" \
+        || hook_warns+=("$dest is not Nonna's, so her $1 gate is NOT enforced; chain $target from it") ;;
+    esac
+  fi
+}
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+  : # not a git checkout: nothing to wire, nothing to warn about
+elif [ -z "$hooks_src" ]; then
+  hook_warns+=("Nonna's git hooks could not be located (no .claude/hooks/ here and CLAUDE_PLUGIN_ROOT unset), so they are NOT enforced")
+else
+  case "$hooks_dir" in
+    .git/hooks | */.git/hooks | */.git/worktrees/*/hooks)
+      wire_hook pre-push require-status-sync.sh
+      wire_hook pre-commit pre-commit.sh
+      ;;
+    *) hook_warns+=("git hooks live in $hooks_dir (a hook manager?): point its pre-push at $hooks_src/require-status-sync.sh and its pre-commit at $hooks_src/pre-commit.sh, or they are NOT enforced") ;;
+  esac
 fi
+hook_warn=""
+[ "${#hook_warns[@]}" -eq 0 ] || hook_warn=" WARNING: $(printf '%s; ' "${hook_warns[@]}")"
 
 # 2. Plugin install: record what the git hooks cannot read from the plugin's options, the first time
 #    Nonna meets this repo: the mode, and (when the run_tests option allows it, the default) the test
@@ -87,7 +114,7 @@ stack="$(printf '%s' "$stack" | sed 's/^ //')"
 [ -n "$stack" ] || stack="undetected"
 
 # 4. Emit additionalContext (JSON on stdout; exit 0).
-msg="Nonna harness active. Gates live: branch-guard (no commits/pushes to main/master/develop, no force pushes), secret-scan on writes and Bash secret reads, Definition-of-Done pre-push (docs/STATUS.md). Detected stack: ${stack}.${dod_warn}"
+msg="Nonna harness active. Gates live: branch-guard (no commits/pushes to main/master/develop, no force pushes), secret-scan on writes and Bash secret reads, Definition-of-Done pre-push (docs/STATUS.md). Detected stack: ${stack}.${hook_warn}"
 # Announce where the harness actually lives. Commands invoke gate scripts under
 # skills/*/scripts/; that path differs between a standalone checkout and a plugin
 # install, and the model cannot infer it. Resolving it here — in the one process

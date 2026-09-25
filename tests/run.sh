@@ -745,12 +745,13 @@ rm -rf "$OFF"
 
 echo "== session-start.sh (SessionStart) =="
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
-mkdir -p "$TMP/.claude/hooks"; cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"
+mkdir -p "$TMP/.claude/hooks"; cp "$HOOKS/require-status-sync.sh" "$HOOKS/pre-commit.sh" "$TMP/.claude/hooks/"
 out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"; check "exits 0" 0 "$?"
 contains "emits additionalContext" "additionalContext" "$out"
 if [ -e "$TMP/.git/hooks/pre-push" ]; then rc=0; else rc=1; fi; check "auto-installs the pre-push DoD hook" 0 "$rc"
 out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"
-printf '%s' "$out" | grep -q "not Nonna's DoD hook"; check "no warning when Nonna's own hook is installed" 1 "$?"
+printf '%s' "$out" | grep -q "is not Nonna's"; check "no warning when Nonna's own hook is installed" 1 "$?"
+if [ -e "$TMP/.git/hooks/pre-commit" ]; then rc=0; else rc=1; fi; check "copy-in: wires the pre-commit hook too" 0 "$rc"
 rm -rf "$TMP"
 # A pre-existing foreign pre-push hook must never be overwritten — but going
 # silent about it means the DoD gate is off without anyone knowing. Warn.
@@ -758,7 +759,7 @@ TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 mkdir -p "$TMP/.claude/hooks"; cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"
 printf '#!/bin/sh\nexit 0\n' > "$TMP/.git/hooks/pre-push"; chmod +x "$TMP/.git/hooks/pre-push"
 out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"; check "exits 0 with a foreign pre-push hook" 0 "$?"
-contains "warns that DoD is not enforced" "not Nonna's DoD hook" "$out"
+contains "warns that the foreign hook leaves her gate off" "is not Nonna's" "$out"
 grep -q 'exit 0' "$TMP/.git/hooks/pre-push"; check "does not overwrite the foreign hook" 0 "$?"
 rm -rf "$TMP"
 # Plugin install: the repo has no .claude/ at all — the harness lives at
@@ -767,8 +768,44 @@ rm -rf "$TMP"
 # what ADR-0004 forbids, so this must either install or warn — never both quiet.
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"; check "plugin install: exits 0" 0 "$?"
-if [ -e "$TMP/.git/hooks/pre-push" ]; then rc=0; else rc=1; fi; check "plugin install: installs the DoD hook from CLAUDE_PLUGIN_ROOT" 0 "$rc"
+if [ -e "$TMP/.git/hooks/pre-push" ]; then rc=0; else rc=1; fi; check "plugin install: installs the pre-push hook from CLAUDE_PLUGIN_ROOT" 0 "$rc"
 contains "plugin install: announces the resolved harness root" "$ROOT/.claude" "$out"
+rm -rf "$TMP"
+# Plugin install with a data dir: the hooks go through ${CLAUDE_PLUGIN_DATA}/current, refreshed every
+# session, because the versioned cache directory is removed after an update and git silently skips a
+# dangling hook. Simulate an update: v1 disappears, v2 arrives, the next session re-points current.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; PD="$(mktemp -d)"; V1="$(mktemp -d)"; V2="$(mktemp -d)"
+cp -R "$ROOT/.claude/." "$V1/"; cp -R "$ROOT/.claude/." "$V2/"
+CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$V1" "$HOOKS/session-start.sh" "$PD/data" >/dev/null
+check "plugin: pre-push goes through the data dir" "$PD/data/current/hooks/require-status-sync.sh" "$(readlink "$TMP/.git/hooks/pre-push")"
+check "plugin: pre-commit goes through the data dir" "$PD/data/current/hooks/pre-commit.sh" "$(readlink "$TMP/.git/hooks/pre-commit")"
+rm -rf "$V1"
+CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$V2" "$HOOKS/session-start.sh" "$PD/data" >/dev/null
+if [ -e "$TMP/.git/hooks/pre-push" ] && [ -e "$TMP/.git/hooks/pre-commit" ]; then rc=0; else rc=1; fi
+check "plugin: after an update the hooks still resolve" 0 "$rc"
+rm -rf "$TMP" "$PD" "$V2"
+# A dangling link of ours (the old absolute link into a removed cache version) is repaired; a
+# dangling link that is not ours is left alone and reported.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; PD="$(mktemp -d)"
+ln -s /gone/.claude/plugins/cache/nonna/nonna/1.0.0/hooks/require-status-sync.sh "$TMP/.git/hooks/pre-push"
+ln -s /gone/husky/pre-commit "$TMP/.git/hooks/pre-commit"
+out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh" "$PD/data")"
+if [ -e "$TMP/.git/hooks/pre-push" ]; then rc=0; else rc=1; fi; check "plugin: a dangling pre-push of ours is repaired" 0 "$rc"
+check "plugin: a dangling hook that is not ours is left alone" /gone/husky/pre-commit "$(readlink "$TMP/.git/hooks/pre-commit")"
+contains "plugin: ...and reported" ".git/hooks/pre-commit is not Nonna's" "$out"
+rm -rf "$TMP" "$PD"
+# A hook manager (core.hooksPath) owns the hooks: say where to point it, write nothing.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; git -C "$TMP" config core.hooksPath .husky
+out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"
+if [ -e "$TMP/.husky/pre-push" ] || [ -e "$TMP/.git/hooks/pre-push" ]; then rc=1; else rc=0; fi
+check "plugin: a hook manager's directory is not written" 0 "$rc"
+contains "plugin: says where the hook manager should point" "require-status-sync.sh" "$out"
+rm -rf "$TMP"
+# A linked worktree shares the main checkout's hooks directory.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; "${GIT[@]}" -C "$TMP" commit -q --allow-empty -m init --no-verify
+"${GIT[@]}" -C "$TMP" worktree add -q "$TMP/wt" -b feature/wt 2>/dev/null
+CLAUDE_PROJECT_DIR="$TMP/wt" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh" >/dev/null
+if [ -e "$TMP/.git/hooks/pre-push" ]; then rc=0; else rc=1; fi; check "plugin: a worktree wires the shared hooks" 0 "$rc"
 rm -rf "$TMP"
 # Neither source present: the gate cannot be installed, so it must say so loudly.
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
