@@ -48,10 +48,13 @@ versioning is [SemVer](https://semver.org/spec/v2.0.0.html).
   quoted as the repository's words (a test cannot speak in her voice), with any line that looks like
   a secret hidden, then what to do.
 - **Guards that travel with the plugin.** The branch guard refuses force pushes (`--force`, `-f`,
-  `--force-with-lease`, abbreviated or in a cluster), `--no-verify`, hook-path overrides, and an
-  agent's changes to Nonna's own settings or git hooks. It reads each command the way the shell will
-  run it, so quotes, escapes and a nested `sh -c` do not hide a flag; a value computed when the
-  command runs can. It is a speed bump: branch protection on the server is the wall. The secret
+  `--force-with-lease`, abbreviated or in a cluster), a push of every branch (`:`, a wildcard),
+  `--no-verify`, hook-path overrides, push config, and an agent's changes to Nonna's own settings or
+  git hooks, through `git push`, `subtree push` or git's own `git-push`, and git's plumbing pushes,
+  which run no hook (`send-pack`). It reads each
+  command the way the shell will run it, so quotes, escapes, brace lists, globs, capitals and a
+  nested `sh -c` do not hide a flag; a value computed when the command runs can. It is a speed bump:
+  branch protection on the server is the wall. The secret
   guard refuses reads and searches (Read, Grep) of secret files, by any name that leads to one,
   linted against the `settings.json` deny-list.
 - **Plugin git hooks survive updates**, and plugin installs get `pre-commit` too. The links go

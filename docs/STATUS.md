@@ -123,6 +123,14 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
   Without jq, a JSON string is decoded in full; an escaped quote had cut
   `git commit -m "x" && git push --force` short. A failing jq or awk no longer waves a git command
   through, even one whose name is split across a continued line. 812 tests.
+  Ninth review round (code: a long heredoc outran the hook's timeout, and a glob named git): the
+  reader runs in linear time in every awk (macOS's one-true-awk had taken over a minute on 100 KB),
+  and a command over 256 KB is refused, since a hook that times out does not block. Brace lists
+  expand as bash expands them, and a glob is read as what it could match (`gi[t]`, `@(git)`,
+  `mai[n]`, `.g?t/hooks`); an expansion too large to read is refused. Probing found more spellings,
+  now refused too: git's own binaries (`/usr/lib/git-core/git-push`), capitals (macOS finds
+  `GIT`), a path to `env`, `send-pack` (which runs no hook), `subtree push`, the `:` and wildcard refspecs, and push
+  refspecs or `push.default` in the config. 856 tests.
 
 - **2026-09-25** — 2.0 packaging, the first unit of the launch plan (#17). Both manifests say 2.0.0;
   the plugin shows as "Nonna" and declares two install options, `run_tests` and `mode`. The hooks

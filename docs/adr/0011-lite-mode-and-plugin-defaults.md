@@ -69,12 +69,26 @@ lighter mode to select". A plugin user's first day is that use.
    where no earlier option takes the flag as its own value. Claude Code's `"$(cat <<'EOF' … EOF)"`
    message is one quoted word only where it ends where bash ends it and its body holds no `"`, `$`,
    backtick or backslash: macOS `/bin/bash` 3.2 ends the `$(` early and reads the rest as
-   double-quoted text, where nothing else can run. Anything else stays in view. It
-   refuses the agent's writes to `nonna.*`, includes, aliases, `core.hooksPath` and forced refspecs,
-   whether through `git config`, `-c` or `--config-env`. It also refuses the variables the gates
-   read, and hand edits of `.git/config` and the git hooks. It is a speed bump, not a sandbox: a
-   script file, or a value the shell computes when it runs (a variable, `$(…)`'s output, `xargs`),
-   gets past it. Branch protection on the server is the wall.
+   double-quoted text, where nothing else can run. Anything else stays in view. Brace lists expand
+   as bash expands them (`.claude/hooks/lib/expand.awk`). A glob is read as the name of hers it
+   could match, glob groups included (`gi[t]`, `@(git)`, zsh's `(a|b)`): git, or git's own binary
+   for a command (`git-push`), a protected branch, `.git/hooks`. Names match without case, as
+   macOS's disk finds `GIT`. What it cannot read before the hook times out is refused: a command
+   over 256 KB, or an expansion past 100,000 words. It refuses the agent's writes to `nonna.*`,
+   includes, aliases, `core.hooksPath`, push refspecs and `push.default`, whether through
+   `git config`, `-c` or `--config-env`. It refuses a push of every branch (`--all`, `--mirror`, `:`,
+   a wildcard), through `git push` or `subtree push`, and git's plumbing pushes (`send-pack`,
+   `http-push`), which run no hook. It also refuses the variables the gates read, and hand edits of
+   `.git/config` and the git hooks. It is a speed bump, not a sandbox.
+   These get past it:
+   - a script file, or git under another name;
+   - a value the shell computes when it runs (a variable, `$(…)`'s output, `xargs`);
+   - a glob that a file the agent made completes;
+   - git configuration already in place (the user's own `push.default`);
+   - a tool that writes to the server another way (`gh api`).
+
+   Branch protection on the server is the wall.
+
 5. **Lite** is the test gate, "where's the test?", the branch guard, the secret guard, the git hooks
    and six house rules (`.claude/hooks/lib/lite.md`, linted to 150 words and to cover the never-list's
    tests, branch and secret lines). **Full** adds the STATUS gate, the constitution and the

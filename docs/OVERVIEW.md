@@ -81,9 +81,9 @@ Hooks turn the rules into deterministic guards — gates, not suggestions. Each 
 and only the STATUS checks are full mode's:
 
 - **`guard-branch.sh`** — **blocks** `git commit` / `git push` to `main` / `master` / `develop` (warns
-  on edits there), plus `--all` / `--mirror`, force pushes, `--no-verify` and hook-path overrides,
-  reading each command the way the shell will run it. A speed bump for the agent; server-side branch
-  protection is the wall.
+  on edits there), plus a push of every branch (`--all`, `--mirror`, `:`, a wildcard), force pushes,
+  `--no-verify` and hook-path overrides, reading each command the way the shell will run it, brace
+  lists and globs included. A speed bump for the agent; server-side branch protection is the wall.
   The "never commit to a protected branch" rule, actually enforced.
 - **`secret-scan.sh`** — **blocks** any edit/write that introduces a high-confidence secret (AWS /
   GitHub / Slack / Google keys, private-key blocks, hardcoded credentials), and reads/copies of
