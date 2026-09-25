@@ -117,6 +117,19 @@ check "blocks Grep glob *.yml once it would read secrets/db.yml" 2 "$(sg '*.yml'
 rm -rf "$CLEAN/config"; OUT="$(mktemp -d)"; printf 'K=1\n' > "$OUT/.env"; mkdir -p "$CLEAN/docs"; ln -s "$OUT/.env" "$CLEAN/docs/notes.txt"
 check "blocks a broad glob that picks a link to a secret file" 2 "$(sg '*' "$CLEAN")"
 printf '%s' '{"tool_name":"Grep","tool_input":{"pattern":"x","path":"/","glob":"*.yml"}}' | CLAUDE_PROJECT_DIR="$CLEAN" "$SS" 2>/dev/null; check "outside the project a broad glob is judged by name, not searched" 2 "$?"
+# A glob that names a secret file is refused where the file is there, whatever the sample names say
+# (ripgrep's -g reaches hidden and ignored files).
+NAMED="$(mktemp -d)"; mkdir -p "$NAMED/secrets" "$NAMED/.aws" "$NAMED/.ssh"
+for f in .env.production secrets/key.json .aws/config .ssh/id_ed25519 id_rsa_work; do printf 'x\n' > "$NAMED/$f"; done
+check "blocks glob .env.production where it is" 2 "$(sg '.env.production' "$NAMED")"
+check "blocks glob .env.prod* where it is" 2 "$(sg '.env.prod*' "$NAMED")"
+check "blocks glob *.production where .env.production is" 2 "$(sg '*.production' "$NAMED")"
+check "blocks glob secrets/*.json where it is" 2 "$(sg 'secrets/*.json' "$NAMED")"
+check "blocks glob .aws/config where it is" 2 "$(sg '.aws/config' "$NAMED")"
+check "blocks glob .ssh/id_ed25519 where it is" 2 "$(sg '.ssh/id_ed25519' "$NAMED")"
+check "blocks glob id_rsa_work where it is" 2 "$(sg 'id_rsa_work' "$NAMED")"
+printf '%s' '{"tool_name":"Grep","tool_input":{"pattern":"x","path":"/","glob":".env.prod*"}}' | CLAUDE_PROJECT_DIR="$CLEAN" "$SS" 2>/dev/null; check "outside the project a glob that names a secret file is refused" 2 "$?"
+rm -rf "$NAMED"
 rm -rf "$SEC" "$CLEAN" "$OUT"
 # A name is not the file: case-folding file systems and symlinks reach a secret under another name.
 printf '%s' '{"tool_name":"Read","tool_input":{"file_path":".ENV"}}' | "$SS" 2>/dev/null; check "blocks Read of .ENV (a case-folding file system reads .env)" 2 "$?"

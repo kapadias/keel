@@ -76,16 +76,20 @@ if printf '%s' "$payload" | grep -qE '"tool_name"[[:space:]]*:[[:space:]]*"(Read
     [ "$depth" -eq 0 ] || return 0 # braces that do not balance: refuse
     shopt -s extglob
     lpat="$(printf '%s' "$pat" | tr '[:upper:]' '[:lower:]')"
-    # Can it pick one at all? One name for each thing the deny list covers.
-    for s in .env .env.local secrets/db.yml server.pem server.key cert.p12 key.p8 cert.pfx store.jks \
-      id_rsa id_rsa.pub .ssh/config .aws/credentials .npmrc kubeconfig credentials; do
-      picks "$s" && break
-      s=""
-    done
-    [ -n "$s" ] || return 1
-    # It can. In the project, what decides is whether it picks a secret file that is there, or a link
-    # to one (a link to a secret directory, always); outside the project, the name alone does.
-    [ -n "$dir" ] || return 0
+    # Outside the project the name decides: the glob with its wildcards taken out (as a path), and
+    # one name for each thing the deny list covers.
+    if [ -z "$dir" ]; then
+      secret_file "$(printf '%s' "$1" | sed 's/\*//g; s/?/a/g')" && return 0
+      secret_file "$(printf '%s' "$1" | sed 's/\*\*/x/g; s/\*/a/g; s/?/a/g')" && return 0
+      for s in .env .env.local .env.production secrets/db.yml server.pem server.key cert.p12 key.p8 \
+        cert.pfx store.jks id_rsa id_rsa.pub .ssh/config .aws/credentials .npmrc kubeconfig credentials; do
+        picks "$s" && return 0
+      done
+      return 1
+    fi
+    # In the project, what decides is whether it picks a secret file that is there, or a link to one
+    # (a link to a secret directory, always): ripgrep's -g reaches hidden and ignored files, so a
+    # name no sample has (.env.production) is judged by the file.
     while IFS= read -r f; do
       if [ -L "$f" ]; then
         s="$(resolved "$f")"
