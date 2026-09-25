@@ -393,6 +393,26 @@ check "allows a heredoc message with apostrophes, parens and #" 0 "$(gb "$(print
 check "allows a search for export NONNA_MODE" 0 "$(gb "grep -rn 'export NONNA_MODE' docs/")"
 check "allows a search for declare NONNA_TEST_CMD" 0 "$(gb "rg 'declare NONNA_TEST_CMD' .")"
 check "allows a search for export HOME before git" 0 "$(gb "grep -n 'export HOME' ~/.bashrc; git status")"
+# The guard reads a command whole or refuses it. Without jq, a JSON string is decoded in full, so an
+# escaped quote does not end the command; when its reader (awk, jq) fails, a command that touches git
+# is refused, not waved through.
+NJ="$(mktemp -d)"
+for b in bash sh env cat grep sed head tail tr cut awk dirname basename git mktemp; do
+  p="$(command -v "$b" 2>/dev/null || true)"; if [ -n "$p" ]; then ln -s "$p" "$NJ/$b" 2>/dev/null || true; fi
+done
+gbp() { printf '{"tool_name":"Bash","tool_input":{"command":%s}}' "$(printf '%s' "$2" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')" | PATH="$1" CLAUDE_PROJECT_DIR="$TMP" "$GB" 2>/dev/null; echo $?; }
+check "no jq: a force push after a quoted message is still seen" 2 "$(gbp "$NJ" 'git commit -m "fix: x" && git push --force origin feature/x')"
+check "no jq: an ordinary commit and push pass" 0 "$(gbp "$NJ" 'git commit -m "fix: x" && git push origin feature/x')"
+BADAWK="$(mktemp -d)"; printf '#!/bin/sh\nexit 1\n' > "$BADAWK/awk"; chmod +x "$BADAWK/awk"
+check "a failing awk: an ANSI-C force push is refused" 2 "$(gbp "$BADAWK:$PATH" "git push \$'--force' origin feature/x")"
+check "a failing awk: a push continued onto a second line is refused" 2 "$(gbp "$BADAWK:$PATH" "$(printf 'git push \\\n  --force origin feature/x')")"
+check "a failing awk: any git command is refused" 2 "$(gbp "$BADAWK:$PATH" 'git status')"
+check "a failing awk: a command without git passes" 0 "$(gbp "$BADAWK:$PATH" 'ls -la')"
+BADJQ="$(mktemp -d)"; printf '#!/bin/sh\nexit 1\n' > "$BADJQ/jq"; chmod +x "$BADJQ/jq"
+check "a failing jq: a force push is refused" 2 "$(gbp "$BADJQ:$PATH" 'git push --force origin feature/x')"
+got="$(printf '%s' '{"a":1,"tool_input":{"command":"a \"b\" c\\d\ne\u0041\/"}}' | PATH="$NJ" bash -c '. "$0"; nonna_json_field .tool_input.command' "$HOOKS/lib/json.sh")"
+check "json.sh without jq: a string is decoded in full (quotes, backslash, newline, \\u, \\/)" "$(printf 'a "b" c\\d\neA/')" "$got"
+rm -rf "$NJ" "$BADAWK" "$BADJQ"
 out="$(printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push --force origin feature/x"}}' | CLAUDE_PROJECT_DIR="$TMP" "$GB" 2>&1)"
 contains "force-push refusal is in her voice" "we don't force things in this house" "$out"
 # Nor may the agent edit her settings or her git hooks with the file tools.

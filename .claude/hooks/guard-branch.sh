@@ -45,13 +45,24 @@ kitchen_door() { # <technical reason>: the git hooks are the gate
   exit 2
 }
 
+unread() { # <what could not be read>: fail closed, never guess
+  echo "✗ Nonna: I can't taste what I can't read. (branch guard: $1, so it is refused, not guessed at.)" >&2
+  echo "  Run it again; if this repeats, check that awk and jq work in this shell." >&2
+  exit 2
+}
+# Raw text the parsers could not read: a tool name, or a field that is there with a value.
+raw_tool() { printf '%s' "$payload" | grep -oE '"tool_name"[[:space:]]*:[[:space:]]*"[A-Za-z]+"' | head -n 1 | sed -E 's/.*"([A-Za-z]+)"$/\1/'; }
+has_field() { printf '%s' "$payload" | grep -qE "\"$1\"[[:space:]]*:[[:space:]]*\"[^\"]"; }
+
 payload="$(cat 2>/dev/null || true)"
 tool="$(printf '%s' "$payload" | nonna_json_field '.tool_name')"
+[ -n "$tool" ] || tool="$(raw_tool)" # a parser that failed (jq, awk) leaves the name empty
 
 case "$tool" in
   Edit | Write | MultiEdit)
     # Her settings and her git hooks are the user's: the file tools may not rewrite them either.
     file="$(printf '%s' "$payload" | nonna_json_field '.tool_input.file_path')"
+    [ -n "$file" ] || ! has_field file_path || unread "the file path could not be read"
     case "/${file#./}" in
       */.git/config | */.git/hooks/* | */.git/nonna/* | */.git/nonna-green)
         recipe "refusing to edit ${file}: her settings and git hooks live there." ;;
@@ -67,6 +78,7 @@ case "$tool" in
     ;;
   Bash)
     cmd="$(printf '%s' "$payload" | nonna_json_field '.tool_input.command')"
+    [ -n "$cmd" ] || ! has_field command || unread "the command could not be read"
     [ -n "$cmd" ] || exit 0
     # How the shell will see it (lib/shell-words.awk). Readings, checked together: A keeps each word
     # whole, so a quoted value with a space cannot shift the words after it; B exposes what a quoted
@@ -74,14 +86,22 @@ case "$tool" in
     # quote or an escape is left in it (up to six times), so a quote nested inside one (sh -c '…
     # "--force"') is removed as the inner shell removes it. Nesting deeper than that is refused. A
     # message is masked only where the reading is sure to be the shell's. A match in any refuses.
-    # Without awk: quotes deleted, nothing masked, which can only refuse more.
+    # When the reader fails (awk missing or failing), a command that could touch git or her settings
+    # (git or nonna in it, however quoted, or a $'…' escape) is refused; nothing else here reads one.
     words() { printf '%s\n' "$cmd" | awk -v out="$1" -f "$here/lib/shell-words.awk" 2>/dev/null; }
     quoted() { case "$1" in *[\'\"\\]*) return 0 ;; esac; return 1; }
-    lvl="$(words B)"
-    segs="$(words A)"$'\n'"$lvl"
+    cant_read() {
+      if printf '%s' "$cmd" | grep -qiE "g[\\'\"]*i[\\'\"]*t|n[\\'\"]*o[\\'\"]*n[\\'\"]*n[\\'\"]*a|\\$'"; then
+        unread "the command reader (awk) failed"
+      fi
+      exit 0
+    }
+    lvl="$(words B)" || cant_read
+    segs="$(words A)" || cant_read
+    segs="$segs"$'\n'"$lvl"
     n=0
     while [ "$n" -lt 6 ] && quoted "$lvl"; do
-      next="$(printf '%s\n' "$lvl" | awk -v out=B -v nomask=1 -v relevel=1 -f "$here/lib/shell-words.awk" 2>/dev/null)"
+      next="$(printf '%s\n' "$lvl" | awk -v out=B -v nomask=1 -v relevel=1 -f "$here/lib/shell-words.awk" 2>/dev/null)" || cant_read
       [ "$next" = "$lvl" ] && break
       segs="$segs"$'\n'"$next"
       lvl="$next"
@@ -89,10 +109,6 @@ case "$tool" in
     done
     if [ "$n" -ge 6 ] && quoted "$lvl"; then
       kitchen_door "refusing quotes nested deeper than the guard reads; run the inner command itself."
-    fi
-    if [ -z "${segs//[[:space:]]/}" ]; then
-      # shellcheck disable=SC2020  # tr maps each of those characters to a newline
-      segs="$(printf '%s\n' "$cmd" | tr -d "\"'\\\\" | tr ';&|()`' '\n\n\n\n\n\n')"
     fi
     runs_git() { printf '%s\n' "$segs" | grep -qE "${GIT}[a-z]"; }
     RD=$'\002' # the mark shell-words.awk puts before a redirection the shell performs
