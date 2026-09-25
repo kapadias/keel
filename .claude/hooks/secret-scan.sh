@@ -48,21 +48,57 @@ if printf '%s' "$payload" | grep -qE '"tool_name"[[:space:]]*:[[:space:]]*"(Read
     done
     if d="$(cd "$(dirname "$p")" 2>/dev/null && pwd -P)"; then printf '%s/%s' "$d" "$(basename "$p")"; else printf '%s' "$p"; fi
   }
+  glob_picks_secret() { # <ripgrep glob>: 0 when it can pick a file the deny list covers
+    local g="$1" pat="" c i depth=0 s
+    case "$g" in '!'*) return 1 ;; esac # an exclusion reads nothing
+    [ "${#g}" -le 200 ] || return 0     # too long to judge: refuse
+    # ripgrep's **/ also matches no directory at all; bash's * already crosses slashes.
+    g="${g//\*\*\//*}"
+    g="${g//\*\*/*}"
+    # ripgrep's {a,b} is bash's @(a|b); * ? and [...] mean the same in both.
+    for ((i = 0; i < ${#g}; i++)); do
+      c="${g:i:1}"
+      case "$c" in
+        '{') depth=$((depth + 1)); pat="$pat@(" ;;
+        '}') if [ "$depth" -gt 0 ]; then depth=$((depth - 1)); pat="$pat)"; else pat="$pat}"; fi ;;
+        ',') if [ "$depth" -gt 0 ]; then pat="$pat|"; else pat="$pat,"; fi ;;
+        *) pat="$pat$c" ;;
+      esac
+    done
+    [ "$depth" -eq 0 ] || return 0 # braces that do not balance: refuse
+    shopt -s extglob
+    # One name for each thing the deny list covers; a glob is matched against the name and the path.
+    for s in .env .env.local secrets/db.yml server.pem server.key cert.p12 key.p8 cert.pfx store.jks \
+      id_rsa id_rsa.pub .ssh/config .aws/credentials .npmrc kubeconfig credentials; do
+      # shellcheck disable=SC2053  # the right side is meant as a pattern
+      [[ $s == $pat || ${s##*/} == $pat ]] && return 0
+      # shellcheck disable=SC2053
+      [[ $s == $(printf '%s' "$pat" | tr '[:upper:]' '[:lower:]') ]] && return 0
+      # shellcheck disable=SC2053
+      [[ ${s##*/} == $(printf '%s' "$pat" | tr '[:upper:]' '[:lower:]') ]] && return 0
+    done
+    return 1
+  }
   f="$(printf '%s' "$payload" | nonna_json_field '.tool_input.file_path')"
   d="$(printf '%s' "$payload" | nonna_json_field '.tool_input.path')"
   g="$(printf '%s' "$payload" | nonna_json_field '.tool_input.glob')"
   paths=()
   [ -z "$f" ] || paths+=("$f")
   [ -z "$d" ] || paths+=("${d%/}")
-  [ -z "$g" ] || paths+=("$(printf '%s' "$g" | sed 's/\*//g; s/?/a/g')" "$(printf '%s' "$g" | sed 's/\*\*/x/g; s/\*/a/g; s/?/a/g')")
+  hit=""
   for p in ${paths[@]+"${paths[@]}"}; do
     secret_file "$p" || secret_file "$(cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null && resolved "$p")" || continue
+    hit=1
+    break
+  done
+  [ -n "$hit" ] || [ -z "$g" ] || ! glob_picks_secret "$g" || hit=1
+  if [ -n "$hit" ]; then
     {
       echo "✗ Nonna: that drawer is private. (secret-scan: blocked reading ${f:-${d:-$g}}.)"
       echo "  Secret files stay out of the context; reference an env var instead (rules/safety.md)."
     } >&2
     exit 2
-  done
+  fi
   exit 0
 fi
 
