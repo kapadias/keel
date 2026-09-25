@@ -3,19 +3,31 @@
 # Shared by session-start.sh (parent session) and subagent-start.sh (every
 # subagent), so the two carriers cannot drift apart (ADR-0007, ADR-0008).
 
+# The harness this file belongs to (hooks/lib/../..), wherever it was loaded from: a copy-in repo's
+# .claude/, the plugin's directory, or a git hook's link target. Symlinks resolved.
+_nonna_self="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd -P)"
+
 # nonna_harness_root
-#   Prints the harness root: the project's own .claude/ in a standalone checkout,
-#   ${CLAUDE_PLUGIN_ROOT} under a plugin install, nothing when neither is found.
-#   The project wins on purpose: a repo that ships its own .claude/ is the copy-in
-#   install, and its rules/ already load natively. The carrier only ever injects
-#   00-core.md from the resolved root, never arbitrary project content.
-#   Runs from the project directory.
+#   Prints the harness the running hook belongs to: ${CLAUDE_PLUGIN_ROOT} under a plugin install
+#   (Claude Code sets it), else the directory this library was loaded from; nothing when neither
+#   is a harness. Never a project's .claude/ unless that is the harness running: a repository can
+#   ship a .claude/hooks/ of its own, and a plugin must not source, run or wire what it ships.
 nonna_harness_root() {
-  if [ -f ".claude/hooks/require-status-sync.sh" ]; then
-    (cd .claude 2>/dev/null && pwd)
-  elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -f "${CLAUDE_PLUGIN_ROOT}/hooks/require-status-sync.sh" ]; then
+  if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -f "${CLAUDE_PLUGIN_ROOT}/hooks/require-status-sync.sh" ]; then
     printf '%s' "${CLAUDE_PLUGIN_ROOT}"
+  elif [ -n "$_nonna_self" ] && [ -f "$_nonna_self/hooks/require-status-sync.sh" ]; then
+    printf '%s' "$_nonna_self"
   fi
+}
+
+# nonna_copy_in
+#   True when the running harness is this repository's own .claude/ (a copy-in install): only then
+#   may Nonna detect and run the repo's test command unasked, and link its git hooks to repo scripts.
+#   Runs from the project directory.
+nonna_copy_in() {
+  local repo
+  repo="$(cd .claude 2>/dev/null && pwd -P)" || return 1
+  [ -n "$_nonna_self" ] && [ "$_nonna_self" = "$repo" ]
 }
 
 # nonna_config <key>
@@ -30,7 +42,7 @@ nonna_config() {
 # nonna_mode [git-hook]
 #   Prints off, lite or full: what Nonna enforces in the repo in the current directory.
 #   Precedence: NONNA_MODE > git config nonna.mode (repo, then global) > the plugin's `mode`
-#   option > nonna.defaultMode > the install (a copy-in install is full, a plugin install lite).
+#   option > nonna.defaultMode > what the repo carries (the hooks and the rules: full; else lite).
 #   git config is the per-repo switch because git hooks read it too, it is never committed, and a
 #   clone cannot carry it. nonna.mode is the user's alone; what Nonna records (the plugin option,
 #   for git hooks that cannot see it, or install.sh --mode) goes in nonna.defaultMode, below it, so
@@ -45,7 +57,10 @@ nonna_mode() {
   [ -n "$m" ] || [ "${1:-}" = git-hook ] || m="${CLAUDE_PLUGIN_OPTION_MODE:-}"
   [ -n "$m" ] || m="$(nonna_config nonna.defaultMode)"
   if [ -z "$m" ]; then
-    if [ -f .claude/hooks/require-status-sync.sh ]; then m=full; else m=lite; fi
+    # A repo that carries the whole harness (its hooks and its rules) is a full copy-in; a lite
+    # copy-in carries no rules, and its clones have no nonna.defaultMode, since .git/config is not
+    # cloned. What a repo carries can only raise the mode to full, never lower it.
+    if [ -f .claude/hooks/require-status-sync.sh ] && [ -f .claude/rules/00-core.md ]; then m=full; else m=lite; fi
   fi
   case "$m" in off | lite | full) printf '%s' "$m" ;; *) printf 'full' ;; esac
 }

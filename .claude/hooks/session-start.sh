@@ -43,9 +43,9 @@ fi
 data="${1:-${CLAUDE_PLUGIN_DATA:-}}"
 hooks_dir="$(git rev-parse --git-path hooks 2>/dev/null || true)"
 hooks_src=""
-if [ -f .claude/hooks/require-status-sync.sh ]; then
-  hooks_src="../../.claude/hooks"
-elif [ -n "$nonna_root" ]; then
+if nonna_copy_in; then
+  hooks_src="../../.claude/hooks" # the repo's own harness: its own scripts, relative
+elif [ -n "$nonna_root" ]; then # a plugin: its own scripts, never ones the repo ships
   hooks_src="$nonna_root/hooks"
   if [ -n "$data" ] && mkdir -p "$data" 2>/dev/null && ln -sfn "$nonna_root" "$data/current" 2>/dev/null; then
     hooks_src="$data/current/hooks"
@@ -96,7 +96,7 @@ hook_warn=""
 #    nonna.mode (repo or global): Nonna never writes nonna.mode. The first time Nonna meets the
 #    repo, and only when the run_tests option allows it (the default), the test command detection
 #    finds is recorded; a command already set is never overwritten, nor an empty one (gate off).
-if [ ! -f .claude/hooks/lib/tests.sh ] && [ -n "$nonna_root" ] && git rev-parse --git-dir >/dev/null 2>&1; then
+if ! nonna_copy_in && [ -n "$nonna_root" ] && git rev-parse --git-dir >/dev/null 2>&1; then
   case "${CLAUDE_PLUGIN_OPTION_MODE:-}" in
     lite | full)
       [ "$(git config --local --get nonna.defaultMode 2>/dev/null)" = "$CLAUDE_PLUGIN_OPTION_MODE" ] \
@@ -106,9 +106,9 @@ if [ ! -f .claude/hooks/lib/tests.sh ] && [ -n "$nonna_root" ] && git rev-parse 
   case "${CLAUDE_PLUGIN_OPTION_RUN_TESTS:-true}" in
     false | False | FALSE | 0 | no | off) : ;;
     *)
-      if ! nonna_config nonna.testCmd >/dev/null && [ -f "$nonna_root/hooks/lib/tests.sh" ]; then
+      if ! nonna_config nonna.testCmd >/dev/null && [ -f "$here/lib/tests.sh" ]; then
         # shellcheck source=/dev/null
-        . "$nonna_root/hooks/lib/tests.sh"
+        . "$here/lib/tests.sh"
         detected="$(nonna_detect_test_cmd)"
         [ -z "$detected" ] || git config nonna.testCmd "$detected" 2>/dev/null || true
       fi
@@ -116,9 +116,9 @@ if [ ! -f .claude/hooks/lib/tests.sh ] && [ -n "$nonna_root" ] && git rev-parse 
   esac
 fi
 gate=""
-if [ -n "$nonna_root" ] && [ -f "$nonna_root/hooks/lib/tests.sh" ]; then
+if [ -f "$here/lib/tests.sh" ]; then # this hook's own library, never one the repo ships
   # shellcheck source=/dev/null
-  . "$nonna_root/hooks/lib/tests.sh"
+  . "$here/lib/tests.sh"
   gate="$(nonna_test_cmd)"
 fi
 

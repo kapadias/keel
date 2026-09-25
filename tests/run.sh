@@ -43,6 +43,9 @@ contains() { # <desc> <needle> <haystack>
     *) FAIL=$((FAIL + 1)); printf '  FAIL %s (missing: %s)\n' "$1" "$2" ;;
   esac
 }
+copy_in() { # <repo>: Nonna's hooks inside the repo, as install.sh puts them; run them from there
+  mkdir -p "$1/.claude/hooks" && cp -R "$HOOKS/." "$1/.claude/hooks/"
+}
 
 echo "== the suite runs on its own config =="
 git config --global --get-regexp '^nonna\.' >/dev/null 2>&1; check "suite: no global nonna.* setting reaches the gates" 1 "$?"
@@ -337,9 +340,7 @@ check "pre-push: a 1000-commit, 1000-file first push passes" 0 "$rc"
 check "pre-push: ...in one scan, well under 10s" 1 "$(( SECONDS - start < 10 ))"
 rm -rf "$T2" "$B2" "$PS"
 # Installed AS a symlink (the way session-start wires it): must still resolve lib/.
-mkdir -p "$TMP/.claude/hooks/lib"
-cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"
-cp "$HOOKS/lib/secret-patterns.sh" "$HOOKS/lib/tests.sh" "$TMP/.claude/hooks/lib/"
+copy_in "$TMP"
 ln -sf ../../.claude/hooks/require-status-sync.sh "$TMP/.git/hooks/pre-push"
 sl_out="$(cd "$TMP" && .git/hooks/pre-push 2>&1)"; sl_rc=$?
 check "blocks a secret when run via the installed symlink" 1 "$sl_rc"
@@ -807,8 +808,10 @@ mode_of() { # [VAR=value ...]: the mode in $TMP with only those variables set
     bash -c '. "$1/lib/core.sh"; nonna_mode' _ "$HOOKS")
 }
 check "mode: a plugin install defaults to lite" lite "$(mode_of)"
-mkdir -p "$TMP/.claude/hooks"; : > "$TMP/.claude/hooks/require-status-sync.sh"
-check "mode: a copy-in install defaults to full" full "$(mode_of)"
+mkdir -p "$TMP/.claude/hooks" "$TMP/.claude/rules"; : > "$TMP/.claude/hooks/require-status-sync.sh"
+check "mode: a lite copy-in (the hooks, no rules) defaults to lite, for everyone who clones it" lite "$(mode_of)"
+: > "$TMP/.claude/rules/00-core.md"
+check "mode: a full copy-in (the hooks and the rules) defaults to full" full "$(mode_of)"
 rm -rf "$TMP/.claude"
 check "mode: the plugin option beats the install default" full "$(mode_of CLAUDE_PLUGIN_OPTION_MODE=full)"
 git -C "$TMP" config nonna.defaultMode full
@@ -855,14 +858,14 @@ check "off: post-compact says nothing" 0 "$(off_rc post-compact.sh '{}')"
 rm -rf "$OFF"
 
 echo "== session-start.sh (SessionStart) =="
-TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
-mkdir -p "$TMP/.claude/hooks"; cp "$HOOKS/require-status-sync.sh" "$HOOKS/pre-commit.sh" "$TMP/.claude/hooks/"
-out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"; check "exits 0" 0 "$?"
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; copy_in "$TMP"
+out="$(CLAUDE_PROJECT_DIR="$TMP" "$TMP/.claude/hooks/session-start.sh")"; check "exits 0" 0 "$?"
 contains "emits additionalContext" "additionalContext" "$out"
 if [ -e "$TMP/.git/hooks/pre-push" ]; then rc=0; else rc=1; fi; check "auto-installs the pre-push DoD hook" 0 "$rc"
-out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"
+out="$(CLAUDE_PROJECT_DIR="$TMP" "$TMP/.claude/hooks/session-start.sh")"
 printf '%s' "$out" | grep -q "is not Nonna's"; check "no warning when Nonna's own hook is installed" 1 "$?"
 if [ -e "$TMP/.git/hooks/pre-commit" ]; then rc=0; else rc=1; fi; check "copy-in: wires the pre-commit hook too" 0 "$rc"
+check "copy-in: links the repo's own script, relatively" "../../.claude/hooks/require-status-sync.sh" "$(readlink "$TMP/.git/hooks/pre-push")"
 rm -rf "$TMP"
 # A pre-existing foreign pre-push hook must never be overwritten — but going
 # silent about it means the DoD gate is off without anyone knowing. Warn.
@@ -881,6 +884,18 @@ TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 out="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh")"; check "plugin install: exits 0" 0 "$?"
 if [ -e "$TMP/.git/hooks/pre-push" ]; then rc=0; else rc=1; fi; check "plugin install: installs the pre-push hook from CLAUDE_PLUGIN_ROOT" 0 "$rc"
 contains "plugin install: announces the resolved harness root" "$ROOT/.claude" "$out"
+rm -rf "$TMP"
+# A plugin install never runs or wires a repository's own scripts. A repo can ship a .claude/hooks/ of
+# its own (a real copy-in, or a hostile one); git refuses to let a clone install hooks, and Nonna must
+# not do it for the clone. The plugin sources its own library and links its own scripts.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; mkdir -p "$TMP/.claude/hooks/lib"
+for f in require-status-sync.sh pre-commit.sh; do printf '#!/bin/sh\ntouch "%s/ran-%s"\n' "$TMP" "$f" > "$TMP/.claude/hooks/$f"; chmod +x "$TMP/.claude/hooks/$f"; done
+printf 'touch "%s/sourced"\n' "$TMP" > "$TMP/.claude/hooks/lib/tests.sh"
+printf '{"scripts":{"test":"node t.js"}}\n' > "$TMP/package.json"
+CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh" >/dev/null
+if [ -e "$TMP/sourced" ]; then rc=1; else rc=0; fi; check "plugin: never sources a repository's own hook library" 0 "$rc"
+check "plugin: links pre-push to its own script, not the repo's" "$ROOT/.claude/hooks/require-status-sync.sh" "$(readlink "$TMP/.git/hooks/pre-push")"
+check "plugin: links pre-commit to its own script, not the repo's" "$ROOT/.claude/hooks/pre-commit.sh" "$(readlink "$TMP/.git/hooks/pre-commit")"
 rm -rf "$TMP"
 # Plugin install with a data dir: the hooks go through ${CLAUDE_PLUGIN_DATA}/current, refreshed every
 # session, because the versioned cache directory is removed after an update and git silently skips a
@@ -918,11 +933,13 @@ TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; "${GIT[@]}" -C "$TMP" commit 
 CLAUDE_PROJECT_DIR="$TMP/wt" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/session-start.sh" >/dev/null
 if [ -e "$TMP/.git/hooks/pre-push" ]; then rc=0; else rc=1; fi; check "plugin: a worktree wires the shared hooks" 0 "$rc"
 rm -rf "$TMP"
-# Neither source present: the gate cannot be installed, so it must say so loudly.
-TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
-out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"; check "unlocatable harness: still exits 0" 0 "$?"
+# A harness copy without its gate scripts cannot install them, so it must say so loudly.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; PART="$(mktemp -d)"; mkdir -p "$PART/hooks"
+cp "$HOOKS/session-start.sh" "$PART/hooks/"; cp -R "$HOOKS/lib" "$PART/hooks/"
+out="$(CLAUDE_PROJECT_DIR="$TMP" "$PART/hooks/session-start.sh")"; check "unlocatable harness: still exits 0" 0 "$?"
 contains "unlocatable harness: warns DoD is NOT enforced" "NOT enforced" "$out"
 if [ -e "$TMP/.git/hooks/pre-push" ]; then rc=0; else rc=1; fi; check "unlocatable harness: installs no dangling hook" 1 "$rc"
+rm -rf "$PART"
 rm -rf "$TMP"
 # Plugin install: rules/ never loads (no `rules` plugin component, ADR-0007), so the
 # constitution must ride additionalContext or the user gets agents with no policy.
@@ -1007,15 +1024,21 @@ um="$(CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$HOOKS/sessi
 contains "notice: says when there is no test gate, and how to set one" "git config nonna.testCmd" "$um"
 rm -rf "$TMP"
 # A copy-in install detects at run time; its session start records neither.
-TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
-mkdir -p "$TMP/.claude/hooks/lib"; cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"; cp "$HOOKS/lib/tests.sh" "$TMP/.claude/hooks/lib/"
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; copy_in "$TMP"
 printf '{"scripts":{"test":"node t.js"}}\n' > "$TMP/package.json"
-out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"
+out="$(CLAUDE_PROJECT_DIR="$TMP" "$TMP/.claude/hooks/session-start.sh")"
 git -C "$TMP" config --get nonna.testCmd >/dev/null; check "copy-in: session start records no test command" 1 "$?"
 git -C "$TMP" config --get nonna.mode >/dev/null; check "copy-in: session start records no mode" 1 "$?"
-CLAUDE_PLUGIN_OPTION_MODE=full CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh" >/dev/null
+CLAUDE_PLUGIN_OPTION_MODE=full CLAUDE_PROJECT_DIR="$TMP" "$TMP/.claude/hooks/session-start.sh" >/dev/null
 git -C "$TMP" config --get nonna.defaultMode >/dev/null; check "copy-in: session start records no default mode" 1 "$?"
 contains "copy-in: tells the agent what the test gate runs" "Test gate: npm test --silent" "$out"
+rm -rf "$TMP"
+# A teammate's clone of a lite copy-in has no nonna.defaultMode, because .git/config is not cloned.
+# The repo carries the hooks and no rules, so it is lite, and the house rules ride along.
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; copy_in "$TMP"
+out="$(CLAUDE_PROJECT_DIR="$TMP" "$TMP/.claude/hooks/session-start.sh")"
+contains "lite clone: runs as lite" "Nonna is on (lite)" "$out"
+contains "lite clone: carries the house rules" "House rules" "$out"
 rm -rf "$TMP"
 # Standalone checkout: rules/ loads natively — carrying it again would double-pay.
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
@@ -1026,9 +1049,8 @@ out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"
 printf '%s' "$out" | grep -q "The three principles"; check "standalone: does NOT double-pay for the constitution" 1 "$?"
 rm -rf "$TMP"
 # Standalone checkout: the announced root must be the project's own .claude/.
-TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
-mkdir -p "$TMP/.claude/hooks"; cp "$HOOKS/require-status-sync.sh" "$TMP/.claude/hooks/"
-out="$(CLAUDE_PROJECT_DIR="$TMP" "$HOOKS/session-start.sh")"
+TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; copy_in "$TMP"
+out="$(CLAUDE_PROJECT_DIR="$TMP" "$TMP/.claude/hooks/session-start.sh")"
 contains "standalone: announces the project harness root" "$TMP/.claude" "$out"
 # One assertion, always executed: a branch that only sometimes runs makes the
 # derived suite count (harness_lint's ACTUAL_GATES) disagree with what the run
@@ -1176,16 +1198,16 @@ TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q
 mkdir -p "$TMP/docs" "$TMP/tests"; printf 'S\n' > "$TMP/docs/STATUS.md"; printf '[project]\nname = "x"\n' > "$TMP/pyproject.toml"
 printf 'def f():\n    return 1\n' > "$TMP/app.py"; printf 'from app import f\n\ndef test_f():\n    assert f() == 1\n' > "$TMP/tests/test_app.py"
 "${GIT[@]}" -C "$TMP" add -A >/dev/null; "${GIT[@]}" -C "$TMP" commit -qm init
-mkdir -p "$TMP/.claude/hooks/lib"; cp "$HOOKS/lib/tests.sh" "$TMP/.claude/hooks/lib/"  # a copy-in install, untracked
+copy_in "$TMP"; CSD="$TMP/.claude/hooks/stop-dod.sh"  # a copy-in install, untracked
 printf 'def f():\n    return 2\n' > "$TMP/app.py"; printf 'S2\n' > "$TMP/docs/STATUS.md"
-out="$(printf '{"stop_hook_active":false}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+out="$(printf '{"stop_hook_active":false}' | CLAUDE_PROJECT_DIR="$TMP" "$CSD")"
 contains "stop: a red suite blocks the turn even with STATUS updated" '"decision":"block"' "$out"
 contains "stop: says the tests said no, in Nonna's voice" "the tests say no" "$out"
 contains "stop: names the command it ran" "pytest" "$out"
 out="$(printf '{"stop_hook_active":true}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"
 printf '%s' "$out" | grep -q '"decision"'; check "stop: a second stop after a red block goes through (no loop)" 1 "$?"
 printf 'def f():\n    return 1\n\n\ndef g():\n    return 3\n' > "$TMP/app.py"
-out="$(printf '{"stop_hook_active":false}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"
+out="$(printf '{"stop_hook_active":false}' | CLAUDE_PROJECT_DIR="$TMP" "$CSD")"
 printf '%s' "$out" | grep -q '"decision"'; check "stop: a green suite with STATUS updated ends freely" 1 "$?"
 out="$(printf '{}' | NONNA_TEST_CMD=false CLAUDE_PROJECT_DIR="$TMP" "$SD")"
 contains "stop: NONNA_TEST_CMD overrides detection" "the tests say no" "$out"
@@ -1271,6 +1293,10 @@ printf 'def f():\n    return 1\n' > "$TMP/app.py"; printf 'from app import f\n\n
 printf 'def f():\n    return 2\n' > "$TMP/app.py"; printf 'S2\n' > "$TMP/docs/STATUS.md"
 out="$(printf '{}' | CLAUDE_PROJECT_DIR="$TMP" "$SD")"
 printf '%s' "$out" | grep -q '"decision"'; check "stop: plugin install never auto-runs the repo's tests" 1 "$?"
+mkdir -p "$TMP/.claude/hooks/lib"; : > "$TMP/.claude/hooks/lib/tests.sh"
+out="$(printf '{}' | CLAUDE_PROJECT_DIR="$TMP" CLAUDE_PLUGIN_ROOT="$ROOT/.claude" "$SD")"
+printf '%s' "$out" | grep -q 'the tests say no'; check "stop: a repo cannot switch the plugin's detection on by shipping the copy-in marker" 1 "$?"
+rm -rf "$TMP/.claude"
 out="$(printf '{}' | NONNA_TEST_CMD='python3 -m pytest -q' CLAUDE_PROJECT_DIR="$TMP" "$SD")"
 contains "stop: plugin install runs the suite once NONNA_TEST_CMD opts in" "the tests say no" "$out"
 git -C "$TMP" config nonna.testCmd 'python3 -m pytest -q'
@@ -1289,23 +1315,24 @@ check "tests.sh: no timeout(1): a forking suite is cut off on time (124)" 124 "$
 check "tests.sh: no timeout(1): ...and within the budget, not after the child" 1 "$(( SECONDS - start < 4 ))"
 rm -rf "$NOTO"
 # Detection claims pytest only when pytest is there; a false red would block every push.
-TMP="$(mktemp -d)"; STUB="$(mktemp -d)"; mkdir -p "$TMP/tests" "$TMP/.claude/hooks/lib"; : > "$TMP/.claude/hooks/lib/tests.sh"
+TMP="$(mktemp -d)"; STUB="$(mktemp -d)"; mkdir -p "$TMP/tests"; copy_in "$TMP"
 printf 'def test_x():\n    pass\n' > "$TMP/tests/test_x.py"
 printf '#!/bin/sh\nexit 1\n' > "$STUB/python3"; chmod +x "$STUB/python3"
-got="$(cd "$TMP" && unset NONNA_TEST_CMD && . "$HOOKS/lib/tests.sh" && nonna_test_cmd)"; contains "tests.sh: detects pytest in a copy-in install" "pytest" "$got"
+got="$(cd "$TMP" && unset NONNA_TEST_CMD && . .claude/hooks/lib/tests.sh && nonna_test_cmd)"; contains "tests.sh: detects pytest in a copy-in install" "pytest" "$got"
+got="$(cd "$TMP" && unset NONNA_TEST_CMD && . "$HOOKS/lib/tests.sh" && nonna_test_cmd)"; check "tests.sh: the same repo, from a harness elsewhere (a plugin), detects nothing" "" "$got"
 # shellcheck disable=SC2031
-got="$(cd "$TMP" && unset NONNA_TEST_CMD && PATH="$STUB:$PATH" && . "$HOOKS/lib/tests.sh" && nonna_test_cmd)"; check "tests.sh: no pytest installed, no pytest command" 0 "${#got}"
+got="$(cd "$TMP" && unset NONNA_TEST_CMD && PATH="$STUB:$PATH" && . .claude/hooks/lib/tests.sh && nonna_test_cmd)"; check "tests.sh: no pytest installed, no pytest command" 0 "${#got}"
 rm -rf "$TMP" "$STUB"
 # The test command: NONNA_TEST_CMD > git config nonna.testCmd > detection (copy-in only); empty is off.
 TMP="$(mktemp -d)"; "${GIT[@]}" -C "$TMP" init -q; git -C "$TMP" config nonna.testCmd "make check"
 got="$(cd "$TMP" && unset NONNA_TEST_CMD && . "$HOOKS/lib/tests.sh" && nonna_test_cmd)"; check "tests.sh: reads the command recorded in git config" "make check" "$got"
-got="$(cd "$TMP" && export NONNA_TEST_CMD="pytest -x" && . "$HOOKS/lib/tests.sh" && nonna_test_cmd)"; check "tests.sh: NONNA_TEST_CMD beats git config" "pytest -x" "$got"
+got="$(cd "$TMP" && . "$HOOKS/lib/tests.sh" && NONNA_TEST_CMD="pytest -x" nonna_test_cmd)"; check "tests.sh: NONNA_TEST_CMD beats git config" "pytest -x" "$got"
 got="$(cd "$TMP" && . "$HOOKS/lib/tests.sh" && NONNA_TEST_CMD=true nonna_test_cmd git-hook)"; check "tests.sh: a git hook ignores NONNA_TEST_CMD" "make check" "$got"
 got="$(cd "$TMP" && export GIT_CONFIG_PARAMETERS="'nonna.testcmd'='true'" && . "$HOOKS/lib/tests.sh" && nonna_test_cmd git-hook)"
 check "tests.sh: nor a git -c flag's config" "make check" "$got"
-mkdir -p "$TMP/.claude/hooks/lib"; : > "$TMP/.claude/hooks/lib/tests.sh"; printf '{"scripts":{"test":"node t.js"}}\n' > "$TMP/package.json"
+copy_in "$TMP"; printf '{"scripts":{"test":"node t.js"}}\n' > "$TMP/package.json"
 git -C "$TMP" config nonna.testCmd ""
-got="$(cd "$TMP" && unset NONNA_TEST_CMD && . "$HOOKS/lib/tests.sh" && nonna_test_cmd)"; check "tests.sh: an empty git config command turns off even copy-in detection" "" "$got"
+got="$(cd "$TMP" && unset NONNA_TEST_CMD && . .claude/hooks/lib/tests.sh && nonna_test_cmd)"; check "tests.sh: an empty git config command turns off even copy-in detection" "" "$got"
 rm -rf "$TMP"
 
 rm -rf "$PYSTUB"; if [ -n "$OLD_PYTHONPATH" ]; then PYTHONPATH="$OLD_PYTHONPATH"; else unset PYTHONPATH; fi

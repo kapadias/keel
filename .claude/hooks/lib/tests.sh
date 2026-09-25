@@ -3,8 +3,8 @@
 #
 # nonna_test_cmd   prints the test command for the repo in the current directory, or nothing.
 #                  Precedence: NONNA_TEST_CMD (empty turns the gate off) > git config nonna.testCmd
-#                  (empty turns it off) > detection, in a copy-in install only (the repo carries
-#                  .claude/hooks/lib/tests.sh). A plugin install detects once, at session start, when
+#                  (empty turns it off) > detection, in a copy-in install only (the harness running
+#                  is the repo's own .claude/). A plugin install detects once, at session start, when
 #                  the plugin's run_tests option allows it (the default): session-start.sh records the
 #                  command in the repo's own git config, which is never committed and never cloned,
 #                  and says so. So the Stop hook and the git pre-push hook run one command, and the
@@ -32,7 +32,7 @@ nonna_test_cmd() { # [git-hook]: a git hook takes nothing from the environment (
     printf '%s' "$cfg"
     return 0
   fi
-  [ -f .claude/hooks/lib/tests.sh ] || return 0
+  nonna_copy_in || return 0 # only a repo's own harness detects; a plugin runs what was recorded
   nonna_detect_test_cmd
 }
 
