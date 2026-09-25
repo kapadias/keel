@@ -28,9 +28,15 @@ BEGIN { for (v = 32; v < 127; v++) ASCII = ASCII sprintf("%c", v) }
 function endword() {
   if (w == "" && !q) return
   k++; tok[k] = w; tq[k] = q; tpre[k] = (q ? pre : w); tsep[k] = ""; tsync[k] = sync
-  w = ""; q = 0; pre = ""
+  w = ""; q = 0; pre = ""; esc = 0
 }
 function sep(c) { k++; tok[k] = c; tsep[k] = c; tq[k] = 0; tsync[k] = sync }
+# A redirection: digits written right before it, unquoted and unescaped, are its file descriptor
+# (2>x) and print with it; with a space between (2 >x), or quoted, they are an argument.
+function redir(op) {
+  if (w ~ /^[0-9]+$/ && !q && !esc) { k++; tok[k] = w op; tsep[k] = op; tq[k] = 0; tsync[k] = sync; w = ""; pre = ""; return }
+  endword(); sep(op)
+}
 
 # At a double quote, s[i]: when "$(cat <<'D'<nl>…<nl>D<nl>)" follows, the body is left in hd and the
 # index of the closing quote is returned, else 0. The first line that begins with D must be exactly
@@ -101,15 +107,15 @@ function msgflag(t, kind) {
 
 END {
   gsub(/\$\{IFS\}|\$IFS/, " ", s)
-  n = length(s); state = 0; w = ""; q = 0; pre = ""; k = 0; sync = 1; cut = 0
+  n = length(s); state = 0; w = ""; q = 0; pre = ""; esc = 0; k = 0; sync = 1; cut = 0
   for (i = 1; i <= n; i++) {
     c = substr(s, i, 1); nx = substr(s, i + 1, 1)
     if (state == 0) {
       # $( ` ${ $[ <( >( and << open what this reading does not follow: from here on its quoting may
       # part from the shell's, so nothing more is masked.
       if ((c == "$" && (nx == "(" || nx == "[" || (nx == "{" && !plainparam(i)))) || c == "`" || ((c == "<" || c == ">") && nx == "(") || (c == "<" && nx == "<")) sync = 0
-      if (c == "\\") { i++; if (nx != "\n") w = w nx }
-      else if ((c == ">" || c == "<") && (nx == "|" || nx == "&" || (c == "<" && nx == ">"))) { endword(); sep(c == "<" && nx == ">" ? ">" : c); i++ } # >| >& <& <>: one redirection
+      if (c == "\\") { i++; if (nx != "\n") { w = w nx; esc = 1 } }
+      else if ((c == ">" || c == "<") && (nx == "|" || nx == "&" || (c == "<" && nx == ">"))) { redir(c == "<" && nx == ">" ? ">" : c); i++ } # >| >& <& <>: one redirection
       else if (c == "&" && nx == ">") { endword(); sep(">"); i++ } # &> and &>>: a redirection, not a separator
       else if (c == "'") { if (!q) pre = w; q = 1; state = 1 }
       else if (c == "\"") {
@@ -121,7 +127,8 @@ END {
       else if (c == "$" && nx == "\"") { if (!q) pre = w; q = 1; state = 2; i++ }
       else if (c == "#" && w == "" && !q) { while (i < n && substr(s, i + 1, 1) != "\n") i++ }
       else if (c == " " || c == "\t") endword()
-      else if (c ~ /[;&|()`<>\n]/) { endword(); sep(c) }
+      else if (c == "<" || c == ">") redir(c)
+      else if (c ~ /[;&|()`\n]/) { endword(); sep(c) }
       else w = w c
     } else if (state == 1) {
       if (c == "'") state = 0; else w = w c
@@ -186,7 +193,7 @@ END {
   line = ""
   for (j = 1; j <= k; j++) {
     if (tsep[j] != "") {
-      if (tsep[j] ~ /[<>]/) line = line " " tsep[j]
+      if (tsep[j] ~ /[<>]/) line = line " " tok[j]
       else { print line; line = "" }
       continue
     }

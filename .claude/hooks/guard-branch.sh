@@ -128,18 +128,17 @@ case "$tool" in
       kitchen_door "refusing an include, alias, hooks path or forced refspec on the command line; the git hooks are the gate."
     fi
 
-    # git config: a read is fine: --get*, --list or -l among the options before the key (git refuses a
-    # second action beside them), the get/list subcommand, or one key (it has a dot) with nothing
-    # after it and only read-safe options before it. Every word after the key is a value to git, an
-    # empty one ('') or one that looks like an option included, and git takes an abbreviated action
-    # (--rem). A write to her keys, or to one that reroutes git, is refused in any command.
-    COPT='[[:space:]]+-([^-[:space:]]|-[^[:space:]])[^[:space:]]*' # an option, not --
+    # git config: a read is fine: --get*, --list, -l, the get/list subcommand, or one key (it has a
+    # dot) with nothing after it, each after read-safe options only (git 2.45's --comment takes the
+    # next word as its value, so a read flag after it is a comment). Every word after the key is a
+    # value to git, an empty one ('') or one that looks like an option included, and git takes an
+    # abbreviated action (--rem). A write to her keys, or to one that reroutes git, is refused.
     ROPT='[[:space:]]+(--(local|global|system|worktree|show-origin|show-scope|includes|no-includes|null|name-only|bool|int|bool-or-int|path|expiry-date)|-z|--type=[a-z-]+|--(file|blob)=[^[:space:]]+|(-f|--file|--blob|--type)[[:space:]]+[^-[:space:]][^[:space:]]*)'
     while IFS= read -r seg; do
       printf '%s' "$seg" | grep -qE "${GIT}config([[:space:]]|$)" || continue
-      printf '%s' "$seg" | grep -qE "${GIT}config(${COPT})*[[:space:]]+(--get[a-z-]*|--list|-l)([[:space:]=]|$)" && continue
-      printf '%s' "$seg" | grep -qE "${GIT}config(${COPT})*[[:space:]]+(get|list)([[:space:]]|$)" && continue
-      printf '%s' "$seg" | sed -E 's/[[:space:]]+[0-9]*[[:space:]]*[<>]+[[:space:]]*[^[:space:]]*//g' \
+      printf '%s' "$seg" | grep -qE "${GIT}config(${ROPT})*[[:space:]]+(--get[a-z-]*|--list|-l)([[:space:]=]|$)" && continue
+      printf '%s' "$seg" | grep -qE "${GIT}config(${ROPT})*[[:space:]]+(get|list)([[:space:]]|$)" && continue
+      printf '%s' "$seg" | sed -E 's/[[:space:]]+[0-9]*[<>]+([[:space:]]+[<>]+)*[[:space:]]*[^[:space:]<>]*//g' \
         | grep -qE "${GIT}config(${ROPT})*[[:space:]]+[^-[:space:]'][^[:space:]]*\.[^[:space:]]*[[:space:]]*$" && continue
       printf '%s' "$seg" | grep -qiE "(^|[[:space:]])${NKEY}" && recipe "refusing to change Nonna's own git config."
       if printf '%s' "$seg" | grep -qiE "(^|[[:space:]])(${RKEY}|(-e|--edit|edit)([[:space:]]|$))"; then
@@ -155,7 +154,7 @@ case "$tool" in
       || printf '%s\n' "$segs" | grep -E "$GITF" \
       | grep -qE '(^|[[:space:]])(rm|unlink|chmod|chown|truncate|touch|shred|patch|ed|ex|vi|vim|nano|emacs|python3?|ruby|node|perl|tee|dd)([[:space:]]|$)|(^|[[:space:]])(sed|awk|gawk)[[:space:]](.*[[:space:]])?(-[A-Za-z]*i|--in-place)' \
       || printf '%s\n' "$segs" | grep -E '(^|[[:space:]])(cp|mv|ln|install|rsync)[[:space:]]' \
-      | sed -E 's/[[:space:]]+[0-9]*[[:space:]]*[<>]+[[:space:]]*[^[:space:]]*//g' \
+      | sed -E 's/[[:space:]]+[0-9]*[<>]+([[:space:]]+[<>]+)*[[:space:]]*[^[:space:]<>]*//g' \
       | grep -qE '(^|[^A-Za-z0-9_.-])\.git/(hooks(/[^[:space:]]*)?|config)[[:space:]]*$|(^|[[:space:]])(-[A-Za-z]*t[[:space:]]*|--ta[a-z-]*[=[:space:]]+)[^[:space:]]*\.git/(hooks|config)'; then
       recipe "refusing to change .git/config or .git/hooks by hand."
     fi

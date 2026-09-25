@@ -303,6 +303,14 @@ check "blocks a hooks path that looks like an option" 2 "$(gb 'git config core.h
 check "blocks an abbreviated --remove-section" 2 "$(gb 'git config --rem nonna')"
 check "blocks --remove-sec" 2 "$(gb 'git config --remove-sec nonna')"
 check "blocks git config edit" 2 "$(gb 'git config edit')"
+# An option that takes a value (git 2.45's --comment) takes the read flag as its value, and a digit
+# with a space before > is an argument, not a file descriptor: both leave a write.
+check "blocks --comment taking --get as its value" 2 "$(gb 'git config --comment --get nonna.mode off')"
+check "blocks --comment taking get as its value" 2 "$(gb 'git config --comment get nonna.mode off')"
+check "blocks --comment taking -l as its value" 2 "$(gb 'git config --comment -l core.hooksPath /dev/null')"
+check "blocks a hooks path set to 2 before a redirection" 2 "$(gb 'git config core.hooksPath 2 >/dev/null')"
+check "blocks a hooks path set to 0 before a redirection" 2 "$(gb 'git config core.hooksPath 0 </dev/null')"
+check "allows a read with stderr redirected" 0 "$(gb 'git config core.hooksPath 2>/dev/null')"
 # &> and &>> are one redirection: the flags after them are still the push's.
 check "blocks a force flag after &>" 2 "$(gb 'git push &>/dev/null --force origin feature/x')"
 check "blocks a protected target after &>" 2 "$(gb 'git push origin &>/dev/null main')"
