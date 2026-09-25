@@ -138,6 +138,11 @@ History lives in `CHANGELOG.md` and `git log`. Entries here describe the current
   commit; it had let the first commit onto a new, empty `main` through. And a git hook link is hers
   only when it leads to her own script. A user's own `scripts/pre-commit.sh` link had been taken
   for hers, which left her gate off without a word. 859 tests.
+  Eleventh review round, three findings, all fixed. A tag named `main` made the branch read as
+  `heads/main`, so the guard and the pre-commit hook let a commit onto `main` through; both now
+  read the full ref. Her plugin paths are anchored to the plugins directory Claude Code uses, so a
+  link merely shaped like hers is not hers. And a user's hook chains hers only when it names her
+  script's path, not a file that merely shares its name. 864 tests.
 
 - **2026-09-25** — 2.0 packaging, the first unit of the launch plan (#17). Both manifests say 2.0.0;
   the plugin shows as "Nonna" and declares two install options, `run_tests` and `mode`. The hooks

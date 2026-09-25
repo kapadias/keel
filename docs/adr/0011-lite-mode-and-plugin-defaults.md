@@ -111,10 +111,12 @@ lighter mode to select". A plugin user's first day is that use.
    sources its own library and links the git hooks to its own scripts, through
    `${CLAUDE_PLUGIN_DATA}/current`, which each session points at the running version so the hooks
    survive updates.
-   - A dangling link of Nonna's (or Keel's) is repaired.
+   - A dangling link of Nonna's (or Keel's) is repaired. Hers means the link she would make now,
+     one into her cache or data in the plugins directory Claude Code uses, or a copy-in's
+     `../../.claude/hooks/<script>`; a path merely shaped like hers is not.
    - A foreign hook is never overwritten, and neither is a hook manager's directory.
-   - A hook that points at nothing is reported. So is a foreign hook, a hook manager, and any gate
-     that could not be wired.
+   - A hook that points at nothing is reported. So is a hook manager, any gate that could not be
+     wired, and a foreign hook, unless it chains hers by naming her script's path.
 9. **The guards live in hooks.** The branch guard refuses force pushes, `--no-verify` and hook-path
    overrides. The secret guard refuses reads and searches (Read, Grep) of secret files by any name
    that leads to one: case-folded, with symlinks followed. It is linted against `settings.json`'s
