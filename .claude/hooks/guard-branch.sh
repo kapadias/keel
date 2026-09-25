@@ -98,19 +98,23 @@ case "$tool" in
 
     # What her gates read is the user's to set: an environment variable can switch a git hook off
     # or swap its test command, GIT_CONFIG_* and a borrowed HOME can hand git a config of their own.
-    # Only a way of setting one counts, at the start of a command (after { ! if then do else elif
-    # while until time eval coproc, or after sh -c and its kind, whose text B puts on the same line):
-    # an assignment, a name given to export, declare and the like (with or without a value), env or
-    # sudo, printf -v or read; or anywhere, an assignment right before git. A grep for the name, or an
-    # echo of it, sets nothing.
+    # Only a way of setting one counts. One that carries a value counts wherever it stands: a name=
+    # given to export, declare and the like, or to env or sudo (behind builtin, command, nice,
+    # timeout, a redirection or a trap string alike), and an assignment right before git. A bare
+    # assignment, and a name given without a value (export NAME, read NAME, printf -v NAME), count at
+    # the start of a command: after { ! if then do else elif while until time eval coproc, builtin,
+    # command, other assignments, redirections, or sh -c and its kind (whose text B puts on the same
+    # line). A grep for the name, or an echo of it, sets nothing.
     ASSIGN='[A-Za-z_][A-Za-z0-9_]*\+?=[^[:space:]]*'
-    KW='(\{|!|if|then|do|else|elif|while|until|time([[:space:]]+-p)?|eval|coproc|[^[:space:]]*(sh|bash|zsh|dash|ksh)([[:space:]]+-[A-Za-z]+)*[[:space:]]+-[A-Za-z]*c)'
-    AT="^[[:space:]]*(${KW}[[:space:]]+)*(${ASSIGN}[[:space:]]+)*"
+    KW='(\{|!|if|then|do|else|elif|while|until|time([[:space:]]+-p)?|eval|coproc|builtin|command([[:space:]]+-[A-Za-z]+)*|[^[:space:]]*(sh|bash|zsh|dash|ksh)([[:space:]]+-[A-Za-z]+)*[[:space:]]+-[A-Za-z]*c)'
+    AT="^[[:space:]]*((${KW}|${ASSIGN}|[0-9]*[<>]+[[:space:]]*[^[:space:]]+)[[:space:]]+)*"
+    DECL='(export|declare|typeset|readonly|local)([[:space:]]+-[A-Za-z]+)*'
     assigns() { # <name regex>
       printf '%s\n' "$segs" | grep -qE \
         -e "${AT}$1\+?=" \
-        -e "${AT}(export|declare|typeset|readonly|local)([[:space:]]+-[A-Za-z]+)*([[:space:]]+[A-Za-z_][A-Za-z0-9_]*(\+?=[^[:space:]]*)?)*[[:space:]]+$1(\+?=|[[:space:]]|$)" \
-        -e "${AT}(env|sudo)[[:space:]](.*[[:space:]])?$1\+?=" \
+        -e "(^|[[:space:]])${DECL}([[:space:]]+${ASSIGN})*[[:space:]]+$1\+?=" \
+        -e "(^|[[:space:]])(env|sudo)[[:space:]](.*[[:space:]])?$1\+?=" \
+        -e "${AT}${DECL}([[:space:]]+[A-Za-z_][A-Za-z0-9_]*(\+?=[^[:space:]]*)?)*[[:space:]]+$1([[:space:]]|$)" \
         -e "${AT}printf[[:space:]]+(-[^[:space:]]+[[:space:]]+)*-v[[:space:]]*$1([[:space:]]|$)" \
         -e "${AT}(read|readarray|mapfile)[[:space:]](.*[[:space:]])?$1([[:space:]]|$)" \
         -e "(^|[^A-Za-z0-9_])$1\+?=[^[:space:]]*[[:space:]]+(${ASSIGN}[[:space:]]+)*([^[:space:]]*/)?git([[:space:]]|$)"
